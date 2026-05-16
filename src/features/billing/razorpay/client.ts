@@ -1,0 +1,241 @@
+import "server-only";
+
+/**
+ * Minimal Razorpay REST client.
+ *
+ * We use the HTTP API directly instead of the `razorpay` Node SDK to:
+ *   - Keep the dependency footprint small.
+ *   - Stay edge-runtime compatible (no Node-only crypto deps at import).
+ *   - Let TypeScript describe only the fields we actually consume.
+ *
+ * All endpoints used here are documented at:
+ *   https://razorpay.com/docs/api/payments/server-integration/
+ */
+
+import { requireServerEnv } from "@/config/env";
+
+const BASE_URL = "https://api.razorpay.com/v1";
+
+// --- Razorpay payload shapes (subset) --------------------------------------
+
+export type RazorpaySubscriptionStatus =
+  | "created"
+  | "authenticated"
+  | "active"
+  | "pending"
+  | "halted"
+  | "cancelled"
+  | "completed"
+  | "expired"
+  | "paused";
+
+export interface RazorpaySubscription {
+  id: string;
+  entity: "subscription";
+  plan_id: string;
+  customer_id?: string;
+  status: RazorpaySubscriptionStatus;
+  current_start: number | null;
+  current_end: number | null;
+  ended_at: number | null;
+  charge_at: number | null;
+  start_at: number | null;
+  end_at: number | null;
+  total_count: number;
+  paid_count: number;
+  remaining_count: number;
+  short_url: string | null;
+  notes: Record<string, string> | null;
+  created_at: number;
+}
+
+export interface RazorpayPayment {
+  id: string;
+  entity: "payment";
+  amount: number;
+  currency: string;
+  status: "created" | "authorized" | "captured" | "refunded" | "failed";
+  order_id: string | null;
+  invoice_id: string | null;
+  international: boolean;
+  method: string;
+  description: string | null;
+  card_id?: string;
+  card?: { last4?: string; network?: string } | null;
+  bank?: string | null;
+  wallet?: string | null;
+  vpa?: string | null;
+  email?: string | null;
+  contact?: string | null;
+  notes?: Record<string, string> | null;
+  fee?: number | null;
+  tax?: number | null;
+  error_code: string | null;
+  error_description: string | null;
+  created_at: number;
+}
+
+export interface RazorpayInvoice {
+  id: string;
+  entity: "invoice";
+  short_url: string | null;
+  status: string;
+  amount: number;
+  amount_paid: number;
+  currency: string;
+  customer_id?: string | null;
+  subscription_id?: string | null;
+  payment_id?: string | null;
+  receipt?: string | null;
+  date?: number;
+  created_at: number;
+}
+
+export interface RazorpayCustomer {
+  id: string;
+  entity: "customer";
+  name?: string | null;
+  email?: string | null;
+  contact?: string | null;
+  notes?: Record<string, string> | null;
+  created_at: number;
+}
+
+// --- Internal HTTP helper --------------------------------------------------
+
+async function rzpFetch<T>(
+  path: string,
+  init?: { method?: string; body?: unknown },
+): Promise<T> {
+  const env = requireServerEnv();
+  if (!env.razorpayKeyId || !env.razorpayKeySecret) {
+    throw new Error(
+      "[billing] Razorpay keys not configured. Set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET.",
+    );
+  }
+  const auth = Buffer.from(
+    `${env.razorpayKeyId}:${env.razorpayKeySecret}`,
+  ).toString("base64");
+
+  const headers: Record<string, string> = {
+    Authorization: `Basic ${auth}`,
+    Accept: "application/json",
+  };
+  let body: BodyInit | undefined;
+  if (init?.body !== undefined) {
+    headers["Content-Type"] = "application/json";
+    body = JSON.stringify(init.body);
+  }
+
+  const res = await fetch(`${BASE_URL}${path}`, {
+    method: init?.method ?? "GET",
+    headers,
+    body,
+    cache: "no-store",
+  });
+
+  const text = await res.text();
+  let json: unknown = null;
+  try {
+    json = text ? JSON.parse(text) : null;
+  } catch {
+    /* fall through */
+  }
+
+  if (!res.ok) {
+    const description =
+      json &&
+      typeof json === "object" &&
+      "error" in json &&
+      (json as { error?: { description?: string } }).error?.description;
+    const message =
+      typeof description === "string" && description.length > 0
+        ? description
+        : `Razorpay ${res.status} on ${path}`;
+    throw new RazorpayApiError(message, res.status, json);
+  }
+  return json as T;
+}
+
+export class RazorpayApiError extends Error {
+  status: number;
+  body: unknown;
+  constructor(message: string, status: number, body: unknown) {
+    super(message);
+    this.name = "RazorpayApiError";
+    this.status = status;
+    this.body = body;
+  }
+}
+
+// --- High-level API methods ------------------------------------------------
+
+export async function createCustomer(input: {
+  name: string;
+  email: string;
+  contact?: string;
+  notes?: Record<string, string>;
+}): Promise<RazorpayCustomer> {
+  return rzpFetch<RazorpayCustomer>("/customers", {
+    method: "POST",
+    body: {
+      name: input.name,
+      email: input.email,
+      contact: input.contact,
+      notes: input.notes,
+      // Razorpay treats duplicate customers (same contact/email) as an error
+      // unless we set fail_existing=0, in which case it returns the existing one.
+      fail_existing: 0,
+    },
+  });
+}
+
+export async function fetchCustomer(id: string): Promise<RazorpayCustomer> {
+  return rzpFetch<RazorpayCustomer>(`/customers/${id}`);
+}
+
+export async function createSubscription(input: {
+  planId: string;
+  customerId?: string;
+  totalCount?: number;
+  customerNotify?: 0 | 1;
+  notes?: Record<string, string>;
+}): Promise<RazorpaySubscription> {
+  return rzpFetch<RazorpaySubscription>("/subscriptions", {
+    method: "POST",
+    body: {
+      plan_id: input.planId,
+      // 12 months default for monthly plans, 5 years for yearly. The user
+      // can cancel any time before that. Use a high cap to behave like an
+      // open-ended subscription.
+      total_count: input.totalCount ?? 120,
+      customer_notify: input.customerNotify ?? 1,
+      customer_id: input.customerId,
+      notes: input.notes,
+    },
+  });
+}
+
+export async function fetchSubscription(
+  id: string,
+): Promise<RazorpaySubscription> {
+  return rzpFetch<RazorpaySubscription>(`/subscriptions/${id}`);
+}
+
+export async function cancelSubscription(
+  id: string,
+  cancelAtCycleEnd: boolean,
+): Promise<RazorpaySubscription> {
+  return rzpFetch<RazorpaySubscription>(`/subscriptions/${id}/cancel`, {
+    method: "POST",
+    body: { cancel_at_cycle_end: cancelAtCycleEnd ? 1 : 0 },
+  });
+}
+
+export async function fetchPayment(id: string): Promise<RazorpayPayment> {
+  return rzpFetch<RazorpayPayment>(`/payments/${id}`);
+}
+
+export async function fetchInvoice(id: string): Promise<RazorpayInvoice> {
+  return rzpFetch<RazorpayInvoice>(`/invoices/${id}`);
+}

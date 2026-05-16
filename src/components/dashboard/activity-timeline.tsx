@@ -1,0 +1,105 @@
+import * as React from "react";
+import {
+  Check,
+  FileText,
+  AlertTriangle,
+  UserPlus,
+  FileSignature,
+  Clock,
+  Activity as ActivityIcon,
+  Bell,
+  type LucideIcon,
+} from "lucide-react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { EmptyState } from "@/components/shared/empty-state";
+import type { ActivityRecord } from "@/features/activity/server";
+import { formatRelativeTime } from "@/lib/format";
+import { cn } from "@/lib/utils";
+
+interface KindMeta {
+  icon: LucideIcon;
+  tone: string;
+}
+
+/**
+ * Map the activity `kind` string (stored in the DB) to an icon + colour.
+ * Unknown kinds get a neutral "activity" icon so new kinds added later
+ * don't crash the UI.
+ */
+function kindMeta(kind: string): KindMeta {
+  if (kind.startsWith("invoice_paid")) return { icon: Check, tone: "bg-emerald-500/10 text-emerald-600 ring-emerald-500/20 dark:text-emerald-400" };
+  if (kind.startsWith("invoice_reminder")) return { icon: Bell, tone: "bg-amber-500/10 text-amber-600 ring-amber-500/20 dark:text-amber-400" };
+  if (kind.startsWith("invoice_overdue")) return { icon: AlertTriangle, tone: "bg-destructive/10 text-destructive ring-destructive/20" };
+  if (kind.startsWith("invoice")) return { icon: FileText, tone: "bg-primary/10 text-primary ring-primary/20" };
+  if (kind.startsWith("client")) return { icon: UserPlus, tone: "bg-primary/10 text-primary ring-primary/20" };
+  if (kind.startsWith("contract") || kind.startsWith("proposal"))
+    return { icon: FileSignature, tone: "bg-violet-500/10 text-violet-600 ring-violet-500/20 dark:text-violet-400" };
+  if (kind.startsWith("time") || kind.startsWith("timer"))
+    return { icon: Clock, tone: "bg-muted text-muted-foreground ring-border" };
+  return { icon: ActivityIcon, tone: "bg-muted text-muted-foreground ring-border" };
+}
+
+export function ActivityTimeline({ items }: { items: ActivityRecord[] }) {
+  return (
+    <Card className="flex h-full flex-col">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base font-bold tracking-tight">Activity</CardTitle>
+        <CardDescription className="text-xs">
+          What&apos;s happening in your workspace
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="flex-1">
+        {items.length === 0 ? (
+          <EmptyState
+            icon={ActivityIcon}
+            title="No activity yet"
+            description="Activity from invoices, clients, contracts, and time entries will show up here."
+          />
+        ) : (
+          <ol className="relative space-y-5">
+            {/* Vertical guideline */}
+            <span
+              className="absolute left-[14px] top-2 h-[calc(100%-1rem)] w-px bg-border"
+              aria-hidden
+            />
+            {items.map((item) => {
+              const meta = kindMeta(item.kind);
+              const Icon = meta.icon;
+              return (
+                <li key={item.id} className="relative flex gap-3">
+                  <span
+                    className={cn(
+                      "relative z-10 flex h-7 w-7 shrink-0 items-center justify-center rounded-full ring-1 ring-inset shadow-sm",
+                      meta.tone,
+                    )}
+                  >
+                    <Icon className="h-3.5 w-3.5" />
+                  </span>
+                  <div className="min-w-0 flex-1 pb-1">
+                    <p className="text-sm font-semibold leading-tight">
+                      {item.title}
+                    </p>
+                    {item.message && (
+                      <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                        {item.message}
+                      </p>
+                    )}
+                    <p className="mt-1 text-[11px] text-muted-foreground/80">
+                      {formatRelativeTime(item.createdAt)}
+                    </p>
+                  </div>
+                </li>
+              );
+            })}
+          </ol>
+        )}
+      </CardContent>
+    </Card>
+  );
+}

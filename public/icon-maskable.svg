@@ -1,0 +1,18 @@
+<!--
+  Maskable variant: keeps the brand mark inside the safe zone (40% inner radius)
+  so platform-specific masks (circle, squircle, rounded square) don't crop the
+  glyph. Background fills the full canvas.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#6366F1"/>
+      <stop offset="100%" stop-color="#4338CA"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#g)"/>
+  <g transform="translate(64,64) scale(0.75)">
+    <path d="M306 132 L188 280 H260 L206 380 L324 232 H252 Z"
+          fill="#FFFFFF" stroke="#FFFFFF" stroke-width="6" stroke-linejoin="round"/>
+  </g>
+</svg>

@@ -1,0 +1,2 @@
+# Feature modules (auth, invoices, clients, projects, contracts, portal, pulse, time)
+# Each feature houses its hooks, components, schemas, and services co-located.

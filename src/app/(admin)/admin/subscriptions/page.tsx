@@ -1,0 +1,296 @@
+/**
+ * /admin/subscriptions — list view.
+ *
+ * Status tabs (Active / Trialing / Past due / Cancelled) with counts
+ * resolved in parallel. Click into a row to inspect billing_events +
+ * payments timeline, comp/refund/cancel.
+ */
+
+import Link from "next/link";
+import { listSubscriptions } from "@/features/admin/queries";
+import { AdminPageHeader } from "@/components/admin/page-header";
+import {
+  formatIstStamp,
+  formatRelative,
+} from "@/features/admin/format";
+import { cn } from "@/lib/utils";
+
+export const dynamic = "force-dynamic";
+
+interface Props {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}
+
+const PAGE_SIZE = 25;
+const TABS = ["active", "trialing", "past_due", "canceled", "all"] as const;
+type Tab = (typeof TABS)[number];
+
+export default async function AdminSubscriptionsPage({ searchParams }: Props) {
+  const sp = await searchParams;
+  const status = parseTab(asString(sp.status)) ?? "active";
+  const page = Math.max(parseInt(asString(sp.page) ?? "1", 10) || 1, 1);
+
+  const result = await listSubscriptions({
+    status: status === "all" ? "all" : status,
+    page,
+    pageSize: PAGE_SIZE,
+  });
+  const totalPages = Math.max(1, Math.ceil(result.total / PAGE_SIZE));
+
+  return (
+    <div className="space-y-5">
+      <AdminPageHeader
+        title="Subscriptions"
+        subtitle={
+          <span>
+            {result.total.toLocaleString("en-IN")} in this tab · page {page} /{" "}
+            {totalPages}
+          </span>
+        }
+      />
+
+      <div className="flex flex-wrap gap-1.5 border-b border-border/60 pb-1">
+        {TABS.map((t) => {
+          const label = TAB_LABELS[t];
+          const count =
+            t === "all"
+              ? result.counts.active +
+                result.counts.trialing +
+                result.counts.past_due +
+                result.counts.canceled
+              : result.counts[t];
+          const active = t === status;
+          return (
+            <Link
+              key={t}
+              href={`/admin/subscriptions?status=${t}`}
+              className={cn(
+                "flex items-center gap-1.5 rounded px-2.5 py-1 text-xs font-medium transition-colors",
+                active
+                  ? "bg-accent text-foreground"
+                  : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
+              )}
+            >
+              {label}
+              <span
+                className={cn(
+                  "rounded bg-muted px-1.5 text-[10px] tabular-nums",
+                  active
+                    ? "bg-foreground/10 text-foreground"
+                    : "text-muted-foreground",
+                )}
+              >
+                {count.toLocaleString("en-IN")}
+              </span>
+            </Link>
+          );
+        })}
+      </div>
+
+      {/* Mobile cards */}
+      <ul className="space-y-2 md:hidden">
+        {result.rows.map((row) => (
+          <li
+            key={row.id}
+            className="rounded-md border bg-card p-3 text-sm"
+          >
+            <Link
+              href={`/admin/subscriptions/${row.id}`}
+              className="space-y-0.5"
+            >
+              <div className="flex items-baseline justify-between">
+                <span className="font-medium">{row.full_name}</span>
+                <span className="text-[11px] text-muted-foreground">
+                  {formatRelative(row.updated_at)}
+                </span>
+              </div>
+              <div className="truncate text-xs text-muted-foreground">
+                {row.email}
+              </div>
+              <div className="mt-1.5 flex items-center gap-2 text-[11px]">
+                <PlanTag plan={row.plan} />
+                <StatusBadge status={row.status} />
+                {row.razorpay_subscription_id ? (
+                  <span className="rounded bg-muted px-1.5 py-0.5 text-muted-foreground">
+                    razorpay
+                  </span>
+                ) : null}
+              </div>
+            </Link>
+          </li>
+        ))}
+      </ul>
+
+      {/* Desktop table */}
+      <div className="hidden overflow-hidden rounded-md border bg-card md:block">
+        <table className="w-full text-sm">
+          <thead className="bg-muted/40 text-left text-[11px] uppercase tracking-wider text-muted-foreground">
+            <tr>
+              <th className="px-3 py-2 font-medium">User</th>
+              <th className="px-3 py-2 font-medium">Plan</th>
+              <th className="px-3 py-2 font-medium">Status</th>
+              <th className="px-3 py-2 font-medium">Cycle</th>
+              <th className="px-3 py-2 font-medium tabular-nums">Period end</th>
+              <th className="px-3 py-2 font-medium">Source</th>
+              <th className="px-3 py-2 font-medium tabular-nums">Updated</th>
+            </tr>
+          </thead>
+          <tbody>
+            {result.rows.length === 0 ? (
+              <tr>
+                <td
+                  colSpan={7}
+                  className="px-3 py-8 text-center text-xs text-muted-foreground"
+                >
+                  No subscriptions in this tab.
+                </td>
+              </tr>
+            ) : (
+              result.rows.map((row) => (
+                <tr
+                  key={row.id}
+                  className="border-t border-border/40 hover:bg-accent/30"
+                >
+                  <td className="px-3 py-2">
+                    <Link
+                      href={`/admin/subscriptions/${row.id}`}
+                      className="block leading-tight"
+                    >
+                      <div className="font-medium">{row.full_name}</div>
+                      <div className="truncate text-[11px] text-muted-foreground">
+                        {row.email}
+                      </div>
+                    </Link>
+                  </td>
+                  <td className="px-3 py-2">
+                    <PlanTag plan={row.plan} />
+                  </td>
+                  <td className="px-3 py-2">
+                    <StatusBadge status={row.status} />
+                  </td>
+                  <td className="px-3 py-2 text-xs text-muted-foreground">
+                    {row.billing_cycle}
+                  </td>
+                  <td className="px-3 py-2 font-mono text-[11px] tabular-nums text-muted-foreground">
+                    {formatIstStamp(row.current_period_end)}
+                  </td>
+                  <td className="px-3 py-2 text-xs text-muted-foreground">
+                    {row.razorpay_subscription_id ? "razorpay" : "manual"}
+                  </td>
+                  <td className="px-3 py-2 font-mono text-[11px] tabular-nums text-muted-foreground">
+                    {formatRelative(row.updated_at)}
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {totalPages > 1 ? (
+        <nav className="flex items-center justify-between text-xs">
+          <PageLink page={Math.max(1, page - 1)} status={status} disabled={page === 1}>
+            ← Prev
+          </PageLink>
+          <span className="text-muted-foreground tabular-nums">
+            Page {page} / {totalPages}
+          </span>
+          <PageLink
+            page={Math.min(totalPages, page + 1)}
+            status={status}
+            disabled={page === totalPages}
+          >
+            Next →
+          </PageLink>
+        </nav>
+      ) : null}
+
+      <p className="text-[11px] text-muted-foreground">
+        Showing most recent updates first. Manual ops (comp / refund /
+        cancel) live in the detail page.
+      </p>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+
+const TAB_LABELS: Record<Tab, string> = {
+  active: "Active",
+  trialing: "Trialing",
+  past_due: "Past due",
+  canceled: "Cancelled",
+  all: "All",
+};
+
+function PlanTag({ plan }: { plan: string }) {
+  const tone =
+    plan === "business"
+      ? "bg-violet-500/10 text-violet-700 dark:text-violet-400"
+      : plan === "pro"
+        ? "bg-sky-500/10 text-sky-700 dark:text-sky-400"
+        : "bg-muted text-muted-foreground";
+  return (
+    <span
+      className={cn(
+        "inline-block rounded px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider",
+        tone,
+      )}
+    >
+      {plan}
+    </span>
+  );
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const tone =
+    status === "active" || status === "trialing"
+      ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+      : status === "past_due"
+        ? "bg-red-500/10 text-red-700 dark:text-red-400"
+        : "bg-muted text-muted-foreground";
+  return (
+    <span
+      className={cn(
+        "inline-block rounded px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider",
+        tone,
+      )}
+    >
+      {status}
+    </span>
+  );
+}
+
+function PageLink({
+  page,
+  status,
+  disabled,
+  children,
+}: {
+  page: number;
+  status: Tab;
+  disabled: boolean;
+  children: React.ReactNode;
+}) {
+  if (disabled) {
+    return (
+      <span className="rounded border px-2 py-1 opacity-40">{children}</span>
+    );
+  }
+  return (
+    <Link
+      href={`/admin/subscriptions?status=${status}&page=${page}`}
+      className="rounded border px-2 py-1 hover:bg-accent"
+    >
+      {children}
+    </Link>
+  );
+}
+
+function asString(v: unknown): string | undefined {
+  return typeof v === "string" ? v : undefined;
+}
+
+function parseTab(v: string | undefined): Tab | undefined {
+  return (TABS as readonly string[]).includes(v ?? "") ? (v as Tab) : undefined;
+}

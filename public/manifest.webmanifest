@@ -1,0 +1,67 @@
+{
+  "name": "Stackivo — Operating System for Independents",
+  "short_name": "Stackivo",
+  "description": "Clients, invoices, contracts, projects, payments, time, and analytics — unified in one premium workspace with GST-ready billing for India.",
+  "start_url": "/dashboard",
+  "scope": "/",
+  "id": "/?source=pwa",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "portrait-primary",
+  "background_color": "#0a1020",
+  "theme_color": "#0a1020",
+  "lang": "en-IN",
+  "dir": "ltr",
+  "categories": ["business", "finance", "productivity"],
+  "prefer_related_applications": false,
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/apple-touch-icon.svg",
+      "sizes": "180x180",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "New invoice",
+      "short_name": "Invoice",
+      "description": "Create a new invoice",
+      "url": "/dashboard/invoices/new",
+      "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+    },
+    {
+      "name": "Clients",
+      "short_name": "Clients",
+      "description": "Open your client directory",
+      "url": "/dashboard/clients",
+      "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+    },
+    {
+      "name": "Pulse",
+      "short_name": "Pulse",
+      "description": "Revenue and business analytics",
+      "url": "/dashboard/pulse",
+      "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+    },
+    {
+      "name": "Time",
+      "short_name": "Time",
+      "description": "Track time on projects",
+      "url": "/dashboard/time",
+      "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+    }
+  ]
+}

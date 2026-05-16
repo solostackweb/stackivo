@@ -1,0 +1,130 @@
+/**
+ *   POST /api/portals/<portalId>/files/presign
+ *
+ * Mint a short-lived presigned PUT URL pointing at R2. The browser then
+ * uploads the file directly to R2 — Vercel function bandwidth is never
+ * touched.
+ *
+ * Authentication: Supabase session cookie. The portal-access guard
+ * checks the user is the owner OR an active member.
+ *
+ * Quotas: we hard-cap individual files at `R2_MAX_OBJECT_BYTES` and
+ * inspect the portal's storage usage against the freelancer's plan
+ * limit (`storage_bytes`). Enforced again on COMMIT — the presign step
+ * is a soft check, COMMIT is the hard one.
+ */
+
+import { NextResponse } from "next/server";
+import { z } from "zod";
+import {
+  presignPut,
+  buildPortalFileKey,
+  isR2Configured,
+  R2_MAX_OBJECT_BYTES,
+} from "@/lib/r2/client";
+import { getAdminSupabase } from "@/lib/supabase/admin";
+import {
+  PortalAccessError,
+  requirePortalAccess,
+} from "@/features/portals/server";
+import { requireFeature } from "@/features/subscription/server";
+import { limitFor } from "@/features/subscription/features";
+import crypto from "node:crypto";
+
+export const runtime = "nodejs";
+
+const inputSchema = z.object({
+  filename: z.string().trim().min(1).max(300),
+  mimeType: z.string().trim().min(1).max(255),
+  sizeBytes: z.number().int().min(1).max(R2_MAX_OBJECT_BYTES),
+});
+
+export async function POST(
+  req: Request,
+  ctx: { params: Promise<{ portalId: string }> },
+): Promise<Response> {
+  if (!isR2Configured()) {
+    return NextResponse.json(
+      { ok: false, error: "File storage is not configured." },
+      { status: 503 },
+    );
+  }
+
+  const { portalId } = await ctx.params;
+
+  // Plan + access guards. Order matters: feature first so a Free-plan user
+  // gets a "Upgrade to Pro" message rather than a 403 leak.
+  const sub = await requireFeature("clients.portal");
+
+  const access = await requirePortalAccess(portalId).catch(
+    (e) => e as PortalAccessError,
+  );
+  if (access instanceof PortalAccessError) {
+    return NextResponse.json(
+      { ok: false, error: access.code },
+      { status: access.code === "unauthenticated" ? 401 : 403 },
+    );
+  }
+
+  const body = (await req.json().catch(() => null)) as unknown;
+  const parsed = inputSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input." },
+      { status: 400 },
+    );
+  }
+
+  // Soft quota check — the COMMIT step re-checks against the actual
+  // uploaded size, so this is best-effort UX.
+  const cap = limitFor(sub, "storage_bytes");
+  if (Number.isFinite(cap)) {
+    const admin = getAdminSupabase();
+    const { data: usageRow } = await admin
+      .from("portal_storage_usage")
+      .select("total_bytes")
+      .eq("portal_id", portalId)
+      .maybeSingle();
+    const used = (usageRow as { total_bytes?: number } | null)?.total_bytes ?? 0;
+    if (used + parsed.data.sizeBytes > cap) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: `This upload would exceed your ${formatMb(cap)} portal storage quota. Free up space or upgrade your plan.`,
+        },
+        { status: 402 },
+      );
+    }
+  }
+
+  const fileId = crypto.randomUUID();
+  const key = buildPortalFileKey({
+    portalId,
+    fileId,
+    filename: parsed.data.filename,
+  });
+
+  const presigned = await presignPut({
+    key,
+    contentType: parsed.data.mimeType,
+    contentLength: parsed.data.sizeBytes,
+  });
+
+  return NextResponse.json({
+    ok: true,
+    fileId,
+    key,
+    putUrl: presigned.url,
+    expiresAt: presigned.expiresAt,
+  });
+}
+
+function formatMb(bytes: number): string {
+  if (!Number.isFinite(bytes)) return "unlimited";
+  if (bytes >= 1024 ** 3) return `${(bytes / 1024 ** 3).toFixed(1)} GB`;
+  return `${Math.round(bytes / 1024 ** 2)} MB`;
+}
+
+// Static export so we can defensively avoid double-invocation; Next caches
+// per-request anyway, but `force-dynamic` documents intent.
+export const dynamic = "force-dynamic";

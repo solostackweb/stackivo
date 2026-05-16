@@ -1,0 +1,146 @@
+import * as React from "react";
+import {
+  CheckCircle2,
+  FileText,
+  Send,
+  TrendingUp,
+} from "lucide-react";
+
+import { Card, CardContent } from "@/components/ui/card";
+import { formatINR } from "@/lib/format";
+import { cn } from "@/lib/utils";
+
+import type { InvoiceRecord } from "../server";
+
+interface SummaryStats {
+  paidThisMonthAmount: number;
+  paidThisMonthCount: number;
+  paidAllTimeAmount: number;
+  paidAllTimeCount: number;
+  emailedCount: number;
+  averageInvoiceAmount: number;
+}
+
+/**
+ * Derive the four KPI tiles from a snapshot of invoices. Pure and
+ * deterministic — safe to memoize at the call site.
+ */
+export function computeInvoiceStats(invoices: InvoiceRecord[]): SummaryStats {
+  const now = new Date();
+  const startOfMonth = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1),
+  );
+
+  let paidThisMonthAmount = 0;
+  let paidThisMonthCount = 0;
+  let paidAllTimeAmount = 0;
+  let paidAllTimeCount = 0;
+  let emailedCount = 0;
+
+  for (const inv of invoices) {
+    const total = Number(inv.totalAmount) || 0;
+    if (inv.status === "paid") {
+      paidAllTimeAmount += total;
+      paidAllTimeCount += 1;
+      if (inv.paidAt && new Date(inv.paidAt) >= startOfMonth) {
+        paidThisMonthAmount += total;
+        paidThisMonthCount += 1;
+      }
+    }
+    if (inv.sentAt) emailedCount += 1;
+  }
+
+  return {
+    paidThisMonthAmount,
+    paidThisMonthCount,
+    paidAllTimeAmount,
+    paidAllTimeCount,
+    emailedCount,
+    averageInvoiceAmount:
+      paidAllTimeCount > 0 ? paidAllTimeAmount / paidAllTimeCount : 0,
+  };
+}
+
+export function InvoicesSummary({
+  invoices,
+}: {
+  invoices: InvoiceRecord[];
+}) {
+  const stats = React.useMemo(() => computeInvoiceStats(invoices), [invoices]);
+
+  return (
+    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <SummaryCard
+        label="Paid this month"
+        value={formatINR(stats.paidThisMonthAmount)}
+        helper={`${stats.paidThisMonthCount} collected`}
+        icon={CheckCircle2}
+        tone="success"
+      />
+      <SummaryCard
+        label="Paid invoices"
+        value={formatINR(stats.paidAllTimeAmount)}
+        helper={`${stats.paidAllTimeCount} invoice${stats.paidAllTimeCount === 1 ? "" : "s"} issued`}
+        icon={FileText}
+        tone="default"
+      />
+      <SummaryCard
+        label="Emailed"
+        value={String(stats.emailedCount)}
+        helper="PDFs sent to clients"
+        icon={Send}
+        tone="default"
+      />
+      <SummaryCard
+        label="Average invoice"
+        value={formatINR(stats.averageInvoiceAmount)}
+        helper="Across paid invoices"
+        icon={TrendingUp}
+        tone="default"
+      />
+    </div>
+  );
+}
+
+interface SummaryCardProps {
+  label: string;
+  value: string;
+  helper: string;
+  icon: React.ComponentType<{ className?: string }>;
+  tone: "default" | "success";
+}
+
+function SummaryCard({
+  label,
+  value,
+  helper,
+  icon: Icon,
+  tone,
+}: SummaryCardProps) {
+  return (
+    <Card className="group transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/20 hover:shadow-lg hover:shadow-primary/[0.05]">
+      <CardContent className="flex items-start justify-between gap-3 p-5">
+        <div className="min-w-0 space-y-1">
+          <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+            {label}
+          </p>
+          <p className="text-2xl font-bold tabular-nums tracking-tight">
+            {value}
+          </p>
+          <p className="text-xs text-muted-foreground">{helper}</p>
+        </div>
+        <div
+          className={cn(
+            "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ring-1",
+            tone === "success" &&
+              "bg-gradient-to-br from-emerald-500/10 to-teal-500/10 text-emerald-600 ring-emerald-500/15 dark:text-emerald-400",
+            tone === "default" &&
+              "bg-gradient-to-br from-primary/10 to-indigo-500/10 text-primary ring-primary/15",
+          )}
+        >
+          <Icon className="h-4 w-4" />
+        </div>
+      </CardContent>
+    </Card>
+  );
+}

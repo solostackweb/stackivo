@@ -1,0 +1,217 @@
+/**
+ * Typed, validated access to environment variables.
+ *
+ * - Throws at import time if a required var is missing, so missing config
+ *   fails fast in dev and during build instead of at runtime in a request.
+ * - `NEXT_PUBLIC_*` vars are inlined by Next.js at build time and are safe
+ *   in both server and client bundles.
+ * - Server-only secrets are read via `requireServerEnv()` which is ONLY
+ *   importable from server components, route handlers, server actions, and
+ *   middleware. Never import `env.server` from a Client Component.
+ */
+
+function required(name: string, value: string | undefined): string {
+  if (!value || value.length === 0) {
+    throw new Error(
+      `[env] Missing required environment variable: ${name}. ` +
+        `See .env.example for the full list.`,
+    );
+  }
+  return value;
+}
+
+function optional(value: string | undefined): string | undefined {
+  return value && value.length > 0 ? value : undefined;
+}
+
+/**
+ * Public environment — safe to use in both server and client bundles.
+ * All keys MUST be prefixed with `NEXT_PUBLIC_`.
+ */
+export const env = {
+  appUrl: required("NEXT_PUBLIC_APP_URL", process.env.NEXT_PUBLIC_APP_URL),
+  appName:
+    process.env.NEXT_PUBLIC_APP_NAME && process.env.NEXT_PUBLIC_APP_NAME.length > 0
+      ? process.env.NEXT_PUBLIC_APP_NAME
+      : "Stackivo",
+  supabaseUrl: required(
+    "NEXT_PUBLIC_SUPABASE_URL",
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+  ),
+  supabaseAnonKey: required(
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+  ),
+  // ---- Observability (all optional, graceful no-op when unset) ----------
+  // Sentry browser DSN. Must be NEXT_PUBLIC_ so the client bundle can init.
+  sentryDsn: optional(process.env.NEXT_PUBLIC_SENTRY_DSN) ?? "",
+  // PostHog client key + host. EU host = https://eu.i.posthog.com.
+  posthogKey: optional(process.env.NEXT_PUBLIC_POSTHOG_KEY) ?? "",
+  posthogHost:
+    optional(process.env.NEXT_PUBLIC_POSTHOG_HOST) ?? "https://eu.i.posthog.com",
+  // Commit SHA for release tagging in Sentry / PostHog / logs.
+  // Vercel populates VERCEL_GIT_COMMIT_SHA automatically.
+  commitSha:
+    optional(process.env.NEXT_PUBLIC_COMMIT_SHA) ??
+    optional(process.env.VERCEL_GIT_COMMIT_SHA) ??
+    "dev",
+  // Runtime environment tag for events + logs.
+  runtimeEnv:
+    optional(process.env.NEXT_PUBLIC_RUNTIME_ENV) ??
+    optional(process.env.VERCEL_ENV) ??
+    process.env.NODE_ENV ??
+    "development",
+  // Crisp Live Chat website id. Browser-safe by design — Crisp's
+  // identifier is part of the public widget script. Unset → the chat
+  // widget + identity bridge silently no-op so dev / preview deploys
+  // skip chat entirely.
+  crispWebsiteId: optional(process.env.NEXT_PUBLIC_CRISP_WEBSITE_ID) ?? "",
+  // Microsoft Clarity project id. Free unlimited heatmaps + scroll +
+  // click + session replay; complements PostHog product analytics.
+  // Browser-safe by design. Unset → script never loads.
+  clarityProjectId: optional(process.env.NEXT_PUBLIC_CLARITY_PROJECT_ID) ?? "",
+  // Cal.com booking link for the founder-call slot. Embedded at /talk.
+  // Format: https://cal.com/<handle>/<event> — see SALES_SETUP_GUIDE.md.
+  // Unset → /talk renders an honest "coming soon" stub with the
+  // contact form + email fallback.
+  calComUrl: optional(process.env.NEXT_PUBLIC_CAL_COM_URL) ?? "",
+  // Loom demo video share URL. Embedded as an iframe at /demo. Unset
+  // → /demo renders a placeholder with a sign-up CTA.
+  loomDemoUrl: optional(process.env.NEXT_PUBLIC_LOOM_DEMO_URL) ?? "",
+  // Zoho Desk public help-center URL. Used by the in-app `<HelpButton/>`
+  // and `/help` page to deep-link customers to KB articles. Unset →
+  // the "Browse help articles" affordance hides itself.
+  zohoDeskHelpUrl: optional(process.env.NEXT_PUBLIC_ZOHO_DESK_HELP_URL) ?? "",
+} as const;
+
+export type PublicEnv = typeof env;
+
+/**
+ * Server-only environment. Calling this from a client bundle will throw.
+ * Only import from server components, route handlers, server actions,
+ * and middleware.
+ */
+export function requireServerEnv() {
+  if (typeof window !== "undefined") {
+    throw new Error(
+      "[env] requireServerEnv() was called from a client context. " +
+        "Move the call into a Server Component, route handler, or server action.",
+    );
+  }
+
+  return {
+    ...env,
+    supabaseServiceRoleKey: required(
+      "SUPABASE_SERVICE_ROLE_KEY",
+      process.env.SUPABASE_SERVICE_ROLE_KEY,
+    ),
+    googleOAuthClientId: optional(process.env.GOOGLE_OAUTH_CLIENT_ID),
+    googleOAuthClientSecret: optional(process.env.GOOGLE_OAUTH_CLIENT_SECRET),
+    razorpayKeyId: optional(process.env.RAZORPAY_KEY_ID),
+    razorpayKeySecret: optional(process.env.RAZORPAY_KEY_SECRET),
+    razorpayWebhookSecret: optional(process.env.RAZORPAY_WEBHOOK_SECRET),
+    razorpayPlanProMonthly: optional(process.env.RAZORPAY_PLAN_PRO_MONTHLY),
+    razorpayPlanProYearly: optional(process.env.RAZORPAY_PLAN_PRO_YEARLY),
+    razorpayPlanBusinessMonthly: optional(
+      process.env.RAZORPAY_PLAN_BUSINESS_MONTHLY,
+    ),
+    razorpayPlanBusinessYearly: optional(
+      process.env.RAZORPAY_PLAN_BUSINESS_YEARLY,
+    ),
+    brevoTransport:
+      process.env.BREVO_TRANSPORT === "smtp" ? "smtp" : "api",
+    brevoApiKey: optional(process.env.BREVO_API_KEY),
+    brevoSenderEmail: optional(process.env.BREVO_SENDER_EMAIL),
+    brevoSenderName: process.env.BREVO_SENDER_NAME ?? "Stackivo",
+    brevoSmtpHost:
+      optional(process.env.BREVO_SMTP_HOST) ?? "smtp-relay.brevo.com",
+    brevoSmtpPort: process.env.BREVO_SMTP_PORT
+      ? Number(process.env.BREVO_SMTP_PORT)
+      : 587,
+    brevoSmtpSecure:
+      process.env.BREVO_SMTP_SECURE === "true" ||
+      process.env.BREVO_SMTP_SECURE === "1",
+    brevoSmtpUser: optional(process.env.BREVO_SMTP_USER),
+    brevoSmtpPassword: optional(process.env.BREVO_SMTP_PASSWORD),
+    // Upstash Redis (optional) — when set, enables production rate
+    // limiting on login / signup / password-reset / public-sign endpoints.
+    // Provision at https://upstash.com → Create database → REST API page.
+    upstashRedisUrl: optional(process.env.UPSTASH_REDIS_REST_URL),
+    upstashRedisToken: optional(process.env.UPSTASH_REDIS_REST_TOKEN),
+    // Brevo webhook shared secret. Sent in the `?token=` query parameter
+    // configured on the Brevo webhook subscription. `/api/webhooks/brevo`
+    // rejects any request without a timing-safe match.
+    brevoWebhookSecret: optional(process.env.BREVO_WEBHOOK_SECRET),
+    // Ops / observability (all optional) -----------------------------------
+    // Slack incoming webhook for cron-based failure alerts. Unset → no-op.
+    opsSlackWebhookUrl: optional(process.env.OPS_SLACK_WEBHOOK_URL),
+    // Shared secret required by `/api/cron/*` route handlers. Vercel Cron
+    // includes this via the `Authorization: Bearer <CRON_SECRET>` header
+    // when configured in the `vercel.json` cron schedule.
+    cronSecret: optional(process.env.CRON_SECRET),
+    // Sentry server auth token (build-time only — uploads source maps
+    // during `next build`). Not used at runtime.
+    sentryAuthToken: optional(process.env.SENTRY_AUTH_TOKEN),
+    // Hard kill-switch for outbound transactional email.
+    //   - Unset       → live in production (NODE_ENV=production), dry-run
+    //                   everywhere else. Safe default.
+    //   - "true"      → force live sending (only set in production).
+    //   - "false"     → force dry-run (emails log to delivery_logs with
+    //                   status='failed' + error='dry_run' and never hit
+    //                   the provider).
+    emailLiveMode:
+      process.env.EMAIL_LIVE_MODE === "true"
+        ? true
+        : process.env.EMAIL_LIVE_MODE === "false"
+          ? false
+          : process.env.NODE_ENV === "production",
+    // -- Support system (all optional; missing config => graceful no-op) --
+    // Zoho Desk REST API credentials. The orgId scopes every API call to
+    // a single Zoho Desk org; the access token authenticates. Refresh
+    // tokens are NOT persisted here — re-run the OAuth flow to mint a
+    // long-lived access token via Self-Client. See SUPPORT_SYSTEM_SETUP.md.
+    zohoDeskOrgId: optional(process.env.ZOHO_DESK_ORG_ID),
+    zohoDeskAccessToken: optional(process.env.ZOHO_DESK_ACCESS_TOKEN),
+    zohoDeskDepartmentId: optional(process.env.ZOHO_DESK_DEPARTMENT_ID),
+    // EU = https://desk.zoho.eu, IN = https://desk.zoho.in, US = https://desk.zoho.com
+    zohoDeskApiBase:
+      optional(process.env.ZOHO_DESK_API_BASE) ?? "https://desk.zoho.in",
+    // Crisp REST API. Used ONLY for delete-on-soft-delete fan-out and
+    // optional historical message fetch from webhooks. The widget itself
+    // doesn't use these.
+    crispApiIdentifier: optional(process.env.CRISP_API_IDENTIFIER),
+    crispApiKey: optional(process.env.CRISP_API_KEY),
+    // Webhook shared secrets — verified on each inbound webhook delivery
+    // via timing-safe comparison. Missing => the route returns 404.
+    crispWebhookSecret: optional(process.env.CRISP_WEBHOOK_SECRET),
+    zohoDeskWebhookSecret: optional(process.env.ZOHO_DESK_WEBHOOK_SECRET),
+    // Brevo contact list id for the marketing newsletter / lead capture
+    // forms. Numeric (e.g. "12"). Unset → leads are still captured to
+    // delivery_logs metadata but not added to a Brevo list, so subscription
+    // forms succeed and the founder gets the lead in support@.
+    brevoNewsletterListId: optional(process.env.BREVO_NEWSLETTER_LIST_ID),
+    // -- Cloudflare R2 (Client Portal file storage) -----------------------
+    // S3-compatible bucket for client-portal file uploads. We use R2
+    // because it has zero egress fees, which lets us host customer
+    // deliverables (designs, videos, archives) without metering bandwidth.
+    // All values optional — when missing, the portal disables file
+    // upload UI and the route handlers return a 503 with a clear message.
+    r2AccountId: optional(process.env.R2_ACCOUNT_ID),
+    r2AccessKeyId: optional(process.env.R2_ACCESS_KEY_ID),
+    r2SecretAccessKey: optional(process.env.R2_SECRET_ACCESS_KEY),
+    r2Bucket: optional(process.env.R2_BUCKET),
+    // Optional CDN / public R2 URL prefix (e.g. https://files.stackivo.in).
+    // When set, downloads are served from this domain instead of presigned
+    // S3 URLs — better caching and a cleaner branded URL.
+    r2PublicBaseUrl: optional(process.env.R2_PUBLIC_BASE_URL),
+  } as const;
+}
+
+/**
+ * Public-only Razorpay key id, exposed to the browser so the Razorpay
+ * Checkout JS can be initialised.
+ */
+export const publicRazorpayKeyId =
+  process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || undefined;
+
+export type ServerEnv = ReturnType<typeof requireServerEnv>;

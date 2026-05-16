@@ -1,0 +1,201 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* --font-sans and --font-mono are injected on <html> by next/font (see app/layout.tsx). */
+
+    --background: 0 0% 100%;
+    --foreground: 222 47% 11%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+
+    --primary: 224 76% 40%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 222 47% 11%;
+
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 16% 47%;
+
+    --accent: 210 40% 96%;
+    --accent-foreground: 222 47% 11%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+
+    --success: 142 72% 36%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+
+    --info: 199 89% 48%;
+    --info-foreground: 0 0% 100%;
+
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 224 76% 40%;
+
+    --sidebar: 0 0% 100%;
+    --sidebar-foreground: 222 47% 11%;
+    --sidebar-border: 214 32% 91%;
+    --sidebar-accent: 210 40% 96%;
+    --sidebar-accent-foreground: 222 47% 11%;
+
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: 222 47% 6%;
+    --foreground: 210 40% 98%;
+
+    --card: 222 47% 8%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 222 47% 8%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 217 91% 60%;
+    --primary-foreground: 222 47% 11%;
+
+    --secondary: 217 33% 15%;
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 217 33% 15%;
+    --muted-foreground: 215 20% 65%;
+
+    --accent: 217 33% 15%;
+    --accent-foreground: 210 40% 98%;
+
+    --destructive: 0 63% 50%;
+    --destructive-foreground: 210 40% 98%;
+
+    --success: 142 70% 45%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 38 92% 55%;
+    --warning-foreground: 0 0% 100%;
+
+    --info: 199 89% 55%;
+    --info-foreground: 0 0% 100%;
+
+    --border: 217 33% 18%;
+    --input: 217 33% 18%;
+    --ring: 217 91% 60%;
+
+    --sidebar: 222 47% 7%;
+    --sidebar-foreground: 210 40% 98%;
+    --sidebar-border: 217 33% 15%;
+    --sidebar-accent: 217 33% 15%;
+    --sidebar-accent-foreground: 210 40% 98%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "cv11", "ss01";
+    font-variation-settings: "opsz" 32;
+    /* Suppress the gray flash on mobile tap; we provide explicit hover/active states */
+    -webkit-tap-highlight-color: transparent;
+  }
+  /* Prevent overscroll bounce only in standalone PWA, so browser-tab users
+     keep native pull-to-refresh. */
+  @media (display-mode: standalone) {
+    body {
+      overscroll-behavior-y: none;
+    }
+  }
+  html {
+    scroll-behavior: smooth;
+    /* Ensure mobile Safari treats the page as a touch-first surface */
+    touch-action: manipulation;
+  }
+  /* iOS Safari zooms on focus when input font-size < 16px. Lift form fields to 16px on mobile. */
+  @media (max-width: 767px) {
+    input,
+    select,
+    textarea {
+      font-size: 16px;
+    }
+  }
+  /* Reserve room for the fixed mobile bottom-nav (h-14) on phones only.
+     Consumers can subtract via `pb-[var(--mobile-bottom-nav-h)]`. */
+  :root {
+    --mobile-bottom-nav-h: 0px;
+  }
+  @media (max-width: 767px) {
+    :root {
+      --mobile-bottom-nav-h: 3.5rem;
+    }
+  }
+
+  /* Respect prefers-reduced-motion globally. Disables Framer Motion's
+     while-hover translations, the hero "Floating" loop, the badge ping,
+     and any decorative `animate-*` utilities. CSS smooth-scroll also
+     reverts to instant. WCAG 2.3.3 compliance. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.001ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@layer utilities {
+  .scrollbar-thin {
+    scrollbar-width: thin;
+  }
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--border));
+    border-radius: 3px;
+  }
+
+  /* Toast slide-in helpers used by PWA toasts (install / update / offline)
+     so we don't have to load framer-motion just for a single keyframe.
+     `prefers-reduced-motion` above collapses these to ~0ms. */
+  @keyframes toast-slide-up {
+    from {
+      transform: translateY(80%);
+      opacity: 0;
+    }
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+  @keyframes toast-slide-down {
+    from {
+      transform: translateY(-40%);
+      opacity: 0;
+    }
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+  .animate-toast-up {
+    animation: toast-slide-up 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  .animate-toast-down {
+    animation: toast-slide-down 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+}

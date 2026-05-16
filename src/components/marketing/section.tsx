@@ -1,0 +1,119 @@
+import * as React from "react";
+import { cn } from "@/lib/utils";
+
+/**
+ * Marketing container sizes.
+ *
+ *   default  — typical content (readable prose, cards)   max-w-7xl   (1280)
+ *   wide     — visual-heavy sections (mockups, hero)     max-w-[1400px]
+ *   ultra    — cinematic / full-bleed compositions       max-w-[1600px]
+ *   full     — no max width, caller handles it
+ */
+const SIZE_CLASSES = {
+  default: "max-w-7xl",
+  wide: "max-w-[1400px]",
+  ultra: "max-w-[1600px]",
+  full: "max-w-none",
+} as const;
+
+/**
+ * Horizontal padding scales with viewport — tight on phones, luxurious on
+ * ultra-wide desktops. Using clamp-like step-ups keeps the content from
+ * hugging the edges on 1440p / 4K screens.
+ */
+const HORIZONTAL_PADDING =
+  "px-5 sm:px-8 lg:px-10 xl:px-14 2xl:px-20";
+
+/**
+ * Vertical spacing scales up more aggressively on large screens so the
+ * rhythm feels cinematic rather than cramped.
+ */
+const VERTICAL_PADDING =
+  "py-16 sm:py-20 lg:py-24 xl:py-28";
+
+export function Section({
+  children,
+  id,
+  className,
+  bleed = false,
+  size = "default",
+}: {
+  children: React.ReactNode;
+  id?: string;
+  className?: string;
+  bleed?: boolean;
+  size?: keyof typeof SIZE_CLASSES;
+}) {
+  return (
+    <section
+      id={id}
+      className={cn(
+        "relative w-full",
+        !bleed && VERTICAL_PADDING,
+        className,
+      )}
+    >
+      <div
+        className={cn(
+          "mx-auto w-full",
+          SIZE_CLASSES[size],
+          HORIZONTAL_PADDING,
+        )}
+      >
+        {children}
+      </div>
+    </section>
+  );
+}
+
+export function SectionEyebrow({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="inline-flex items-center gap-2 rounded-full border bg-card/80 px-3 py-1 text-xs font-medium text-muted-foreground backdrop-blur-sm">
+      <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+      {children}
+    </p>
+  );
+}
+
+export function SectionHeading({
+  eyebrow,
+  title,
+  subtitle,
+  align = "center",
+  size = "default",
+}: {
+  eyebrow?: React.ReactNode;
+  title: React.ReactNode;
+  subtitle?: React.ReactNode;
+  align?: "center" | "left";
+  /** `large` bumps the heading one step — used on landing/pricing intros. */
+  size?: "default" | "large";
+}) {
+  return (
+    <div
+      className={cn(
+        "flex flex-col gap-3",
+        align === "center"
+          ? "mx-auto max-w-3xl items-center text-center"
+          : "max-w-2xl items-start text-left",
+      )}
+    >
+      {eyebrow ? <SectionEyebrow>{eyebrow}</SectionEyebrow> : null}
+      <h2
+        className={cn(
+          "text-balance font-semibold tracking-tight",
+          size === "large"
+            ? "text-4xl sm:text-5xl lg:text-[56px]"
+            : "text-3xl sm:text-4xl lg:text-[44px]",
+        )}
+      >
+        {title}
+      </h2>
+      {subtitle ? (
+        <p className="text-pretty text-base leading-7 text-muted-foreground sm:text-lg">
+          {subtitle}
+        </p>
+      ) : null}
+    </div>
+  );
+}

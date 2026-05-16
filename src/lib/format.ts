@@ -1,0 +1,47 @@
+/**
+ * Currency + number formatters.
+ *
+ * Uses INR (₹) by default to match Stackivo's primary market. The
+ * Indian numbering system (lakhs/crores) is preserved by passing the
+ * `en-IN` locale to `Intl.NumberFormat`.
+ */
+
+export function formatINR(value: number, opts?: { compact?: boolean }) {
+  if (opts?.compact) {
+    if (value >= 10_000_000) return `₹${(value / 10_000_000).toFixed(1)}Cr`;
+    if (value >= 100_000) return `₹${(value / 100_000).toFixed(1)}L`;
+    if (value >= 1000) return `₹${(value / 1000).toFixed(1)}k`;
+    return `₹${value}`;
+  }
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    maximumFractionDigits: 0,
+  }).format(value);
+}
+
+export function formatNumber(value: number) {
+  return new Intl.NumberFormat("en-IN").format(value);
+}
+
+export function formatPercent(value: number, fractionDigits = 1) {
+  const sign = value > 0 ? "+" : "";
+  return `${sign}${value.toFixed(fractionDigits)}%`;
+}
+
+export function formatRelativeTime(iso: string) {
+  const target = new Date(iso).getTime();
+  const now = Date.now();
+  const diffMs = now - target;
+  const minutes = Math.floor(diffMs / 60_000);
+  if (minutes < 1) return "Just now";
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d ago`;
+  return new Date(iso).toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "short",
+  });
+}

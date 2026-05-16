@@ -1,0 +1,116 @@
+"use client";
+
+import * as React from "react";
+import Link from "next/link";
+import { Menu, Zap } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Sheet,
+  SheetContent,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
+import { Separator } from "@/components/ui/separator";
+import { primaryNav, secondaryNav } from "@/constants/navigation";
+import { SidebarNav } from "./sidebar-nav";
+import { useMobileNav } from "./mobile-nav-context";
+import { useProfile } from "@/features/profile/context";
+import { getDisplayName, getInitials } from "@/features/profile/utils";
+
+/** Top-nav hamburger trigger. Drives the shared mobile nav drawer state. */
+export function MobileNavTrigger() {
+  const { toggle } = useMobileNav();
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      className="md:hidden"
+      onClick={toggle}
+      aria-label="Open menu"
+    >
+      <Menu className="h-5 w-5" />
+    </Button>
+  );
+}
+
+/**
+ * Mobile navigation drawer. State lives in `MobileNavProvider` so both the
+ * top-nav hamburger and the bottom-nav "More" tab can drive it.
+ */
+export function MobileNav() {
+  const { open, setOpen } = useMobileNav();
+  const { profile, subscription } = useProfile();
+  const workspaceName =
+    profile?.businessName?.trim() ||
+    profile?.legalName?.trim() ||
+    getDisplayName(profile) ||
+    "Your workspace";
+  const workspaceInitials = getInitials(workspaceName);
+  const plan = subscription?.plan ?? "free";
+
+  return (
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetContent
+        side="left"
+        className="flex w-[86vw] max-w-[320px] flex-col p-0"
+      >
+        <SheetTitle className="sr-only">Navigation</SheetTitle>
+        <SheetDescription className="sr-only">
+          Primary application navigation
+        </SheetDescription>
+
+        <div
+          className="flex h-14 items-center border-b px-4"
+          style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}
+        >
+          <Link
+            href="/dashboard"
+            onClick={() => setOpen(false)}
+            className="flex items-center gap-2.5 font-bold tracking-tight"
+          >
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-indigo-600 text-primary-foreground shadow-md shadow-primary/20">
+              <Zap className="h-4 w-4" />
+            </div>
+            <span className="text-[15px]">Stackivo</span>
+          </Link>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-2 py-3">
+          <p className="mb-1.5 px-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70">
+            Workspace
+          </p>
+          <SidebarNav items={primaryNav} onNavigate={() => setOpen(false)} />
+
+          <Separator className="my-3" />
+
+          <p className="mb-1.5 px-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70">
+            Account
+          </p>
+          <SidebarNav items={secondaryNav} onNavigate={() => setOpen(false)} />
+        </div>
+
+        <Link
+          href="/dashboard/settings/company"
+          onClick={() => setOpen(false)}
+          className="flex items-center gap-2.5 border-t p-3 transition-colors hover:bg-muted/60"
+          style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 0.75rem)" }}
+        >
+          <div
+            aria-hidden
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-gradient-to-br from-primary/15 to-indigo-500/15 text-[12px] font-bold text-primary ring-1 ring-primary/15"
+          >
+            {workspaceInitials}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[13px] font-semibold leading-tight">
+              {workspaceName}
+            </p>
+            <p className="truncate text-[11px] capitalize leading-tight text-muted-foreground">
+              {plan} plan
+            </p>
+          </div>
+        </Link>
+      </SheetContent>
+    </Sheet>
+  );
+}

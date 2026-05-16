@@ -1,0 +1,123 @@
+import type { Metadata, Viewport } from "next";
+import { Inter, JetBrains_Mono } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
+import { AppProviders } from "@/components/providers/app-providers";
+import { siteConfig } from "@/config/site";
+import "./globals.css";
+
+/**
+ * Self-hosted, preloaded, swap-display fonts.
+ *
+ * Binding to the CSS variables already consumed by `tailwind.config.ts`
+ * (`--font-sans`, `--font-mono`) means every existing `font-sans` /
+ * `font-mono` class in the codebase now hits real Inter / JetBrains Mono
+ * — no FOUT swap, no post-load `text-balance` reflow, stable hero metrics.
+ */
+const fontSans = Inter({
+  subsets: ["latin"],
+  variable: "--font-sans",
+  display: "swap",
+  preload: true,
+});
+
+const fontMono = JetBrains_Mono({
+  subsets: ["latin"],
+  variable: "--font-mono",
+  display: "swap",
+  preload: false,
+});
+
+export const metadata: Metadata = {
+  applicationName: siteConfig.name,
+  category: "business",
+  title: {
+    default: siteConfig.name,
+    template: `%s · ${siteConfig.name}`,
+  },
+  description: siteConfig.description,
+  metadataBase: new URL(siteConfig.url),
+  alternates: {
+    canonical: "/",
+  },
+  keywords: [
+    "Stackivo",
+    "operating system for independents",
+    "freelancer OS",
+    "GST invoicing India",
+    "invoice software India",
+    "client management for professionals",
+    "contracts and e-signatures",
+    "time tracking and billing",
+    "business analytics for freelancers",
+  ],
+  openGraph: {
+    type: "website",
+    siteName: siteConfig.name,
+    title: siteConfig.name,
+    description: siteConfig.description,
+    url: siteConfig.url,
+    images: [{ url: siteConfig.ogImage, width: 1200, height: 630 }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: siteConfig.name,
+    description: siteConfig.description,
+    images: [siteConfig.ogImage],
+    creator: "@stackivo",
+    site: "@stackivo",
+  },
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    title: siteConfig.name,
+    statusBarStyle: "black-translucent",
+  },
+  formatDetection: {
+    email: false,
+    telephone: false,
+    address: false,
+  },
+  icons: {
+    icon: [
+      { url: "/favicon.ico" },
+      { url: "/icon.svg", type: "image/svg+xml" },
+    ],
+    apple: [{ url: "/apple-touch-icon.svg", sizes: "180x180" }],
+    shortcut: ["/favicon.ico"],
+  },
+  other: {
+    "mobile-web-app-capable": "yes",
+    "apple-mobile-web-app-capable": "yes",
+    "apple-mobile-web-app-status-bar-style": "black-translucent",
+    "apple-mobile-web-app-title": siteConfig.name,
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#0a1020" },
+  ],
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+  viewportFit: "cover",
+  colorScheme: "light dark",
+};
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html
+      lang="en"
+      suppressHydrationWarning
+      className={`${fontSans.variable} ${fontMono.variable}`}
+    >
+      <body className="font-sans antialiased">
+        <AppProviders>{children}</AppProviders>
+        <Analytics />
+        <SpeedInsights />
+      </body>
+    </html>
+  );
+}
