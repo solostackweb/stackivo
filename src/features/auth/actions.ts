@@ -104,7 +104,7 @@ export async function signupAction(
       kind: "auth_signup_failed",
       severity: "info",
       metadata: {
-        email_hash: hashedEmail(email),
+        email_hash: await hashedEmail(email),
         reason: error.message,
       },
     });
@@ -161,7 +161,7 @@ export async function loginAction(
       metadata: {
         flow: "login",
         scope: "account",
-        email_hash: hashedEmail(email),
+        email_hash: await hashedEmail(email),
       },
     });
     return { ok: false, error: perAccount.message };
@@ -189,7 +189,7 @@ export async function loginAction(
     await recordSecurityEvent({
       kind: "auth_login_failed",
       severity: "info",
-      metadata: { email_hash: hashedEmail(email) },
+      metadata: { email_hash: await hashedEmail(email) },
     });
     // Don't leak whether the email exists — generic message.
     return { ok: false, error: "Invalid email or password." };
@@ -250,7 +250,7 @@ export async function forgotPasswordAction(
     severity: limited ? "warn" : "info",
     metadata: {
       flow: "password_reset",
-      email_hash: hashedEmail(parsed.data.email),
+      email_hash: await hashedEmail(parsed.data.email),
     },
   });
 

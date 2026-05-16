@@ -18,8 +18,6 @@
  *     passing them here.
  */
 
-import { createHash } from "node:crypto";
-
 /** Keys that are redacted to `"[REDACTED]"` regardless of value type. */
 const SENSITIVE_KEY_PATTERN =
   /^(password|token|secret|api[_-]?key|authorization|x-.*signature|.*signature|gstin|pan|aadhaar|card_number|cvv|account_number|ifsc|razorpay_signature|razorpay_payment_id|brevo.*key)$/i;
@@ -100,9 +98,25 @@ function redactString(input: string): string {
  * 16 hex chars = 64 bits of entropy — enough for tenant-scoped
  * uniqueness at any realistic scale, short enough to read in dashboards.
  */
-export function hashedEmail(email: string): string {
-  return createHash("sha256")
-    .update(email.trim().toLowerCase())
-    .digest("hex")
-    .slice(0, 16);
+export async function hashedEmail(email: string): Promise<string> {
+  const normalized = email.trim().toLowerCase();
+
+  if (globalThis.crypto?.subtle) {
+    const digest = await globalThis.crypto.subtle.digest(
+      "SHA-256",
+      new TextEncoder().encode(normalized),
+    );
+    return bytesToHex(new Uint8Array(digest)).slice(0, 16);
+  }
+
+  const { createHash } = await import("node:crypto");
+  return createHash("sha256").update(normalized).digest("hex").slice(0, 16);
+}
+
+function bytesToHex(bytes: Uint8Array): string {
+  let out = "";
+  for (const byte of bytes) {
+    out += byte.toString(16).padStart(2, "0");
+  }
+  return out;
 }

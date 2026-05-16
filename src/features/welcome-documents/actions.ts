@@ -547,7 +547,7 @@ function normaliseColor(input?: string | null): string | null {
 }
 
 // Used by the editor to validate JSON content before round-tripping.
-export function _testParse(content: string) {
+export async function _testParse(content: string) {
   return parseWelcomeContent(content);
 }
 

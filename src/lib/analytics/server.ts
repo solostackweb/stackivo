@@ -103,7 +103,7 @@ export async function identifyServer(
     client.identify({
       distinctId: userId,
       properties: {
-        email_hash: props.email ? hashedEmail(props.email) : undefined,
+        email_hash: props.email ? await hashedEmail(props.email) : undefined,
         plan: props.plan,
         created_at: props.createdAt,
       },
