@@ -100,23 +100,18 @@ function redactString(input: string): string {
  */
 export async function hashedEmail(email: string): Promise<string> {
   const normalized = email.trim().toLowerCase();
-
-  if (globalThis.crypto?.subtle) {
-    const digest = await globalThis.crypto.subtle.digest(
-      "SHA-256",
-      new TextEncoder().encode(normalized),
-    );
-    return bytesToHex(new Uint8Array(digest)).slice(0, 16);
+  const subtle = globalThis.crypto?.subtle;
+  if (!subtle) {
+    throw new Error("Web Crypto is unavailable in this runtime.");
   }
 
-  const { createHash } = await import("node:crypto");
-  return createHash("sha256").update(normalized).digest("hex").slice(0, 16);
-}
-
-function bytesToHex(bytes: Uint8Array): string {
+  const digest = await subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(normalized),
+  );
   let out = "";
-  for (const byte of bytes) {
+  for (const byte of new Uint8Array(digest)) {
     out += byte.toString(16).padStart(2, "0");
   }
-  return out;
+  return out.slice(0, 16);
 }

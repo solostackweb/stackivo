@@ -65,7 +65,9 @@ export function PostHogProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <PostHogCtx.Provider value={client}>
-      <PageviewTracker client={client} />
+      <React.Suspense fallback={null}>
+        <PageviewTracker client={client} />
+      </React.Suspense>
       {children}
     </PostHogCtx.Provider>
   );
