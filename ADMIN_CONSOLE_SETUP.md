@@ -485,7 +485,7 @@ Receipts:
 
 ### Hourly audit export (tamper-evidence)
 
-`/api/cron/admin-export` runs at HH:05 every hour (configured in `vercel.json`). It:
+`/api/cron/admin-export` should be called by an external cron service at HH:05 every hour. It:
 
 1. Pulls every `admin_actions` row from the previous full hour.
 2. Serialises to JSONL.
@@ -578,7 +578,7 @@ Wire into CI / pre-commit for permanent enforcement. The script exits with code 
 - MFA enforcement: remove the `aal2` check block in `@/src/features/admin/server.ts`. Existing factors stay enrolled but no longer required.
 - CSP: drop the `Content-Security-Policy` set in `middleware.ts` for `/admin/*`. Global headers (configured in `next.config.ts`) still apply.
 - Email receipts: comment out the `sendAdminReceipt(...)` calls inside the destructive actions.
-- Hourly export: remove the cron entry from `vercel.json`; old files stay in the bucket.
+- Hourly export: stop the external cron call; old files stay in the bucket.
 - DPDP export: remove the action export from `actions.ts` and the form block in `user-actions.tsx`.
 - Playwright + verify script: delete `e2e/`, `playwright.config.ts`, `scripts/verify-admin-actions.mjs`, and the related npm scripts.
 

@@ -15,7 +15,7 @@ provisioning, DNS).
 3. [Cloudflare R2 — file storage](#3-cloudflare-r2--file-storage)
 4. [Razorpay — invoice payment integration](#4-razorpay--invoice-payment-integration)
 5. [Environment variables checklist](#5-environment-variables-checklist)
-6. [Vercel cron jobs](#6-vercel-cron-jobs)
+6. [External cron jobs](#6-external-cron-jobs)
 7. [Email senders & domain auth](#7-email-senders--domain-auth)
 8. [Smoke tests](#8-smoke-tests)
 9. [Operational notes](#9-operational-notes)
@@ -233,9 +233,9 @@ CRON_SECRET=                  # already exists; re-use the same value
 
 ---
 
-## 6. Vercel cron jobs
+## 6. External cron jobs
 
-The new overdue-invoice cron is registered in `vercel.json`:
+Call the overdue-invoice endpoint from an external cron service:
 
 ```jsonc
 {
@@ -244,7 +244,7 @@ The new overdue-invoice cron is registered in `vercel.json`:
 }
 ```
 
-Verify in **Vercel Dashboard → Settings → Cron Jobs**.
+Recommended services: cron-job.org, UptimeRobot, EasyCron.
 
 The cron is idempotent:
 
@@ -252,7 +252,7 @@ The cron is idempotent:
 - Reminder emails use `idempotencyKey="invoice-reminder:<id>:d<N>"` so a
   re-run on the same day cannot duplicate a reminder.
 
-To smoke-test locally:
+To smoke-test locally or from any HTTP client:
 
 ```bash
 curl -H "Authorization: Bearer $CRON_SECRET" \

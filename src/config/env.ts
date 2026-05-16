@@ -145,9 +145,9 @@ export function requireServerEnv() {
     // Ops / observability (all optional) -----------------------------------
     // Slack incoming webhook for cron-based failure alerts. Unset → no-op.
     opsSlackWebhookUrl: optional(process.env.OPS_SLACK_WEBHOOK_URL),
-    // Shared secret required by `/api/cron/*` route handlers. Vercel Cron
-    // includes this via the `Authorization: Bearer <CRON_SECRET>` header
-    // when configured in the `vercel.json` cron schedule.
+    // Shared secret required by `/api/cron/*` route handlers. External
+    // schedulers should include this via the `Authorization: Bearer <CRON_SECRET>`
+    // header when calling the endpoint over HTTP.
     cronSecret: optional(process.env.CRON_SECRET),
     // Sentry server auth token (build-time only — uploads source maps
     // during `next build`). Not used at runtime.

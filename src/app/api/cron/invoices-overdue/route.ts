@@ -3,10 +3,11 @@
  *
  *   GET /api/cron/invoices-overdue
  *
- * Scheduled daily via `vercel.json`. Walks every invoice whose status is
- * `sent` and whose `due_date` is in the past, flips it to `overdue`,
- * notifies the freelancer, and (for invoices exactly N days overdue:
- * 1, 7, 14) emails the client a polite reminder.
+ * Intended to be called by an external cron service once per day.
+ * Walks every invoice whose status is `sent` and whose `due_date` is in
+ * the past, flips it to `overdue`, notifies the freelancer, and (for
+ * invoices exactly N days overdue: 1, 7, 14) emails the client a polite
+ * reminder.
  *
  * Authentication: `Authorization: Bearer <CRON_SECRET>`.
  *

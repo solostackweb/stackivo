@@ -3,14 +3,13 @@
  *
  *   GET /api/cron/monitor
  *
- * Scheduled via `vercel.json` (every 15 minutes). Runs a fixed set
- * of integrity queries against the database and posts a Slack
- * alert if any threshold is breached. Emits a `cron_monitor_alert`
+ * Intended to be called by an external cron service every 15 minutes.
+ * Runs a fixed set of integrity queries against the database and posts
+ * a Slack alert if any threshold is breached. Emits a `cron_monitor_alert`
  * security event on every alert for audit history.
  *
- * Authentication: `Authorization: Bearer <CRON_SECRET>`. Vercel Cron
- * sends this automatically when configured. Manual / misconfigured
- * hits return 401 so we don't leak anything.
+ * Authentication: `Authorization: Bearer <CRON_SECRET>`. Manual or
+ * misconfigured hits return 401 so we don't leak anything.
  *
  * All third-party integrations (Slack) gracefully no-op when the
  * corresponding env var isn't set.

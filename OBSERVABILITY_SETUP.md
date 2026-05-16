@@ -222,14 +222,13 @@ The `/api/cron/monitor` endpoint requires a Bearer token to prevent random calle
    | --- | --- |
    | `CRON_SECRET` | `<the random hex>` |
 
-Vercel Cron auto-attaches this as `Authorization: Bearer <CRON_SECRET>` on every scheduled invocation when the env var exists. The schedule itself lives in `vercel.json` (already committed) and runs every 15 minutes.
+External cron services should attach this as `Authorization: Bearer <CRON_SECRET>` on every scheduled invocation when the env var exists. The schedule is managed outside the app and runs every 15 minutes.
 
 ### Verify
 
 After your next deploy + 15 minutes:
 
-- Vercel Dashboard → **your project → Settings → Cron Jobs** → you should see `/api/cron/monitor` listed.
-- Click it → **Logs** → verify it ran and returned 200.
+- Your cron provider → verify `/api/cron/monitor` is listed and returns 200.
 
 ---
 
@@ -367,7 +366,7 @@ Run through this after deployment to confirm end-to-end. Each line should pass:
 - [ ] **PostHog capturing:** sign up a fresh account → see `auth.user.signed_up` in PostHog within 60s.
 - [ ] **Vercel Analytics:** Vercel Dashboard → Project → **Analytics** tab shows page views.
 - [ ] **Vercel Speed Insights:** Vercel Dashboard → Project → **Speed Insights** tab shows real-user metrics within ~24h of traffic.
-- [ ] **Cron monitor running:** Vercel → Cron Jobs → `/api/cron/monitor` shows 200 responses every 15 min.
+- [ ] **Cron monitor running:** your external cron provider shows `/api/cron/monitor` returning 200 responses every 15 min.
 - [ ] **Security events writing:** trigger a failed login → `select * from public.security_events where kind = 'auth_login_failed'` shows a row.
 - [ ] **Brevo webhook landing:** send a test email → `select status from public.delivery_logs order by created_at desc limit 1` advances to `delivered`.
 - [ ] **UptimeRobot polling:** monitor shows >99% uptime over its first 24h window.
@@ -389,7 +388,7 @@ Run through this after deployment to confirm end-to-end. Each line should pass:
 - `NEXT_PUBLIC_POSTHOG_KEY` typo? Check Vercel env vars → redeploy.
 
 ### Cron monitor returns 401
-- `CRON_SECRET` not set in Production env, OR Vercel Cron isn't sending the Bearer header. Verify under Vercel → Cron Jobs → click the job → **Logs**.
+- `CRON_SECRET` not set in Production env, OR your cron provider isn't sending the Bearer header. Verify the provider's job logs and request headers.
 
 ### Slack alerts spam every 15 min
 - A real probe is failing repeatedly — find which by `select * from public.security_events where kind = 'cron_monitor_alert' order by created_at desc limit 5;` and inspect the `metadata.findings`.
@@ -410,7 +409,7 @@ If any service misbehaves and you need to disable it without a redeploy:
 | Sentry | Unset `NEXT_PUBLIC_SENTRY_DSN` in Vercel, redeploy |
 | PostHog | Unset `NEXT_PUBLIC_POSTHOG_KEY` in Vercel, redeploy |
 | Slack alerts | Unset `OPS_SLACK_WEBHOOK_URL` in Vercel, redeploy |
-| Cron monitor | Unset `CRON_SECRET` (route returns 404) — don't delete `vercel.json` schedule, Vercel will simply log 401s |
+| Cron monitor | Unset `CRON_SECRET` (route returns 404) — the endpoint stays disabled until your external scheduler sends the Bearer header |
 | Brevo webhook | Unset `BREVO_WEBHOOK_SECRET` (endpoint returns 404 to all callers) |
 | Vercel Analytics / Speed Insights | Vercel Dashboard → Project → Analytics → toggle off |
 | UptimeRobot | Pause the monitor in their dashboard |
@@ -428,7 +427,7 @@ The codebase already handles these — no manual setup required:
 - ✅ Request-id correlation (middleware stamps every request)
 - ✅ Security event audit trail writes (auth + webhook signature failures auto-emit)
 - ✅ PostHog identify on signup + login (with hashed email)
-- ✅ Cron schedule (`vercel.json`)
+- ✅ External cron schedule
 - ✅ Source-map upload during `next build` (when `SENTRY_AUTH_TOKEN` is set)
 - ✅ Graceful no-op behaviour when any env var is unset
 
@@ -467,7 +466,7 @@ Realistic cost at 10k DAU: ~$30–50/month total observability spend.
 | `instrumentation.ts` | Server/edge runtime entry |
 | `instrumentation-client.ts` | Client runtime entry |
 | `next.config.ts` | Conditional Sentry plugin wrap |
-| `vercel.json` | Cron schedule |
+| external cron provider | Cron schedule |
 | `src/app/api/health/route.ts` | Synthetic monitor target |
 | `src/app/api/cron/monitor/route.ts` | Cron probe + Slack alert |
 | `supabase/migrations/0018_security_events.sql` | Security events table |
