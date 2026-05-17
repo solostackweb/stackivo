@@ -9,6 +9,7 @@ import { getInvoice } from "@/features/invoices/server";
 import { getClient } from "@/features/clients/server";
 import { getClientDisplayName } from "@/features/clients/utils";
 import { InvoiceStatusBadge } from "@/features/invoices/components/invoice-status-badge";
+import { MarkPaidManuallyDialog } from "@/features/invoices/components/mark-paid-manually-dialog";
 
 export const dynamic = "force-dynamic";
 
@@ -69,6 +70,12 @@ export default async function InvoiceDetailPage({
                 View/download PDF
               </a>
             </Button>
+            <MarkPaidManuallyDialog
+              invoiceId={invoice.id}
+              invoiceNumber={invoice.invoiceNumber}
+              amountLabel={formatINR(invoice.totalAmount)}
+              alreadyPaid={invoice.status === "paid"}
+            />
           </div>
         </div>
       </div>

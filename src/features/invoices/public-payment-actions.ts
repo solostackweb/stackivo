@@ -2,9 +2,27 @@
 
 /**
  * Public (anonymous) server actions invoked from the `/i/<token>`
- * payment page. Anyone with a valid token can call these; we never
- * expose the freelancer's Razorpay secret to the client and we apply
- * IP-based rate limiting on order creation.
+ * payment page.
+ *
+ * Two flows are supported here, gated on the freelancer's
+ * `payment_method_type`:
+ *
+ *   - stackivo_managed: orders are created and signatures verified
+ *     against the PLATFORM Razorpay account. Money lands in Stackivo,
+ *     ops pays the freelancer out manually within 1-2 business days.
+ *     On successful verify we mark the invoice paid AND generate the
+ *     receipt synchronously, so the client sees confirmation immediately.
+ *     The webhook (`/api/billing/razorpay/webhook`) acts as a redundant
+ *     idempotent backstop.
+ *
+ *   - upi_manual: this path is NOT used to confirm payments — the
+ *     freelancer marks the invoice paid manually from their dashboard.
+ *     We expose `getInvoicePaymentContextAction` so the public page can
+ *     render the correct panel (QR vs Razorpay button) without leaking
+ *     internal user-ids.
+ *
+ * The deprecated per-user-Razorpay-secret flow is GONE. We never read
+ * `decrypt_user_razorpay_secret(...)` here anymore.
  */
 
 import crypto from "node:crypto";
@@ -13,11 +31,13 @@ import { getAdminSupabase } from "@/lib/supabase/admin";
 import { isValidPublicShareToken } from "@/features/share/server";
 import { getClientIp, publicSignLimit } from "@/lib/rate-limit";
 import {
-  getUserRazorpayCredentials,
-  createUserRazorpayOrder,
-  UserRazorpayError,
-} from "@/features/billing/razorpay/user-account";
-import { sendInvoiceReceiptAction } from "@/features/invoices/delivery";
+  createPlatformInvoiceOrder,
+  PlatformRazorpayError,
+} from "@/features/billing/razorpay/platform-orders";
+import { getUserPaymentMethod } from "@/features/billing/payment-methods";
+import { requireServerEnv } from "@/config/env";
+import { generateReceiptForInvoice } from "./receipts";
+import { sendInvoiceReceiptAction } from "./delivery";
 import type { InvoicePaymentAttemptRow, InvoiceRow } from "@/lib/supabase/types";
 
 export type PublicPaymentResult =
@@ -32,13 +52,13 @@ export type PublicPaymentResult =
   | { ok: false; error: string };
 
 /**
- * Create a Razorpay order against the invoice owner's account so the
- * client can pay this specific invoice. The action expects the public
- * token of the invoice — never an internal id.
+ * Create a Razorpay order against the PLATFORM account for this invoice.
+ * Only valid for `stackivo_managed` freelancers — UPI manual freelancers
+ * never hit this path.
  *
- * Idempotency: if a `created` order exists for this invoice that hasn't
- * been paid against, we return it instead of opening a new one. This
- * prevents duplicate orders if the client refreshes the checkout modal.
+ * Idempotency: if an outstanding `created` order exists for this invoice
+ * that's still on the platform account, reuse it so a refresh of the
+ * checkout modal doesn't litter Razorpay with duplicate orders.
  */
 export async function createInvoicePaymentOrderAction(
   token: string,
@@ -71,22 +91,31 @@ export async function createInvoicePaymentOrderAction(
   const amountPaise = Math.round(total * 100);
   const currency = invoice.currency || "INR";
 
-  const creds = await getUserRazorpayCredentials(invoice.user_id);
-  if (!creds) {
+  // Gate: freelancer must be on stackivo_managed.
+  const method = await getUserPaymentMethod(invoice.user_id);
+  if (!method || method.type !== "stackivo_managed") {
     return {
       ok: false,
       error:
-        "The freelancer hasn't connected a payment method yet. Please contact them.",
+        "Online card / netbanking payment isn't available for this invoice. Please use the UPI option on the invoice page.",
     };
   }
 
-  // Reuse an outstanding order if we have one — saves a Razorpay round-trip
-  // and avoids littering their dashboard.
+  const env = requireServerEnv();
+  if (!env.razorpayKeyId) {
+    return {
+      ok: false,
+      error: "Payments are temporarily unavailable. Please try again shortly.",
+    };
+  }
+
+  // Idempotent reuse of an outstanding platform order.
   const { data: existingRow } = await admin
     .from("invoice_payment_attempts")
     .select("*")
     .eq("invoice_id", invoice.id)
     .eq("status", "created")
+    .eq("payment_method", "stackivo_managed")
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -94,7 +123,7 @@ export async function createInvoicePaymentOrderAction(
   if (existing?.razorpay_order_id) {
     return {
       ok: true,
-      keyId: creds.keyId,
+      keyId: env.razorpayKeyId,
       orderId: existing.razorpay_order_id,
       amountPaise,
       currency,
@@ -104,7 +133,7 @@ export async function createInvoicePaymentOrderAction(
 
   let order;
   try {
-    order = await createUserRazorpayOrder(creds, {
+    order = await createPlatformInvoiceOrder({
       amountPaise,
       currency,
       receipt: `inv_${invoice.invoice_number}`.slice(0, 40),
@@ -113,11 +142,12 @@ export async function createInvoicePaymentOrderAction(
         invoice_number: invoice.invoice_number,
         user_id: invoice.user_id,
         public_token: token,
+        flow: "invoice_managed",
       },
     });
   } catch (err) {
     const message =
-      err instanceof UserRazorpayError
+      err instanceof PlatformRazorpayError
         ? err.message
         : "We couldn't start the payment. Please try again.";
     await admin.from("invoice_payment_attempts").insert({
@@ -126,6 +156,8 @@ export async function createInvoicePaymentOrderAction(
       amount: total,
       currency,
       status: "failed",
+      payment_method: "stackivo_managed",
+      payout_status: "not_applicable",
       error_description: message,
     } as never);
     return { ok: false, error: message };
@@ -138,11 +170,13 @@ export async function createInvoicePaymentOrderAction(
     amount: total,
     currency,
     status: "created",
+    payment_method: "stackivo_managed",
+    payout_status: "pending",
   } as never);
 
   return {
     ok: true,
-    keyId: creds.keyId,
+    keyId: env.razorpayKeyId,
     orderId: order.id,
     amountPaise,
     currency,
@@ -155,20 +189,17 @@ export type VerifyPaymentResult =
   | { ok: false; error: string };
 
 /**
- * Verify a Razorpay one-off payment using the freelancer's secret.
+ * Verify a Razorpay one-off payment using the PLATFORM secret.
  *
- * Razorpay's checkout `handler` callback hands us:
- *   - `razorpay_payment_id`
- *   - `razorpay_order_id`
- *   - `razorpay_signature` (HMAC-SHA256 of `${order_id}|${payment_id}` with
- *     the merchant secret)
+ * On success we:
+ *   - Upsert the payment attempt as `captured`, leave `payout_status` as
+ *     `pending` so the ops team's payout dashboard sees it.
+ *   - Flip the invoice to `paid` + stamp payment metadata.
+ *   - Generate the receipt row (idempotent — keyed on payment_id).
+ *   - Fire the receipt email to the client.
  *
- * We HMAC the same string with the freelancer's stored secret and compare.
- * On success we mark the invoice paid (idempotent), record the attempt,
- * stamp activity, and trigger the receipt email.
- *
- * This pattern is documented in:
- *   https://razorpay.com/docs/payments/server-integration/nodejs/payment-gateway/build-integration/#16-verify-payment-signature
+ * The webhook handles the same state transition idempotently; this path
+ * exists so the payer gets immediate confirmation in the UI.
  */
 export async function verifyInvoicePaymentAction(input: {
   token: string;
@@ -196,21 +227,19 @@ export async function verifyInvoicePaymentAction(input: {
     return { ok: true, alreadyPaid: true };
   }
 
-  const creds = await getUserRazorpayCredentials(invoice.user_id);
-  if (!creds) {
+  const env = requireServerEnv();
+  if (!env.razorpayKeySecret) {
     return {
       ok: false,
-      error: "Freelancer hasn't connected payments. Cannot verify.",
+      error: "Payment verification is unavailable right now.",
     };
   }
 
-  // HMAC verify ----------------------------------------------------------
+  // HMAC verify with PLATFORM secret -----------------------------------
   const expected = crypto
-    .createHmac("sha256", creds.keySecret)
+    .createHmac("sha256", env.razorpayKeySecret)
     .update(`${input.razorpayOrderId}|${input.razorpayPaymentId}`)
     .digest("hex");
-  // `timingSafeEqual` requires equal-length buffers — bail early on length
-  // mismatch to avoid throwing.
   if (expected.length !== input.razorpaySignature.length) {
     return { ok: false, error: "Invalid payment signature." };
   }
@@ -222,8 +251,10 @@ export async function verifyInvoicePaymentAction(input: {
     return { ok: false, error: "Invalid payment signature." };
   }
 
-  // Persist payment + flip invoice -------------------------------------
+  // Persist payment + flip invoice ------------------------------------
   const now = new Date().toISOString();
+  const total = Number(invoice.total_amount);
+
   await admin
     .from("invoices")
     .update({
@@ -231,11 +262,14 @@ export async function verifyInvoicePaymentAction(input: {
       paid_at: now,
       payment_status: "captured",
       payment_method: "razorpay",
+      payment_method_used: "stackivo_managed",
       payment_reference: input.razorpayPaymentId,
-      payment_amount: Number(invoice.total_amount),
+      payment_amount: total,
       payment_recorded_at: now,
     } as never)
-    .eq("id", invoice.id);
+    .eq("id", invoice.id)
+    // Guard against racing with the webhook — only flip if not paid yet.
+    .neq("status", "paid");
 
   await admin
     .from("invoice_payment_attempts")
@@ -245,15 +279,47 @@ export async function verifyInvoicePaymentAction(input: {
         user_id: invoice.user_id,
         razorpay_order_id: input.razorpayOrderId,
         razorpay_payment_id: input.razorpayPaymentId,
-        amount: Number(invoice.total_amount),
+        amount: total,
         currency: invoice.currency,
         status: "captured",
+        payment_method: "stackivo_managed",
+        payout_status: "pending",
       } as never,
       { onConflict: "razorpay_payment_id" },
     );
 
-  // Activity row + freelancer notification (admin-bypass since the payer
-  // is anonymous).
+  // Receipt + client lookup -------------------------------------------
+  let payerEmail: string | null = null;
+  let payerName: string | null = null;
+  if (invoice.client_id) {
+    const { data: client } = await admin
+      .from("clients")
+      .select("email, full_name")
+      .eq("id", invoice.client_id)
+      .maybeSingle();
+    const c = client as { email?: string | null; full_name?: string | null } | null;
+    payerEmail = c?.email ?? null;
+    payerName = c?.full_name ?? null;
+  }
+
+  try {
+    await generateReceiptForInvoice({
+      invoiceId: invoice.id,
+      userId: invoice.user_id,
+      paymentMethod: "stackivo_managed",
+      amount: total,
+      currency: invoice.currency,
+      paidAt: now,
+      payerEmail,
+      payerName,
+      reference: input.razorpayPaymentId,
+    });
+  } catch {
+    // Receipt generation failures don't reverse the payment — log and
+    // continue. The receipt will be generated lazily on first read if
+    // missing.
+  }
+
   await admin.from("activity_events").insert({
     user_id: invoice.user_id,
     kind: "invoice_paid",
@@ -261,9 +327,9 @@ export async function verifyInvoicePaymentAction(input: {
     entity_id: invoice.id,
     title: `Invoice ${invoice.invoice_number} paid`,
     metadata: {
-      via: "razorpay",
+      via: "stackivo_managed",
       payment_id: input.razorpayPaymentId,
-      amount: Number(invoice.total_amount),
+      amount: total,
       currency: invoice.currency,
     },
   } as never);
@@ -272,33 +338,17 @@ export async function verifyInvoicePaymentAction(input: {
     user_id: invoice.user_id,
     type: "invoice_paid",
     title: `Invoice ${invoice.invoice_number} paid`,
-    message: `Your client just paid ${invoice.currency} ${invoice.total_amount}.`,
+    message: `Your client just paid ${invoice.currency} ${invoice.total_amount}. Payout to your bank in 1-2 business days.`,
   } as never);
 
-  // Receipt email — fire-and-forget. The freelancer will see "receipt
-  // sent" in their delivery logs. We don't fail the public verify on
-  // email errors.
-  let recipientEmail: string | null = null;
-  let recipientName: string | null = null;
-  if (invoice.client_id) {
-    const { data: client } = await admin
-      .from("clients")
-      .select("email, full_name")
-      .eq("id", invoice.client_id)
-      .maybeSingle();
-    const c = client as { email?: string | null; full_name?: string | null } | null;
-    recipientEmail = c?.email ?? null;
-    recipientName = c?.full_name ?? null;
-  }
-  if (recipientEmail) {
+  if (payerEmail) {
     void sendInvoiceReceiptAction({
       invoiceId: invoice.id,
-      toEmail: recipientEmail,
-      toName: recipientName,
+      toEmail: payerEmail,
+      toName: payerName,
     });
   }
 
-  // Refresh the freelancer's dashboard view next time they hit it.
   revalidatePath("/dashboard/invoices");
   revalidatePath(`/dashboard/invoices/${invoice.id}`);
 

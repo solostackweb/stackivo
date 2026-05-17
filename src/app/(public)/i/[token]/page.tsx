@@ -4,8 +4,10 @@ import { PublicDocumentFrame } from "@/features/share/components/public-document
 import { getSharedInvoice, recordInvoiceView } from "@/features/share/server";
 import { buildInvoicePdfDataByToken } from "@/features/documents/builders";
 import { getInvoicePdfShareUrl } from "@/features/documents/urls";
-import { getUserRazorpayAccount } from "@/features/billing/razorpay/user-account";
+import { getUserPaymentMethod } from "@/features/billing/payment-methods";
 import { PublicPaymentPanel } from "@/features/invoices/components/public-payment-panel";
+import { PublicUpiPanel } from "@/features/invoices/components/public-upi-panel";
+import { renderUpiQrSvg } from "@/features/invoices/upi";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -35,8 +37,10 @@ export default async function PublicInvoicePage({ params }: Props) {
   // Fire-and-forget: record the view (throttled to once per hour upstream).
   void recordInvoiceView(token);
 
-  const account = await getUserRazorpayAccount(shared.invoice.user_id);
-  const razorpayConnected = account?.status === "connected";
+  // Decide which payment panel to render based on the freelancer's
+  // configured method. The 0027 model collapses the old "is razorpay
+  // connected" check into a single typed enum.
+  const method = await getUserPaymentMethod(shared.invoice.user_id);
 
   const status = shared.invoice.status;
   const tone =
@@ -51,6 +55,26 @@ export default async function PublicInvoicePage({ params }: Props) {
     shared.invoice.currency,
   );
   const senderName = viewModel.seller.businessName ?? "Stackivo";
+
+  // For UPI we render the QR server-side so the SVG arrives baked into
+  // the HTML — no client-side QR library bundle, no flicker.
+  let upiPanelProps:
+    | {
+        qrSvg: string;
+        vpa: string;
+        upiUri: string;
+      }
+    | null = null;
+  if (method?.type === "upi_manual") {
+    const { svg, uri } = await renderUpiQrSvg({
+      vpa: method.payout.vpa,
+      payeeName: senderName,
+      amount: Number(shared.invoice.total_amount),
+      note: `Invoice ${viewModel.invoiceNumber}`,
+      ref: viewModel.invoiceNumber,
+    });
+    upiPanelProps = { qrSvg: svg, vpa: method.payout.vpa, upiUri: uri };
+  }
 
   return (
     <PublicDocumentFrame
@@ -70,7 +94,6 @@ export default async function PublicInvoicePage({ params }: Props) {
       pdfFileName={`invoice-${viewModel.invoiceNumber}.pdf`}
     >
       <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
-        {/* PDF preview via embedded iframe so the layout matches the contract route. */}
         <div className="overflow-hidden rounded-lg border bg-background">
           <iframe
             src={getInvoicePdfShareUrl(token)}
@@ -79,7 +102,7 @@ export default async function PublicInvoicePage({ params }: Props) {
           />
         </div>
         <aside className="space-y-4">
-          {razorpayConnected ? (
+          {method?.type === "stackivo_managed" ? (
             <PublicPaymentPanel
               token={token}
               amountFormatted={amountFormatted}
@@ -91,13 +114,22 @@ export default async function PublicInvoicePage({ params }: Props) {
                 email: viewModel.client?.email ?? undefined,
               }}
             />
+          ) : method?.type === "upi_manual" && upiPanelProps ? (
+            <PublicUpiPanel
+              qrSvg={upiPanelProps.qrSvg}
+              vpa={upiPanelProps.vpa}
+              upiUri={upiPanelProps.upiUri}
+              amountFormatted={amountFormatted}
+              invoiceNumber={viewModel.invoiceNumber}
+              alreadyPaid={status === "paid"}
+            />
           ) : (
             <div className="rounded-lg border bg-card p-5 text-sm">
               <p className="font-semibold">Pay outside Stackivo</p>
               <p className="mt-1 text-xs text-muted-foreground">
-                {senderName} hasn't connected online payments yet. Please
+                {senderName} hasn&apos;t set up online payments yet. Please
                 pay using the bank or UPI details listed on the invoice and
-                let them know once it's done.
+                let them know once it&apos;s done.
               </p>
             </div>
           )}

@@ -193,9 +193,31 @@ export async function nextInvoiceNumber(userId: string): Promise<{
 
 /**
  * Aggregate dashboard stats for invoices.
+ *
+ * IMPORTANT — accounting separation. Invoices are a DUE mechanism, not a
+ * realisation of revenue. The returned shape deliberately splits:
+ *
+ *   - `totalInvoiced`     : sum of all invoices ever issued (sent/viewed/
+ *                           paid/overdue/partially_paid). The headline
+ *                           "we billed this much" number.
+ *   - `collectedAllTime`  : sum of paid invoices. The only number that
+ *                           represents actual money in the bank.
+ *   - `paidThisMonth`     : collected revenue this calendar month.
+ *   - `outstanding`       : sum of unpaid issued invoices (sent / viewed
+ *                           / overdue / partially_paid). Equivalent to
+ *                           accrued income in single-entry accounting
+ *                           terms.
+ *   - `overdueAmount`     : subset of `outstanding` that is past due.
+ *
+ * The previous single-number `paidThisMonth` shape is preserved for
+ * back-compat with the existing dashboard widgets.
  */
 export async function getInvoiceAggregates(): Promise<{
   paidThisMonth: number;
+  collectedAllTime: number;
+  totalInvoiced: number;
+  outstanding: number;
+  overdueAmount: number;
   overdueCount: number;
   draftCount: number;
   recent: InvoiceRecord[];
@@ -205,13 +227,14 @@ export async function getInvoiceAggregates(): Promise<{
     Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1),
   ).toISOString();
 
-  const [{ data: paidRows }, { count: overdueCount }, { count: draftCount }, { data: recent }] =
+  // Pull just the small set of fields needed to compute every aggregate
+  // in-app. For a single freelancer's lifetime invoice volume this is
+  // tiny and far cheaper than running six separate `count`/`sum` queries.
+  const [{ data: allRows }, { count: overdueCount }, { count: draftCount }, { data: recent }] =
     await Promise.all([
       supabase
         .from("invoices")
-        .select("total_amount, paid_at")
-        .eq("status", "paid")
-        .gte("paid_at", monthStart),
+        .select("total_amount, paid_at, status"),
       supabase
         .from("invoices")
         .select("id", { count: "exact", head: true })
@@ -227,11 +250,43 @@ export async function getInvoiceAggregates(): Promise<{
         .limit(5),
     ]);
 
-  const sum = (rows: Array<{ total_amount?: number }> | null) =>
-    (rows ?? []).reduce((acc, r) => acc + (Number(r.total_amount) || 0), 0);
+  type AggRow = { total_amount?: number; paid_at?: string | null; status?: string };
+  const rows = (allRows as AggRow[] | null) ?? [];
+
+  let paidThisMonth = 0;
+  let collectedAllTime = 0;
+  let totalInvoiced = 0;
+  let outstanding = 0;
+  let overdueAmount = 0;
+
+  for (const r of rows) {
+    const amt = Number(r.total_amount) || 0;
+    const status = r.status ?? "draft";
+    // Drafts have NOT been issued — they're not part of total_invoiced.
+    if (status === "draft") continue;
+    totalInvoiced += amt;
+
+    if (status === "paid") {
+      collectedAllTime += amt;
+      if (r.paid_at && r.paid_at >= monthStart) {
+        paidThisMonth += amt;
+      }
+      continue;
+    }
+
+    // Everything else issued-but-not-paid is outstanding.
+    outstanding += amt;
+    if (status === "overdue") {
+      overdueAmount += amt;
+    }
+  }
 
   return {
-    paidThisMonth: sum(paidRows as Array<{ total_amount?: number }> | null),
+    paidThisMonth,
+    collectedAllTime,
+    totalInvoiced,
+    outstanding,
+    overdueAmount,
     overdueCount: overdueCount ?? 0,
     draftCount: draftCount ?? 0,
     recent: ((recent as unknown as InvoiceRow[]) ?? []).map(mapInvoiceRow),

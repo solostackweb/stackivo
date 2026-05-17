@@ -144,7 +144,24 @@ async function dispatch(event: WebhookEnvelope): Promise<void> {
       const payment = event.payload.payment?.entity as unknown as
         | RazorpayPayment
         | undefined;
-      if (payment) await persistPayment(payment);
+      if (!payment) return;
+      // Backstop for the Stackivo Managed invoice flow: orders we create
+      // tag `notes.flow = "invoice_managed"`. If the payer's browser
+      // closed before the synchronous verify call ran, this webhook is
+      // what flips the invoice to paid + generates the receipt. The
+      // handler is idempotent — re-running it on a paid invoice is a
+      // no-op.
+      const notes = payment.notes ?? null;
+      if (
+        notes &&
+        notes.flow === "invoice_managed" &&
+        typeof notes.invoice_id === "string"
+      ) {
+        await applyInvoicePaymentEvent(payment, notes.invoice_id);
+        return;
+      }
+      // Otherwise treat as a subscription / billing payment.
+      await persistPayment(payment);
       return;
     }
 
@@ -168,6 +185,168 @@ async function dispatch(event: WebhookEnvelope): Promise<void> {
       // Unknown / uninteresting event — log only.
       return;
   }
+}
+
+// --- Invoice-payment backstop ---------------------------------------------
+
+/**
+ * Idempotent webhook-side mirror of `verifyInvoicePaymentAction`.
+ *
+ * Called when a `payment.*` event arrives for an order tagged
+ * `notes.flow = "invoice_managed"`. The synchronous verify path in the
+ * checkout flow has usually already done this work — but if the payer
+ * closed the tab mid-flow, this is what gets the invoice to `paid`.
+ *
+ * Lives here (rather than in the invoices feature) because all webhook
+ * fan-out runs through this dispatcher; the dynamic import keeps the
+ * subscription path's bundle small.
+ */
+async function applyInvoicePaymentEvent(
+  p: RazorpayPayment,
+  invoiceId: string,
+): Promise<void> {
+  // Only act on captured payments. Failed / authorized events are logged
+  // as attempts but don't move the invoice.
+  if (p.status !== "captured") {
+    await recordAttempt(p, invoiceId, p.status === "failed" ? "failed" : "authorized");
+    return;
+  }
+
+  const admin = getAdminSupabase();
+  const { data: invoiceRow } = await admin
+    .from("invoices")
+    .select(
+      "id, user_id, client_id, invoice_number, currency, total_amount, status",
+    )
+    .eq("id", invoiceId)
+    .maybeSingle();
+  const invoice = invoiceRow as
+    | {
+        id: string;
+        user_id: string;
+        client_id: string | null;
+        invoice_number: string;
+        currency: string;
+        total_amount: number;
+        status: string;
+      }
+    | null;
+  if (!invoice) return;
+
+  // Record the attempt regardless — useful for reconciliation.
+  await recordAttempt(p, invoiceId, "captured");
+
+  if (invoice.status === "paid") {
+    // Synchronous verify path already handled it; nothing more to do.
+    return;
+  }
+
+  const paidAtIso = new Date(p.created_at * 1000).toISOString();
+  const total = Number(invoice.total_amount);
+
+  await admin
+    .from("invoices")
+    .update({
+      status: "paid",
+      paid_at: paidAtIso,
+      payment_status: "captured",
+      payment_method: "razorpay",
+      payment_method_used: "stackivo_managed",
+      payment_reference: p.id,
+      payment_amount: total,
+      payment_recorded_at: paidAtIso,
+    } as never)
+    .eq("id", invoice.id)
+    .neq("status", "paid");
+
+  // Receipt — lazy import to keep this module's compile graph tight.
+  let payerEmail: string | null = null;
+  let payerName: string | null = null;
+  if (invoice.client_id) {
+    const { data: client } = await admin
+      .from("clients")
+      .select("email, full_name")
+      .eq("id", invoice.client_id)
+      .maybeSingle();
+    const c = client as { email?: string | null; full_name?: string | null } | null;
+    payerEmail = c?.email ?? null;
+    payerName = c?.full_name ?? null;
+  }
+  try {
+    const { generateReceiptForInvoice } = await import(
+      "@/features/invoices/receipts"
+    );
+    await generateReceiptForInvoice({
+      invoiceId: invoice.id,
+      userId: invoice.user_id,
+      paymentMethod: "stackivo_managed",
+      amount: total,
+      currency: invoice.currency,
+      paidAt: paidAtIso,
+      payerEmail,
+      payerName,
+      reference: p.id,
+    });
+  } catch {
+    /* receipt generation failure is non-fatal — the row exists; receipt can be regenerated. */
+  }
+
+  // Activity + notification + receipt email.
+  await admin.from("activity_events").insert({
+    user_id: invoice.user_id,
+    kind: "invoice_paid",
+    entity_type: "invoice",
+    entity_id: invoice.id,
+    title: `Invoice ${invoice.invoice_number} paid`,
+    metadata: {
+      via: "webhook_backstop",
+      payment_id: p.id,
+      amount: total,
+      currency: invoice.currency,
+    },
+  } as never);
+  await admin.from("notifications").insert({
+    user_id: invoice.user_id,
+    type: "invoice_paid",
+    title: `Invoice ${invoice.invoice_number} paid`,
+    message: `Payment captured. Payout in 1-2 business days.`,
+  } as never);
+  if (payerEmail) {
+    const { sendInvoiceReceiptAction } = await import(
+      "@/features/invoices/delivery"
+    );
+    void sendInvoiceReceiptAction({
+      invoiceId: invoice.id,
+      toEmail: payerEmail,
+      toName: payerName,
+    });
+  }
+}
+
+async function recordAttempt(
+  p: RazorpayPayment,
+  invoiceId: string,
+  status: "created" | "authorized" | "captured" | "failed" | "refunded",
+): Promise<void> {
+  const admin = getAdminSupabase();
+  await admin
+    .from("invoice_payment_attempts")
+    .upsert(
+      {
+        invoice_id: invoiceId,
+        user_id: (p.notes?.user_id as string | undefined) ?? "",
+        razorpay_order_id: p.order_id,
+        razorpay_payment_id: p.id,
+        amount: p.amount / 100,
+        currency: p.currency,
+        status,
+        payment_method: "stackivo_managed",
+        payout_status: status === "captured" ? "pending" : "not_applicable",
+        error_code: p.error_code ?? null,
+        error_description: p.error_description ?? null,
+      } as never,
+      { onConflict: "razorpay_payment_id" },
+    );
 }
 
 // --- Helpers ---------------------------------------------------------------

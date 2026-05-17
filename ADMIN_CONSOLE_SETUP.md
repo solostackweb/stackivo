@@ -55,7 +55,7 @@ set raw_app_meta_data = jsonb_set(
   '{role}',
   '"admin"'
 )
-where email = 'YOUR_FOUNDER_EMAIL@stackivo.me';
+where email = 'admin@stackivo.me';
 ```
 
 3. Verify:

@@ -161,7 +161,9 @@ export interface UserProfileRow {
   onboarding_step: OnboardingStep;
   // Free-plan enforcement
   lifetime_clients_created: number;
-  // Per-user Razorpay credentials for client-invoice payments (added in 0023)
+  // Per-user Razorpay credentials for client-invoice payments (added in 0023).
+  // DEPRECATED in 0027 — kept only for historic data. New code must NOT read
+  // or write these. The two-option model in 0027 supersedes this.
   razorpay_key_id: string | null;
   razorpay_account_status:
     | "unverified"
@@ -171,8 +173,58 @@ export interface UserProfileRow {
   razorpay_test_mode: boolean;
   razorpay_connected_at: string | null;
   razorpay_last_verified_at: string | null;
+  // Two-option payment-method config (added in 0027). `null` means the
+  // freelancer hasn't picked a method yet — the public invoice page falls
+  // back to a "pay outside Stackivo" notice.
+  payment_method_type: "stackivo_managed" | "upi_manual" | null;
+  payment_method_configured_at: string | null;
+  payout_account_holder_name: string | null;
+  payout_bank_account_number: string | null;
+  payout_bank_ifsc: string | null;
+  payout_bank_name: string | null;
+  payout_upi_vpa: string | null;
   created_at: string;
   updated_at: string;
+}
+
+// --- 0027: receipts + manual confirmations ---------------------------------
+
+export type PaymentMethodType = "stackivo_managed" | "upi_manual";
+
+export type PayoutStatus =
+  | "not_applicable"
+  | "pending"
+  | "processing"
+  | "transferred"
+  | "failed";
+
+export interface InvoiceReceiptRow {
+  id: string;
+  invoice_id: string;
+  user_id: string;
+  receipt_number: string;
+  payment_method: PaymentMethodType;
+  amount: number;
+  currency: string;
+  paid_at: string;
+  payer_name: string | null;
+  payer_email: string | null;
+  reference: string | null;
+  notes: string | null;
+  created_at: string;
+}
+
+export interface InvoiceManualConfirmationRow {
+  id: string;
+  invoice_id: string;
+  user_id: string;
+  confirmed_by_user_id: string;
+  amount: number;
+  currency: string;
+  paid_at: string;
+  reference: string | null;
+  notes: string | null;
+  created_at: string;
 }
 
 export interface ClientRow {
@@ -233,6 +285,9 @@ export interface InvoiceRow {
   payment_reference: string | null;
   payment_amount: number | null;
   payment_recorded_at: string | null;
+  // Which collection flow produced the payment (0027). Distinct from the
+  // free-form `payment_method` column kept from 0013 for legacy reasons.
+  payment_method_used: PaymentMethodType | null;
   notes: string | null;
   terms: string | null;
   public_token: string | null;
@@ -608,6 +663,11 @@ export interface InvoicePaymentAttemptRow {
   error_code: string | null;
   error_description: string | null;
   payload: Json | null;
+  // Added in 0027.
+  payment_method: PaymentMethodType;
+  payout_status: PayoutStatus;
+  payout_reference: string | null;
+  payout_transferred_at: string | null;
   created_at: string;
 }
 
@@ -902,6 +962,33 @@ export interface Database {
             "user_id" | "razorpay_payment_id" | "amount" | "status"
           >;
         Update: Partial<BillingPaymentRow>;
+      };
+      invoice_receipts: {
+        Row: InvoiceReceiptRow;
+        Insert: Partial<InvoiceReceiptRow> &
+          Pick<
+            InvoiceReceiptRow,
+            | "invoice_id"
+            | "user_id"
+            | "receipt_number"
+            | "payment_method"
+            | "amount"
+            | "paid_at"
+          >;
+        Update: Partial<InvoiceReceiptRow>;
+      };
+      invoice_manual_confirmations: {
+        Row: InvoiceManualConfirmationRow;
+        Insert: Partial<InvoiceManualConfirmationRow> &
+          Pick<
+            InvoiceManualConfirmationRow,
+            | "invoice_id"
+            | "user_id"
+            | "confirmed_by_user_id"
+            | "amount"
+            | "paid_at"
+          >;
+        Update: Partial<InvoiceManualConfirmationRow>;
       };
       billing_events: {
         Row: BillingEventRow;

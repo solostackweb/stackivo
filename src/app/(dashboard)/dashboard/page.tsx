@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Building2, FileCheck2, Plus, ShieldCheck, Timer, Users, Wallet } from "lucide-react";
 
+import { AccountingOverview } from "@/components/dashboard/accounting-overview";
 import { ActivityTimeline } from "@/components/dashboard/activity-timeline";
 import { QuickActions } from "@/components/dashboard/quick-actions";
 import { RecentClients } from "@/components/dashboard/recent-clients";
@@ -178,6 +179,13 @@ export default async function DashboardPage() {
           icon={Timer}
         />
       </div>
+
+      <AccountingOverview
+        totalInvoiced={invoices.totalInvoiced}
+        collectedAllTime={invoices.collectedAllTime}
+        outstanding={invoices.outstanding}
+        overdueAmount={invoices.overdueAmount}
+      />
 
       <RevenueChartLazy series={pulse.revenueSeries} />
 
