@@ -9,7 +9,7 @@ export interface ContractSignatureReference {
 
 export function hasSignatureReference(
   signature: ContractSignatureReference | null | undefined,
-): boolean {
+): signature is ContractSignatureReference & { type: ContractSignatureType } {
   if (!signature?.type) return false;
   if (signature.type === "type") return Boolean(signature.textValue?.trim());
   return Boolean(signature.imageUrl?.trim());

@@ -27,6 +27,7 @@ import { Document, StyleSheet, Text, View } from "@react-pdf/renderer";
 import { parseContractContent } from "@/features/contracts/content";
 import {
   hasSignatureReference,
+  type ContractSignatureType,
   type ContractSignatureReference,
 } from "@/features/contracts/signatures";
 import {
@@ -289,7 +290,7 @@ export function ContractPdf({
 // --- Helpers ----------------------------------------------------------------
 
 function coerceSignature(
-  ref: ContractSignatureReference,
+  ref: ContractSignatureReference & { type: ContractSignatureType },
   signedAt: string | null,
   signedIp: string | null = null,
 ): SignatureData {
