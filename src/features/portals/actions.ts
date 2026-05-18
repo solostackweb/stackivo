@@ -423,11 +423,13 @@ export async function acceptPortalInvitationAction(
     return { ok: false, error: "This invitation has expired." };
   }
 
-  const { data: existingMemberRows } = await admin
+  const { data: existingMemberRows } = (await admin
     .from("portal_members")
     .select("user_id, revoked_at")
     .eq("portal_id", inv.portal_id)
-    .is("revoked_at", null);
+    .is("revoked_at", null)) as {
+    data: Array<{ user_id: string; revoked_at: string | null }> | null;
+  };
   if (
     existingMemberRows &&
     existingMemberRows.some((m) => m.user_id !== user.id)

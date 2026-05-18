@@ -684,7 +684,11 @@ export function LineItemsTable<T>({
       {rows.map((row, idx) => (
         <View
           key={idx}
-          style={[tableStyles.row, zebra && idx % 2 === 1 ? tableStyles.rowAlt : null]}
+          style={
+            zebra && idx % 2 === 1
+              ? [tableStyles.row, tableStyles.rowAlt]
+              : tableStyles.row
+          }
           wrap={false}
         >
           {columns.map((col) => (
