@@ -407,8 +407,11 @@ export function Divider({ style }: { style?: ViewProps["style"] }) {
     backgroundColor: pdfColors.border,
     marginVertical: pdfSpacing.md,
   };
+  const mergedStyle = style
+    ? [base, ...(Array.isArray(style) ? style : [style])]
+    : base;
   return (
-    <View style={style ? [base, style] : base} />
+    <View style={mergedStyle} />
   );
 }
 
