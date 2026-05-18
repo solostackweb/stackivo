@@ -239,7 +239,7 @@ export function ContractPdf({
               <SignatureBlock
                 label={`Signed for ${brand.businessName}`}
                 signature={
-                  data.seller.signature
+                  hasSignatureReference(data.seller.signature)
                     ? coerceSignature(
                         data.seller.signature,
                         data.seller.signature.signedAt ?? data.issuedAt,
