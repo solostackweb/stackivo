@@ -159,6 +159,12 @@ export async function listPortalsForCurrentUser(): Promise<{
 
 export interface PortalSnapshot {
   access: PortalAccess;
+  client: {
+    id: string;
+    fullName: string | null;
+    businessName: string | null;
+    email: string | null;
+  } | null;
   members: Array<
     PortalMemberRow & {
       profile: { full_name: string | null; email: string | null } | null;
@@ -184,6 +190,11 @@ export interface PortalSnapshot {
     public_token: string | null;
     added_at: string;
   }>;
+  availableContracts: Array<{
+    id: string;
+    title: string;
+    status: string;
+  }>;
   invoices: Array<{
     id: string;
     invoice_number: string;
@@ -193,6 +204,13 @@ export interface PortalSnapshot {
     public_token: string | null;
     added_at: string;
   }>;
+  availableInvoices: Array<{
+    id: string;
+    invoice_number: string;
+    total_amount: number;
+    currency: string;
+    status: string;
+  }>;
   welcomeDocuments: Array<{
     id: string;
     title: string;
@@ -200,6 +218,12 @@ export interface PortalSnapshot {
     public_token: string | null;
     acknowledgement_required: boolean;
     added_at: string;
+  }>;
+  availableWelcomeDocuments: Array<{
+    id: string;
+    title: string;
+    status: string;
+    acknowledgement_required: boolean;
   }>;
   activity: Array<import("@/lib/supabase/types").PortalActivityRow>;
 }
@@ -226,6 +250,7 @@ export async function getPortalSnapshot(
     invoicesRes,
     welcomeDocsRes,
     activityRes,
+    clientRes,
   ] = await Promise.all([
     admin
       .from("portal_members")
@@ -281,6 +306,13 @@ export async function getPortalSnapshot(
       .eq("portal_id", portalId)
       .order("created_at", { ascending: false })
       .limit(50),
+    access.portal.client_id
+      ? admin
+          .from("clients")
+          .select("id, full_name, business_name, email")
+          .eq("id", access.portal.client_id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
   ]);
 
   // Hydrate member profiles in one query so the detail page can show
@@ -413,8 +445,95 @@ export async function getPortalSnapshot(
 
   const usage = (usageRes.data as { total_bytes?: number; file_count?: number } | null) ?? null;
 
+  let availableContracts: PortalSnapshot["availableContracts"] = [];
+  let availableInvoices: PortalSnapshot["availableInvoices"] = [];
+  let availableWelcomeDocuments: PortalSnapshot["availableWelcomeDocuments"] = [];
+  if (access.role === "owner") {
+    const attachedContractIds = new Set(contracts.map((c) => c.id));
+    const attachedInvoiceIds = new Set(invoices.map((i) => i.id));
+    const attachedWelcomeIds = new Set(welcomeDocuments.map((w) => w.id));
+
+    // Constrain "available to attach" to docs that already belong to the
+    // portal's client. Without this filter the freelancer could attach
+    // an invoice belonging to Client B into Client A's portal, which
+    // would surface client B's data to the wrong audience. When the
+    // portal has no client linked (legacy / general portal) we fall
+    // back to the unconstrained user-scoped query.
+    const portalClientId = access.portal.client_id;
+
+    const contractsQuery = admin
+      .from("contracts")
+      .select("id, title, status, client_id")
+      .eq("user_id", access.userId)
+      .order("updated_at", { ascending: false })
+      .limit(200);
+    const invoicesQuery = admin
+      .from("invoices")
+      .select("id, invoice_number, total_amount, currency, status, client_id")
+      .eq("user_id", access.userId)
+      .order("created_at", { ascending: false })
+      .limit(200);
+    const welcomeQuery = admin
+      .from("welcome_documents")
+      .select("id, title, status, acknowledgement_required, client_id")
+      .eq("user_id", access.userId)
+      .order("updated_at", { ascending: false })
+      .limit(200);
+
+    if (portalClientId) {
+      contractsQuery.eq("client_id", portalClientId);
+      invoicesQuery.eq("client_id", portalClientId);
+      welcomeQuery.eq("client_id", portalClientId);
+    }
+
+    const [contractsRes2, invoicesRes2, welcomeRes2] = await Promise.all([
+      contractsQuery,
+      invoicesQuery,
+      welcomeQuery,
+    ]);
+
+    availableContracts = ((contractsRes2.data ?? []) as Array<{
+      id: string;
+      title: string;
+      status: string;
+    }>).filter((c) => !attachedContractIds.has(c.id));
+
+    availableInvoices = ((invoicesRes2.data ?? []) as Array<{
+      id: string;
+      invoice_number: string;
+      total_amount: number;
+      currency: string;
+      status: string;
+    }>).filter((i) => !attachedInvoiceIds.has(i.id));
+
+    availableWelcomeDocuments = ((welcomeRes2.data ?? []) as Array<{
+      id: string;
+      title: string;
+      status: string;
+      acknowledgement_required: boolean;
+    }>).filter((w) => !attachedWelcomeIds.has(w.id));
+  }
+
+  const clientRow = (clientRes as {
+    data: {
+      id: string;
+      full_name: string | null;
+      business_name: string | null;
+      email: string | null;
+    } | null;
+  }).data;
+  const client = clientRow
+    ? {
+        id: clientRow.id,
+        fullName: clientRow.full_name,
+        businessName: clientRow.business_name,
+        email: clientRow.email,
+      }
+    : null;
+
   return {
     access,
+    client,
     members: memberRows.map((m) => ({
       ...m,
       profile: profileMap.get(m.user_id) ?? null,
@@ -435,8 +554,11 @@ export async function getPortalSnapshot(
       author: profileMap.get(m.author_id) ?? null,
     })),
     contracts,
+    availableContracts,
     invoices,
+    availableInvoices,
     welcomeDocuments,
+    availableWelcomeDocuments,
     activity: (activityRes.data ?? []) as import("@/lib/supabase/types").PortalActivityRow[],
   };
 }

@@ -43,7 +43,7 @@ export default async function ClientPortalHomePage({
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Your shared workspace. Find contracts to sign, invoices to pay,
-          files, and the comment thread below.
+          files, and the conversation space below.
         </p>
       </div>
 
@@ -51,7 +51,11 @@ export default async function ClientPortalHomePage({
         portalId={id}
         portalName={access.portal.name}
         brandColor={access.portal.brand_color ?? "#6366F1"}
+        portalStatus={access.portal.status}
+        currentUserId={access.userId}
         role={access.role}
+        clientId={snapshot.client?.id ?? access.portal.client_id}
+        clientEmail={snapshot.client?.email ?? null}
         members={snapshot.members.map((m) => ({
           user_id: m.user_id,
           role: m.role,
@@ -61,8 +65,11 @@ export default async function ClientPortalHomePage({
         files={snapshot.files}
         messages={snapshot.messages}
         contracts={snapshot.contracts}
+        availableContracts={[]}
         invoices={snapshot.invoices}
+        availableInvoices={[]}
         welcomeDocuments={snapshot.welcomeDocuments}
+        availableWelcomeDocuments={[]}
         activity={snapshot.activity}
         storageUsage={snapshot.storageUsage}
         storageCap={Number.POSITIVE_INFINITY}

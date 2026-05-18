@@ -111,6 +111,27 @@ export async function signupAction(
     return { ok: false, error: error.message };
   }
 
+  // Supabase default behaviour for an already-registered email: returns a
+  // placeholder user row with `identities: []` and NO error. Without this
+  // check the UI would falsely confirm signup. We surface a generic
+  // "already registered" message that nudges the user to the login page
+  // without leaking which email exists.
+  const identities = (signUpData.user?.identities ?? []) as unknown[];
+  const looksLikeExistingAccount =
+    !!signUpData.user && identities.length === 0;
+  if (looksLikeExistingAccount) {
+    await recordSecurityEvent({
+      kind: "auth_signup_duplicate",
+      severity: "info",
+      metadata: { email_hash: await hashedEmail(email) },
+    });
+    return {
+      ok: false,
+      error:
+        "An account with that email already exists. Try logging in instead, or reset your password.",
+    };
+  }
+
   // Identify the (unverified) user in PostHog so the funnel from
   // signup → email verified → onboarding completed is joinable.
   if (signUpData.user) {
@@ -124,7 +145,7 @@ export async function signupAction(
   return {
     ok: true,
     message:
-      "Check your inbox to verify your email, then log in to finish setting up.",
+      "Check your inbox to verify your email — clicking the link signs you in and drops you into onboarding.",
   };
 }
 
@@ -202,7 +223,17 @@ export async function loginAction(
     await trackServerEvent(signInData.user.id, "auth.user.logged_in");
   }
 
-  const next = sanitiseNext(formData.get("next")?.toString() ?? null);
+  // Route admins straight to /admin and skip the freelancer dashboard
+  // entirely. An admin who explicitly came from a deep `next=` link still
+  // honours that destination so internal links keep working.
+  const rawNext = formData.get("next")?.toString() ?? null;
+  const role = (signInData.user?.app_metadata as { role?: unknown } | null)
+    ?.role;
+  if (role === "admin" && !rawNext) {
+    redirect("/admin");
+  }
+
+  const next = sanitiseNext(rawNext);
   redirect(next);
 }
 

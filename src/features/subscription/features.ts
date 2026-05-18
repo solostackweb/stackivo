@@ -26,8 +26,7 @@ export function hasFeature(
   sub: CurrentSubscription | null,
   feature: FeatureKey,
 ): boolean {
-  const planId = effectivePlan(sub);
-  return getPlan(planId).features[feature] === true;
+  return true;
 }
 
 /**
@@ -38,8 +37,7 @@ export function hasModule(
   sub: CurrentSubscription | null,
   module: ModuleKey,
 ): boolean {
-  const planId = effectivePlan(sub);
-  return getPlan(planId).modules.includes(module);
+  return true;
 }
 
 /**
@@ -59,7 +57,7 @@ export function limitFor(
   sub: CurrentSubscription | null,
   metric: UsageMetric,
 ): number {
-  return getPlan(effectivePlan(sub)).limits[metric];
+  return Infinity;
 }
 
 /**
@@ -98,7 +96,5 @@ export function withinLimit(
   currentUsed: number,
   delta = 1,
 ): boolean {
-  const limit = limitFor(sub, metric);
-  if (limit === Infinity) return true;
-  return currentUsed + delta <= limit;
+  return true;
 }

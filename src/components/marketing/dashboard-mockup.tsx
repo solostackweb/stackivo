@@ -76,8 +76,10 @@ export function DashboardMockup() {
         </div>
       </div>
 
-      {/* Floating cards — visible on md+, overlap the main panel for depth */}
-      <div className="pointer-events-none absolute -bottom-8 -left-4 hidden w-64 rotate-[-3deg] rounded-xl border bg-card p-3 shadow-xl ring-1 ring-border/40 md:block lg:-bottom-10 lg:-left-10 lg:w-72">
+      {/* Floating cards — visible on xl+ only where the hero column is wide
+          enough to carry the bleed. Below xl the hero wrapper clips and we
+          hide these to keep the section overflow-clean. */}
+      <div className="pointer-events-none absolute -bottom-8 -left-4 hidden w-64 rotate-[-3deg] rounded-xl border bg-card p-3 shadow-xl ring-1 ring-border/40 xl:block xl:-bottom-10 xl:-left-10 xl:w-72">
         <div className="flex items-center gap-2">
           <span className="flex h-7 w-7 items-center justify-center rounded-md bg-success/10 text-success">
             <CheckCircle2 className="h-3.5 w-3.5" />
@@ -89,7 +91,7 @@ export function DashboardMockup() {
         </div>
       </div>
 
-      <div className="pointer-events-none absolute -right-4 -top-6 hidden w-60 rotate-[3deg] rounded-xl border bg-card p-3 shadow-xl ring-1 ring-border/40 md:block lg:-right-10 lg:w-72">
+      <div className="pointer-events-none absolute -right-4 -top-6 hidden w-60 rotate-[3deg] rounded-xl border bg-card p-3 shadow-xl ring-1 ring-border/40 xl:block xl:-right-10 xl:w-72">
         <div className="flex items-center gap-2">
           <span className="flex h-7 w-7 items-center justify-center rounded-md bg-primary/10 text-primary">
             <Bell className="h-3.5 w-3.5" />

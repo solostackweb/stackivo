@@ -117,19 +117,34 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  // 2. Authenticated user hitting an auth-only page → straight to dashboard.
+  // 2. Authenticated user hitting an auth-only page → straight to dashboard
+  //    (or /admin when the user has the admin role and no explicit `next`).
   if (user && isAuthOnlyPath(pathname)) {
     const dashUrl = request.nextUrl.clone();
     const next = request.nextUrl.searchParams.get("next");
+    const role = (user.app_metadata as { role?: unknown } | null)?.role;
+    const defaultFor = role === "admin" ? "/admin" : AUTH_DEFAULT_REDIRECT;
     dashUrl.pathname =
       next &&
       next.startsWith("/") &&
       !next.startsWith("//") &&
       !isAuthOnlyPath(next.split("?")[0] ?? "")
         ? next
-        : AUTH_DEFAULT_REDIRECT;
+        : defaultFor;
     dashUrl.search = "";
     return NextResponse.redirect(dashUrl);
+  }
+
+  // 3. Admin landing on /dashboard root → bounce to /admin. Sub-paths still
+  //    work so admins can drop into the freelancer surface if they want.
+  if (user && (pathname === "/dashboard" || pathname === "/dashboard/")) {
+    const role = (user.app_metadata as { role?: unknown } | null)?.role;
+    if (role === "admin") {
+      const adminUrl = request.nextUrl.clone();
+      adminUrl.pathname = "/admin";
+      adminUrl.search = "";
+      return NextResponse.redirect(adminUrl);
+    }
   }
 
   return response;

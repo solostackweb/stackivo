@@ -1,0 +1,157 @@
+import * as React from "react";
+import { cn } from "@/lib/utils";
+
+/**
+ * Stackivo brand system.
+ *
+ * The mark is two offset rounded "stadium" bars locked into a square
+ * container — reads simultaneously as a stylised "S" monogram and as a
+ * pair of stacked plates (Stackivo). Two bars (not three) keeps the
+ * silhouette crisp at favicon sizes; the diagonal offset gives the mark
+ * directionality so it never sits dead-on-centre.
+ *
+ * Three components:
+ *   - <StackivoMark/>     — square icon mark, all variants, all sizes.
+ *   - <StackivoWordmark/> — text-only "Stackivo" set in tight tracking.
+ *   - <StackivoLogo/>     — mark + wordmark lockup (default nav/header).
+ *
+ * Variants:
+ *   color    Gradient container, white bars. Default for the app + marketing.
+ *   mono     Currentcolor container, white bars. Use on solid coloured panels.
+ *   white    Transparent container, white bars. Use over imagery / dark sections.
+ *   outline  Transparent container, currentcolor bars. PDF/print/email.
+ */
+
+type Variant = "color" | "mono" | "white" | "outline";
+
+interface StackivoMarkProps {
+  variant?: Variant;
+  className?: string;
+  bare?: boolean;
+  decorative?: boolean;
+}
+
+export function StackivoMark({
+  variant = "color",
+  className,
+  bare = false,
+  decorative = true,
+}: StackivoMarkProps) {
+  const a11y = decorative
+    ? { "aria-hidden": true as const, focusable: false as const }
+    : { role: "img" as const, "aria-label": "Stackivo" };
+
+  const barFill = variant === "outline" ? "currentColor" : "#FFFFFF";
+
+  return (
+    <span
+      className={cn(
+        "inline-flex shrink-0 items-center justify-center overflow-hidden",
+        !bare && "rounded-[22%] shadow-sm",
+        !bare &&
+          variant === "color" &&
+          "bg-gradient-to-br from-primary via-primary to-indigo-600",
+        !bare && variant === "mono" && "bg-current text-primary",
+        !bare && variant === "white" && "bg-transparent",
+        !bare &&
+          variant === "outline" &&
+          "bg-transparent ring-1 ring-current/25",
+        "h-8 w-8",
+        className,
+      )}
+      {...a11y}
+    >
+      <svg
+        viewBox="0 0 512 512"
+        width="70%"
+        height="70%"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <rect
+          x="96"
+          y="148"
+          width="280"
+          height="76"
+          rx="38"
+          fill={barFill}
+        />
+        <rect
+          x="136"
+          y="288"
+          width="280"
+          height="76"
+          rx="38"
+          fill={barFill}
+          opacity={variant === "outline" ? 0.65 : 0.92}
+        />
+      </svg>
+    </span>
+  );
+}
+
+interface StackivoWordmarkProps {
+  className?: string;
+  text?: string;
+}
+
+export function StackivoWordmark({
+  className,
+  text = "Stackivo",
+}: StackivoWordmarkProps) {
+  return (
+    <span
+      className={cn(
+        "inline-block font-semibold tracking-tight leading-none",
+        className,
+      )}
+    >
+      {text}
+    </span>
+  );
+}
+
+interface StackivoLogoProps {
+  variant?: Variant;
+  className?: string;
+  iconOnly?: boolean;
+  wordmark?: string;
+}
+
+export function StackivoLogo({
+  variant = "color",
+  className,
+  iconOnly = false,
+  wordmark = "Stackivo",
+}: StackivoLogoProps) {
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-2 font-semibold tracking-tight",
+        className,
+      )}
+    >
+      <StackivoMark variant={variant} />
+      {!iconOnly && (
+        <StackivoWordmark text={wordmark} className="text-[15px]" />
+      )}
+    </span>
+  );
+}
+
+/**
+ * Hardcoded SVG string used by server-side renderers (PDF brand fallback,
+ * email envelope, OG image generators) where React isn't available.
+ */
+export function stackivoMarkSvgString(opts?: {
+  fill?: string;
+  barFill?: string;
+  size?: number;
+}): string {
+  const size = opts?.size ?? 64;
+  const barFill = opts?.barFill ?? "#FFFFFF";
+  const containerFill = opts?.fill ?? `url(#stk-${size})`;
+  const gradient = opts?.fill
+    ? ""
+    : `<defs><linearGradient id="stk-${size}" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#2563EB"/><stop offset="100%" stop-color="#4F46E5"/></linearGradient></defs>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="${size}" height="${size}">${gradient}<rect x="0" y="0" width="512" height="512" rx="113" fill="${containerFill}"/><rect x="96" y="148" width="280" height="76" rx="38" fill="${barFill}"/><rect x="136" y="288" width="280" height="76" rx="38" fill="${barFill}" opacity="0.92"/></svg>`;
+}

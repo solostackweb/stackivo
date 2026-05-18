@@ -40,6 +40,10 @@ export default async function ClientPortalIndexPage() {
           Workspaces you&apos;re part of. Pick one to view its files,
           contracts, and invoices.
         </p>
+        <p className="text-xs text-muted-foreground">
+          Mobile tip: open your invite link on your phone, sign in, then
+          bookmark /portal for quick access.
+        </p>
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
         {portals.map((p) => (

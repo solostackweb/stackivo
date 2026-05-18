@@ -7,6 +7,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import Link from "next/link";
+import { ClientFormDialog } from "@/features/clients/components/client-form-dialog";
+import {
   Dialog,
   DialogContent,
   DialogFooter,
@@ -24,20 +33,58 @@ import { portalDashboardDetail } from "../routes";
  * files, contracts, and invoices are added on the detail page once the
  * portal exists.
  */
-export function CreatePortalButton() {
+interface CreatePortalButtonProps {
+  clients: Array<{
+    id: string;
+    fullName: string;
+    businessName: string | null;
+    email: string | null;
+  }>;
+  activeClientIds?: string[];
+}
+
+export function CreatePortalButton({
+  clients,
+  activeClientIds = [],
+}: CreatePortalButtonProps) {
   const router = useRouter();
   const [open, setOpen] = React.useState(false);
   const [name, setName] = React.useState("");
   const [brandColor, setBrandColor] = React.useState("#6366F1");
+  const [clientId, setClientId] = React.useState<string>("");
+  const [clientDialogOpen, setClientDialogOpen] = React.useState(false);
+  const [clientOptions, setClientOptions] = React.useState(() => clients);
   const [pending, setPending] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const blockedClientIds = React.useMemo(
+    () => new Set(activeClientIds),
+    [activeClientIds],
+  );
+
+  React.useEffect(() => {
+    setClientOptions(clients);
+  }, [clients]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (pending) return;
     setError(null);
     setPending(true);
-    const res = await createPortalAction({ name: name.trim(), brandColor });
+    if (!clientId) {
+      setPending(false);
+      setError("Select a client before creating the portal.");
+      return;
+    }
+    if (blockedClientIds.has(clientId)) {
+      setPending(false);
+      setError("That client already has an active portal.");
+      return;
+    }
+    const res = await createPortalAction({
+      name: name.trim(),
+      brandColor,
+      clientId,
+    });
     setPending(false);
     if (!res.ok) {
       setError(res.error);
@@ -45,11 +92,13 @@ export function CreatePortalButton() {
     }
     setOpen(false);
     setName("");
+    setClientId("");
     router.push(portalDashboardDetail(res.data!.portalId));
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <>
+      <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button>
           <Plus /> New portal
@@ -59,11 +108,60 @@ export function CreatePortalButton() {
         <DialogHeader>
           <DialogTitle>Create a client portal</DialogTitle>
           <DialogDescription>
-            One portal per client engagement. You can attach contracts,
+            Only one active portal per client. You can attach contracts,
             invoices, and files after creation.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={onSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="portal-client">Client</Label>
+            {clientOptions.length === 0 ? (
+              <div className="rounded-md border border-dashed p-3 text-xs text-muted-foreground">
+                No clients yet. Add one to create this portal.
+              </div>
+            ) : (
+              <Select value={clientId} onValueChange={setClientId}>
+                <SelectTrigger id="portal-client">
+                  <SelectValue placeholder="Select a client" />
+                </SelectTrigger>
+                <SelectContent>
+                  {clientOptions.map((client) => (
+                    <SelectItem
+                      key={client.id}
+                      value={client.id}
+                      disabled={blockedClientIds.has(client.id)}
+                    >
+                      {client.businessName
+                        ? `${client.businessName} · ${client.fullName}`
+                        : client.fullName}
+                      {client.email ? ` (${client.email})` : ""}
+                      {blockedClientIds.has(client.id)
+                        ? " · active portal exists"
+                        : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setClientDialogOpen(true)}
+              >
+                Add new client
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                asChild
+              >
+                <Link href="/dashboard/clients">Manage clients</Link>
+              </Button>
+            </div>
+          </div>
           <div className="space-y-2">
             <Label htmlFor="portal-name">Portal name</Label>
             <Input
@@ -109,7 +207,15 @@ export function CreatePortalButton() {
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={pending || name.trim().length < 2}>
+            <Button
+              type="submit"
+              disabled={
+                pending ||
+                name.trim().length < 2 ||
+                clientId.length === 0 ||
+                clientOptions.length === 0
+              }
+            >
               {pending ? (
                 <>
                   <Loader2 className="animate-spin" /> Creating
@@ -121,6 +227,19 @@ export function CreatePortalButton() {
           </DialogFooter>
         </form>
       </DialogContent>
-    </Dialog>
+      </Dialog>
+      <ClientFormDialog
+        open={clientDialogOpen}
+        onOpenChange={setClientDialogOpen}
+        onSaved={(client) => {
+          setClientOptions((prev) => {
+            const exists = prev.some((item) => item.id === client.id);
+            if (exists) return prev;
+            return [client, ...prev];
+          });
+          setClientId(client.id);
+        }}
+      />
+    </>
   );
 }

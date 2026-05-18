@@ -17,6 +17,7 @@ import { redirect } from "next/navigation";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/features/auth/server";
 import { AUTH_LOGIN_ROUTE } from "@/features/auth/routes";
+import { paywallsDisabled } from "./paywalls";
 import {
   effectivePlan,
   hasFeature,
@@ -190,6 +191,11 @@ export async function requireFeature(
 ): Promise<CurrentSubscription> {
   const sub = await getCurrentSubscription();
   if (!sub) redirect(AUTH_LOGIN_ROUTE);
+  // Open-beta kill-switch — see `./paywalls.ts`. When paywalls are
+  // disabled we hand back the current sub unchanged so callers continue
+  // to receive a typed `CurrentSubscription`, but skip the entitlement
+  // check entirely.
+  if (paywallsDisabled()) return sub;
   if (hasFeature(sub, feature)) return sub;
 
   const suggested = minimumPlanFor(feature);
@@ -213,6 +219,10 @@ export async function requireWithinLimit(
   const snapshot = await getUsageSnapshot(metric);
   const sub = await getCurrentSubscription();
   if (!snapshot) redirect(AUTH_LOGIN_ROUTE);
+
+  // Open-beta kill-switch — skip the cap check but still return the
+  // snapshot so analytics surfaces continue to see real usage numbers.
+  if (paywallsDisabled()) return snapshot;
 
   if (!withinLimit(sub, metric, snapshot.used, delta)) {
     const fallback = `/dashboard/settings/billing?limit=${encodeURIComponent(

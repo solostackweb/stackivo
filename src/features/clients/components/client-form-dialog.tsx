@@ -36,6 +36,12 @@ interface ClientFormDialogProps {
   onOpenChange: (open: boolean) => void;
   /** When provided, the dialog is in "edit" mode and pre-fills the form. */
   client?: ClientRecord;
+  onSaved?: (client: {
+    id: string;
+    fullName: string;
+    businessName: string | null;
+    email: string | null;
+  }) => void;
 }
 
 /**
@@ -47,6 +53,7 @@ export function ClientFormDialog({
   open,
   onOpenChange,
   client,
+  onSaved,
 }: ClientFormDialogProps) {
   const router = useRouter();
   const { profile } = useProfile();
@@ -69,6 +76,11 @@ export function ClientFormDialog({
   const userHasGstRegistration = profile?.gstRegistered ?? false;
 
   const handleSubmit = (formData: FormData) => {
+    const draftClient = {
+      fullName: String(formData.get("fullName") ?? "").trim(),
+      businessName: String(formData.get("businessName") ?? "").trim() || null,
+      email: String(formData.get("email") ?? "").trim() || null,
+    };
     // Enforce: only allow GST registration if user has GST registration
     const finalGstRegistered = userHasGstRegistration && gstRegistered;
     formData.set("gstRegistered", finalGstRegistered ? "true" : "false");
@@ -81,6 +93,14 @@ export function ClientFormDialog({
       if (!res.ok) {
         toast.error(res.error);
         return;
+      }
+      if (!isEdit && res.data?.id) {
+        onSaved?.({
+          id: res.data.id,
+          fullName: draftClient.fullName,
+          businessName: draftClient.businessName,
+          email: draftClient.email,
+        });
       }
       toast.success(res.message ?? (isEdit ? "Client updated" : "Client added"));
       onOpenChange(false);

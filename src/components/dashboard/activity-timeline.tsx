@@ -54,18 +54,24 @@ export function ActivityTimeline({ items }: { items: ActivityRecord[] }) {
           What&apos;s happening in your workspace
         </CardDescription>
       </CardHeader>
-      <CardContent className="flex-1">
+      <CardContent className="flex-1 p-0">
         {items.length === 0 ? (
-          <EmptyState
-            icon={ActivityIcon}
-            title="No activity yet"
-            description="Activity from invoices, clients, contracts, and time entries will show up here."
-          />
+          <div className="p-6">
+            <EmptyState
+              icon={ActivityIcon}
+              title="No activity yet"
+              description="Activity from invoices, clients, contracts, and time entries will show up here."
+            />
+          </div>
         ) : (
-          <ol className="relative space-y-5">
+          // Constrain the timeline to a max height with its own scrollbar
+          // so adding more activity rows never stretches the surrounding
+          // dashboard grid — siblings stay height-balanced regardless of
+          // how busy this column gets.
+          <ol className="relative max-h-[420px] space-y-5 overflow-y-auto px-6 py-5">
             {/* Vertical guideline */}
             <span
-              className="absolute left-[14px] top-2 h-[calc(100%-1rem)] w-px bg-border"
+              className="absolute left-[38px] top-7 h-[calc(100%-2.5rem)] w-px bg-border"
               aria-hidden
             />
             {items.map((item) => {

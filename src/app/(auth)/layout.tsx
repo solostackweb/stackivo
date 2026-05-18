@@ -5,9 +5,9 @@ import {
   Receipt,
   ShieldCheck,
   Users,
-  Zap,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { StackivoLogo, StackivoMark } from "@/components/brand/stackivo-logo";
 
 /**
  * Premium split-screen auth layout. Brand panel + value props on the left,
@@ -34,11 +34,10 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         <div className="relative z-10">
           <Link
             href="/"
-            className="inline-flex items-center gap-2.5 font-bold tracking-tight"
+            aria-label="Stackivo home"
+            className="inline-flex items-center gap-2.5 font-bold tracking-tight text-white"
           >
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-indigo-500 shadow-lg shadow-primary/30">
-              <Zap className="h-5 w-5" />
-            </span>
+            <StackivoMark className="h-9 w-9 rounded-xl shadow-lg shadow-primary/30" />
             <span className="text-lg">Stackivo</span>
           </Link>
         </div>
@@ -46,7 +45,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         <div className="relative z-10 space-y-10">
           <blockquote className="text-xl font-medium leading-relaxed text-white/90 xl:text-[22px] xl:leading-snug">
             &ldquo;I went from three tools and a spreadsheet to one workspace.
-            GST invoices that just work — finally.&rdquo;
+            Sending invoices is finally pleasant.&rdquo;
           </blockquote>
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-sm font-semibold ring-1 ring-white/20">
@@ -61,7 +60,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           </div>
 
           <div className="flex flex-wrap gap-2 pt-2">
-            <TrustPill icon={Receipt} label="GST-ready" />
+            <TrustPill icon={Receipt} label="Simple or GST invoices" />
             <TrustPill icon={Users} label="Unlimited workflows" />
             <TrustPill icon={BarChart3} label="Pulse analytics" />
             <TrustPill icon={ShieldCheck} label="Secure by default" />
@@ -87,14 +86,8 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         }}
       >
         <div className="mb-8 flex justify-center lg:hidden">
-          <Link
-            href="/"
-            className="inline-flex items-center gap-2.5 font-bold tracking-tight"
-          >
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-indigo-600 text-primary-foreground shadow-md shadow-primary/20">
-              <Zap className="h-4 w-4" />
-            </span>
-            <span className="text-base">Stackivo</span>
+          <Link href="/" aria-label="Stackivo home">
+            <StackivoLogo />
           </Link>
         </div>
         <div className="w-full max-w-sm">{children}</div>

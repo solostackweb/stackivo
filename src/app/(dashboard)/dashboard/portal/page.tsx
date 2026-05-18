@@ -9,6 +9,7 @@ import {
   canUseFeature,
   getCurrentSubscription,
 } from "@/features/subscription/server";
+import { listClients } from "@/features/clients/server";
 import { listPortalsForCurrentUser } from "@/features/portals/server";
 import { portalDashboardDetail } from "@/features/portals/routes";
 import { CreatePortalButton } from "@/features/portals/components/create-portal-button";
@@ -33,21 +34,39 @@ export default async function PortalIndexPage() {
             "Branded portal per client",
             "Shared files (5 GB on Pro)",
             "In-portal contract signing & invoice payment",
-            "Threaded comments + notifications",
+            "Conversation space + notifications",
           ]}
         />
       </div>
     );
   }
 
-  const { ownedPortals } = await listPortalsForCurrentUser();
+  const [portalResult, clients] = await Promise.all([
+    listPortalsForCurrentUser(),
+    listClients({ limit: 200 }),
+  ]);
+  const { ownedPortals } = portalResult;
+  const activeClientIds = ownedPortals
+    .filter((p) => p.status === "active" && p.client_id)
+    .map((p) => p.client_id!)
+    .filter(Boolean);
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Client portals"
         description="Branded shared workspaces for your clients."
-        actions={<CreatePortalButton />}
+        actions={
+          <CreatePortalButton
+            clients={clients.map((client) => ({
+              id: client.id,
+              fullName: client.fullName,
+              businessName: client.businessName,
+              email: client.email,
+            }))}
+            activeClientIds={activeClientIds}
+          />
+        }
       />
       {ownedPortals.length === 0 ? (
         <EmptyState

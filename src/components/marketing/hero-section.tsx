@@ -57,21 +57,22 @@ export function HeroSection({
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-40" />
                 <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
               </span>
-              Freelancer operating system · Built for India
+              Freelancer operating system · For every independent professional
             </span>
 
             <h1 className="mt-7 text-balance text-[38px] font-bold leading-[1.05] tracking-tight sm:text-[52px] lg:text-[60px] xl:text-[68px]">
-              GST invoicing +{" "}
+              The operating system for{" "}
               <span className="bg-gradient-to-r from-primary via-indigo-500 to-violet-500 bg-clip-text text-transparent">
-                everything else
+                independent
               </span>{" "}
-              your freelance business needs
+              work
             </h1>
 
             <p className="mt-5 text-pretty text-base leading-7 text-muted-foreground sm:text-lg sm:leading-8">
-              One workspace for clients, contracts, time tracking and revenue
-              analytics &mdash; built for Indian freelancers. No spreadsheets,
-              no five-tool stitching, no nasty surprises.{" "}
+              One workspace for clients, invoices, contracts, projects, time
+              tracking, and payments &mdash; built for freelancers, creators,
+              consultants, and small studios. GST when you need it, simple
+              invoices when you don&apos;t.{" "}
               <span className="font-medium text-foreground">
                 Free forever for the first 5 clients.
               </span>
@@ -80,14 +81,17 @@ export function HeroSection({
             <HeroCtas authState={authState} />
 
             <div className="mt-8 flex flex-wrap gap-x-6 gap-y-3 text-sm text-muted-foreground">
-              <TrustItem icon={Receipt} label="GST-ready · India-first" />
+              <TrustItem icon={Receipt} label="Simple or GST invoices" />
               <TrustItem icon={Database} label="Daily backups · TLS encryption" />
               <TrustItem icon={CreditCard} label="No card to start" />
             </div>
           </div>
 
-          {/* Dashboard mockup — static (no entrance animation, no Floating loop) */}
-          <div className="relative mx-auto w-full max-w-[940px] lg:max-w-none">
+          {/* Dashboard mockup — static. Wrapper clips decorative bleed on
+              tablet/medium widths where there isn't room for the floating cards
+              to live outside the column. Bleed is restored at xl+ where the
+              grid is wide enough to carry it. */}
+          <div className="relative mx-auto w-full max-w-[940px] overflow-hidden px-2 pb-6 pt-2 lg:max-w-none xl:overflow-visible xl:px-0 xl:pb-0 xl:pt-0">
             {/* Glow halo — desktop-only, cheaper blur radius */}
             <div
               aria-hidden
@@ -109,8 +113,9 @@ export function HeroSection({
 
             <DashboardMockup />
 
-            {/* Floating accent card — desktop only, decorative */}
-            <div className="pointer-events-none absolute -bottom-4 -right-2 hidden items-center gap-3 rounded-xl border bg-card/95 px-4 py-3 shadow-xl backdrop-blur-md sm:flex lg:-right-6">
+            {/* Floating accent card — only at xl+ where the wrapper releases
+                overflow. Below xl we keep it hidden so it never bleeds. */}
+            <div className="pointer-events-none absolute -bottom-4 right-2 hidden items-center gap-3 rounded-xl border bg-card/95 px-4 py-3 shadow-xl backdrop-blur-md xl:-right-6 xl:flex">
               <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-indigo-500 text-primary-foreground shadow-md shadow-primary/30">
                 <Sparkles className="h-4 w-4" />
               </span>

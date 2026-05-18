@@ -114,9 +114,23 @@ export function CrispProvider({ identity }: Props) {
             // floating <SupportButton/> is the canonical entry point
             // on mobile.
             window.$crisp.push(["safe", true]);
+            // Sit BELOW our own floating support button (z-60). 40 puts
+            // Crisp below modal/sheet overlays but above page content.
+            window.$crisp.push(["config", "container:index", [40]]);
           `,
         }}
       />
+      {/* Lift the Crisp bubble above the mobile bottom-nav so it does not
+          sit underneath the tab bar. Crisp renders its outer wrapper as
+          .crisp-client; a margin shift is enough to clear our own nav. */}
+      <style>
+        {`
+          .crisp-client { margin-bottom: var(--mobile-bottom-nav-h, 0px); }
+          @media (max-width: 768px) {
+            .crisp-client { margin-bottom: calc(var(--mobile-bottom-nav-h, 0px) + env(safe-area-inset-bottom, 0px)); }
+          }
+        `}
+      </style>
       <Script
         id="crisp-loader"
         src="https://client.crisp.chat/l.js"

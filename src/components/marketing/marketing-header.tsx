@@ -3,7 +3,8 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu, X, Zap } from "lucide-react";
+import { Menu, X } from "lucide-react";
+import { StackivoLogo } from "@/components/brand/stackivo-logo";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
@@ -43,12 +44,10 @@ export function MarketingHeader({
       <div className="mx-auto flex h-14 w-full max-w-[1400px] items-center justify-between px-5 sm:px-8 lg:h-16 lg:px-10 xl:px-14 2xl:px-20">
         <Link
           href="/"
-          className="flex items-center gap-2.5 font-bold tracking-tight"
+          aria-label="Stackivo home"
+          className="flex items-center gap-2 font-bold tracking-tight"
         >
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-indigo-600 text-primary-foreground shadow-md shadow-primary/20">
-            <Zap className="h-4 w-4" />
-          </span>
-          <span className="text-base">Stackivo</span>
+          <StackivoLogo />
         </Link>
 
         <nav className="hidden items-center gap-0.5 md:flex">
@@ -92,12 +91,10 @@ export function MarketingHeader({
               <Link
                 href="/"
                 onClick={() => setOpen(false)}
+                aria-label="Stackivo home"
                 className="flex items-center gap-2"
               >
-                <span className="flex h-7 w-7 items-center justify-center rounded-md bg-primary text-primary-foreground">
-                  <Zap className="h-4 w-4" />
-                </span>
-                Stackivo
+                <StackivoLogo />
               </Link>
             </div>
             <div className="flex flex-col gap-1 p-3">

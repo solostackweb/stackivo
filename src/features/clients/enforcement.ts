@@ -12,6 +12,7 @@ import "server-only";
 
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getCurrentSubscription } from "@/features/subscription/server";
+import { paywallsDisabled } from "@/features/subscription/paywalls";
 import { getPlan } from "@/features/subscription/plans";
 import type { CurrentSubscription } from "@/features/subscription/types";
 
@@ -56,7 +57,13 @@ export async function getClientLimitStatus(): Promise<ClientLimitStatus | null> 
     (profile as { lifetime_clients_created?: number } | null)
       ?.lifetime_clients_created ?? 0;
   const planId = effectivePlanFromSub(sub);
-  const limit = getPlan(planId).limits.clients_created;
+  // Open-beta kill-switch — pretend the user is on an unlimited plan so
+  // the UI never shows a blocked / upgrade state. The DB counter still
+  // increments accurately so analytics and the future re-enable will be
+  // correct.
+  const limit = paywallsDisabled()
+    ? Infinity
+    : getPlan(planId).limits.clients_created;
   const blocked = limit !== Infinity && used >= limit;
   const remaining = limit === Infinity ? Infinity : Math.max(0, limit - used);
 

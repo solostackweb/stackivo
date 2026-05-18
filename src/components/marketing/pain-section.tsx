@@ -3,7 +3,7 @@ import { Section, SectionHeading } from "./section";
 import { Reveal } from "./motion";
 
 const PAINS = [
-  "Spreadsheet invoices that break the moment GST gets complex",
+  "Word-doc invoices you re-do every month",
   "WhatsApp-ed contracts you can't find when a dispute starts",
   "Five tools that don't talk to each other",
   "Manual time tracking that never matches what you actually billed",
@@ -12,7 +12,7 @@ const PAINS = [
 ];
 
 const FIXES = [
-  "GST-correct invoices in 30 seconds, every time",
+  "Polished invoices in 30 seconds — simple, GST, whatever you need",
   "Contracts and signature trail in one workspace",
   "One unified workspace, every workflow connected",
   "One-tap timer that flows directly into invoices",

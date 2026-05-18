@@ -196,7 +196,10 @@ export function CreateInvoiceView({
         issueDate: values.issueDate,
         dueDate: values.dueDate,
         currency: profile?.defaultCurrency ?? "INR",
-        status: "paid",
+        // Start every invoice as a draft. The optional email send below
+        // promotes it to "sent". Payment state (paid / partially_paid)
+        // is owned by the payment flow — never set on creation.
+        status: "draft",
         notes: values.notes || undefined,
         terms: values.terms || undefined,
         lines: totalsForLines,
@@ -210,7 +213,7 @@ export function CreateInvoiceView({
       }
       const invoiceId = res.data?.id;
       if (!invoiceId) {
-        toast.success(`Paid invoice ${values.invoiceNumber} created`);
+        toast.success(`Invoice ${values.invoiceNumber} created`);
         router.push("/dashboard/invoices");
         router.refresh();
         return;
@@ -219,7 +222,7 @@ export function CreateInvoiceView({
       if (!send.ok) {
         toast.warning(send.error);
       } else {
-        toast.success(`Paid invoice ${values.invoiceNumber} emailed`);
+        toast.success(`Invoice ${values.invoiceNumber} sent`);
       }
       router.push("/dashboard/invoices");
       router.refresh();
@@ -272,7 +275,7 @@ export function CreateInvoiceView({
               onClick={onSend}
               disabled={isSubmitting}
             >
-              <Send /> Create & email paid invoice
+              <Send /> Create & send invoice
             </Button>
           </div>
         </div>

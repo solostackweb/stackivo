@@ -43,7 +43,7 @@ import type { ActionResult } from "@/features/invoices/delivery";
 
 const createSchema = z.object({
   name: z.string().trim().min(2).max(120),
-  clientId: z.string().uuid().optional(),
+  clientId: z.string().uuid(),
   brandColor: z
     .string()
     .regex(/^#[0-9A-Fa-f]{6}$/)
@@ -65,12 +65,27 @@ export async function createPortalAction(
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Not authenticated." };
 
+  const { data: existing } = await supabase
+    .from("portals")
+    .select("id")
+    .eq("owner_user_id", user.id)
+    .eq("client_id", parsed.data.clientId)
+    .eq("status", "active")
+    .is("deleted_at", null)
+    .limit(1);
+  if (existing && existing.length > 0) {
+    return {
+      ok: false,
+      error: "This client already has an active portal.",
+    };
+  }
+
   const { data: created, error } = await supabase
     .from("portals")
     .insert({
       owner_user_id: user.id,
       name: parsed.data.name,
-      client_id: parsed.data.clientId ?? null,
+      client_id: parsed.data.clientId,
       brand_color: parsed.data.brandColor ?? "#6366F1",
     } as never)
     .select("id")
@@ -141,14 +156,23 @@ export async function archivePortalAction(input: {
   if (access instanceof PortalAccessError) {
     return { ok: false, error: accessErrorMessage(access) };
   }
-  const supabase = await getServerSupabase();
-  await supabase
+  // Use the admin client so any RLS misconfiguration is surfaced as a
+  // real error rather than a silent 0-row update. We've already validated
+  // ownership above, so service-role here is safe.
+  const admin = getAdminSupabase();
+  const { error } = await admin
     .from("portals")
     .update({ status: "archived" } as never)
     .eq("id", input.portalId);
+  if (error) {
+    return {
+      ok: false,
+      error: `Could not deactivate portal: ${error.message}`,
+    };
+  }
   revalidatePath(PORTAL_DASHBOARD_INDEX);
   revalidatePath(portalDashboardDetail(input.portalId));
-  return { ok: true, message: "Portal archived." };
+  return { ok: true, message: "Portal deactivated." };
 }
 
 export async function deletePortalAction(input: {
@@ -162,14 +186,25 @@ export async function deletePortalAction(input: {
     return { ok: false, error: accessErrorMessage(access) };
   }
 
-  // Soft-delete: set deleted_at. A separate cron purges files + R2 objects
-  // after a 30-day grace period (not implemented in MVP — flagged in
-  // PORTAL_SETUP_GUIDE.md as a follow-up).
-  const supabase = await getServerSupabase();
-  await supabase
+  // SOFT delete — the migration (0024) explicitly models deletion as
+  // setting `deleted_at` + status="deleted". Hard `.delete()` was prone
+  // to FK constraint failures against portal_messages / portal_files /
+  // portal_storage_usage and silently no-op'd in some environments. The
+  // soft-delete path also lets us restore portals in support situations.
+  const admin = getAdminSupabase();
+  const { error } = await admin
     .from("portals")
-    .update({ deleted_at: new Date().toISOString(), status: "deleted" } as never)
+    .update({
+      status: "deleted",
+      deleted_at: new Date().toISOString(),
+    } as never)
     .eq("id", input.portalId);
+  if (error) {
+    return {
+      ok: false,
+      error: `Could not delete portal: ${error.message}`,
+    };
+  }
 
   revalidatePath(PORTAL_DASHBOARD_INDEX);
   return { ok: true, message: "Portal deleted." };
@@ -202,13 +237,70 @@ export async function invitePortalMemberAction(
     return { ok: false, error: accessErrorMessage(access) };
   }
 
+  const admin = getAdminSupabase();
+  if (!access.portal.client_id) {
+    return {
+      ok: false,
+      error: "This portal is not linked to a client yet.",
+    };
+  }
+
+  const { data: clientRow } = await admin
+    .from("clients")
+    .select("email")
+    .eq("id", access.portal.client_id)
+    .maybeSingle();
+  const clientEmail =
+    (clientRow as { email: string | null } | null)?.email ?? null;
+  if (!clientEmail) {
+    return {
+      ok: false,
+      error: "Add an email to the client profile before inviting.",
+    };
+  }
+  if (clientEmail.toLowerCase() !== parsed.data.email.toLowerCase()) {
+    return {
+      ok: false,
+      error: "Invite must be sent to the client email on file.",
+    };
+  }
+
+  const [{ data: activeMember }, { data: activeInvite }] = await Promise.all([
+    admin
+      .from("portal_members")
+      .select("user_id")
+      .eq("portal_id", parsed.data.portalId)
+      .is("revoked_at", null)
+      .limit(1),
+    admin
+      .from("portal_invitations")
+      .select("id")
+      .eq("portal_id", parsed.data.portalId)
+      .is("accepted_at", null)
+      .gt("expires_at", new Date().toISOString())
+      .limit(1),
+  ]);
+
+  if (activeMember && activeMember.length > 0) {
+    return {
+      ok: false,
+      error: "This portal already has a client assigned.",
+    };
+  }
+
+  if (activeInvite && activeInvite.length > 0) {
+    return {
+      ok: false,
+      error: "There is already a pending invitation for this portal.",
+    };
+  }
+
   // Mint an unforgeable random token, but persist only its SHA-256 hash.
   // The plaintext goes in the email link only.
   const tokenPlain = crypto.randomBytes(24).toString("base64url");
   const tokenHash = crypto.createHash("sha256").update(tokenPlain).digest("hex");
   const expiresAt = new Date(Date.now() + INVITE_TTL_MS).toISOString();
 
-  const admin = getAdminSupabase();
   const { data: invRow, error } = await admin
     .from("portal_invitations")
     .insert({
@@ -329,6 +421,21 @@ export async function acceptPortalInvitationAction(
   if (!inv) return { ok: false, error: "Invitation not found." };
   if (Date.parse(inv.expires_at) < Date.now()) {
     return { ok: false, error: "This invitation has expired." };
+  }
+
+  const { data: existingMemberRows } = await admin
+    .from("portal_members")
+    .select("user_id, revoked_at")
+    .eq("portal_id", inv.portal_id)
+    .is("revoked_at", null);
+  if (
+    existingMemberRows &&
+    existingMemberRows.some((m) => m.user_id !== user.id)
+  ) {
+    return {
+      ok: false,
+      error: "This portal already has a client assigned.",
+    };
   }
 
   // Email match — case-insensitive. We could allow ANY signed-in user to
@@ -697,3 +804,4 @@ function accessErrorMessage(err: PortalAccessError): string {
       return "Portal not found.";
   }
 }
+

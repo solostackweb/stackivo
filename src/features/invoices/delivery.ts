@@ -10,10 +10,16 @@ import { getInvoice } from "./server";
 import {
   buildInvoicePdfData,
   buildInvoicePdfDataByToken,
+  buildReceiptPdfDataByToken,
 } from "@/features/documents/builders";
 import { renderPdfToBuffer } from "@/features/documents/pdf/render";
 import { InvoicePdf } from "@/features/documents/pdf/invoice-pdf";
-import { renderInvoicePaidEmail, renderInvoiceSentEmail } from "@/features/email/templates";
+import { ReceiptPdf } from "@/features/documents/pdf/receipt-pdf";
+import {
+  buildEmailBrand,
+  renderInvoicePaidEmail,
+  renderInvoiceSentEmail,
+} from "@/features/email/templates";
 import { ensureInvoicePublicToken } from "@/features/share/server";
 import { env } from "@/config/env";
 import { dispatchDelivery, pdfAttachment } from "@/features/email/send";
@@ -86,7 +92,9 @@ export async function sendInvoiceAction(
 
   const { data: profile } = await supabase
     .from("user_profiles")
-    .select("business_name, legal_name, full_name, email")
+    .select(
+      "business_name, legal_name, full_name, email, brand_color, logo_url, business_email, business_phone, website",
+    )
     .eq("id", user.id)
     .maybeSingle();
   const p = profile as
@@ -95,10 +103,29 @@ export async function sendInvoiceAction(
         legal_name?: string | null;
         full_name?: string | null;
         email?: string | null;
+        brand_color?: string | null;
+        logo_url?: string | null;
+        business_email?: string | null;
+        business_phone?: string | null;
+        website?: string | null;
       }
     | null;
   const senderName =
     p?.business_name ?? p?.legal_name ?? p?.full_name ?? "Stackivo";
+
+  // Reuse the PDF's already-resolved logo URL so the email and the PDF
+  // header show the same image (no duplicated signed-URL roundtrip).
+  const emailBrand = buildEmailBrand({
+    businessName: p?.business_name ?? null,
+    legalName: p?.legal_name ?? null,
+    fullName: p?.full_name ?? null,
+    brandColor: p?.brand_color ?? null,
+    logoUrl: pdfData.seller.logoDataUrl,
+    businessEmail: p?.business_email ?? null,
+    businessPhone: p?.business_phone ?? null,
+    email: p?.email ?? null,
+    website: p?.website ?? null,
+  });
 
   const invoiceTotal = resolveInvoiceTotal(pdfData);
   const amountFormatted = formatCurrency(invoiceTotal, record.invoice.currency);
@@ -118,6 +145,7 @@ export async function sendInvoiceAction(
     senderEmail: getEmailSender("billing").email,
     message: parsed.data.message ?? null,
     publicUrl,
+    brand: emailBrand,
   });
 
   const dispatch = await dispatchDelivery({
@@ -244,9 +272,19 @@ export async function sendInvoiceReceiptAction(input: {
   if (!pdfData) return { ok: false, error: "Could not render invoice." };
   const pdfBuffer = await renderPdfToBuffer(InvoicePdf({ data: pdfData }));
 
+  // Prefer the new receipt PDF (when one exists for this invoice). If the
+  // payment is logged but the receipt row was never written for some
+  // reason, we fall back to attaching the invoice PDF with a "paid" stamp.
+  const receiptData = await buildReceiptPdfDataByToken(invoice.public_token);
+  const receiptPdfBuffer = receiptData
+    ? await renderPdfToBuffer(ReceiptPdf({ data: receiptData }))
+    : null;
+
   const { data: profile } = await admin
     .from("user_profiles")
-    .select("business_name, legal_name, full_name, email")
+    .select(
+      "business_name, legal_name, full_name, email, brand_color, logo_url, business_email, business_phone, website",
+    )
     .eq("id", invoice.user_id)
     .maybeSingle();
   const p = profile as
@@ -255,10 +293,27 @@ export async function sendInvoiceReceiptAction(input: {
         legal_name?: string | null;
         full_name?: string | null;
         email?: string | null;
+        brand_color?: string | null;
+        logo_url?: string | null;
+        business_email?: string | null;
+        business_phone?: string | null;
+        website?: string | null;
       }
     | null;
   const senderName =
     p?.business_name ?? p?.legal_name ?? p?.full_name ?? "Stackivo";
+
+  const emailBrand = buildEmailBrand({
+    businessName: p?.business_name ?? null,
+    legalName: p?.legal_name ?? null,
+    fullName: p?.full_name ?? null,
+    brandColor: p?.brand_color ?? null,
+    logoUrl: pdfData.seller.logoDataUrl,
+    businessEmail: p?.business_email ?? null,
+    businessPhone: p?.business_phone ?? null,
+    email: p?.email ?? null,
+    website: p?.website ?? null,
+  });
 
   const invoiceTotal = Number(invoice.total_amount) || 0;
   const amountFormatted = formatCurrency(invoiceTotal, invoice.currency);
@@ -269,6 +324,22 @@ export async function sendInvoiceReceiptAction(input: {
     clientName: input.toName ?? "there",
     senderName,
     senderEmail: getEmailSender("billing").email,
+    receiptNumber: receiptData?.receiptNumber,
+    paymentMethod:
+      receiptData?.paymentMethod === "stackivo_managed"
+        ? "Stackivo Managed (Razorpay)"
+        : receiptData?.paymentMethod === "upi_manual"
+          ? "UPI"
+          : receiptData?.paymentMethod,
+    paidAtFormatted: receiptData
+      ? new Date(receiptData.paidAt).toLocaleDateString("en-IN", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        })
+      : undefined,
+    reference: receiptData?.reference ?? undefined,
+    brand: emailBrand,
   });
 
   const dispatch = await dispatchDelivery({
@@ -282,9 +353,15 @@ export async function sendInvoiceReceiptAction(input: {
     subject: rendered.subject,
     html: rendered.html,
     text: rendered.text,
-    attachments: [
-      pdfAttachment(`receipt-${invoice.invoice_number}.pdf`, pdfBuffer),
-    ],
+    attachments: receiptPdfBuffer && receiptData
+      ? [
+          pdfAttachment(
+            `receipt-${receiptData.receiptNumber}.pdf`,
+            receiptPdfBuffer,
+          ),
+          pdfAttachment(`invoice-${invoice.invoice_number}.pdf`, pdfBuffer),
+        ]
+      : [pdfAttachment(`invoice-${invoice.invoice_number}.pdf`, pdfBuffer)],
     metadata: { invoiceId: invoice.id, receipt: true },
     tags: ["invoice_receipt", "billing"],
     idempotencyKey: `invoice-receipt:${invoice.id}`,

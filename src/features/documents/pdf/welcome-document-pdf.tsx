@@ -1,27 +1,58 @@
 import "server-only";
 
+/**
+ * Welcome Document PDF.
+ *
+ * Premium onboarding package. Two-page-style layout:
+ *
+ *   PAGE 1 — Cover:
+ *     - Big tinted accent surface (uses the freelancer's brand colour as
+ *       background, with readable on-accent text).
+ *     - Eyebrow "WELCOME GUIDE", title in oversized type, intro line.
+ *     - "Prepared for {client}" + "Prepared by {business}" tags.
+ *     - Brand logo in the bottom-left corner, with a "Published {date}"
+ *       footer.
+ *
+ *   PAGE 2..N — Body:
+ *     - Standard branded header (compact mode — no contact lines, since
+ *       the cover already established the sender).
+ *     - Numbered sections rendered as headings + relaxed body type.
+ *     - Optional intro paragraph rendered before the first numbered
+ *       section.
+ *     - "Next steps" callout block at the end pointing to the
+ *       acknowledgement link when required.
+ *     - Branded footer on every page.
+ *
+ * The split-cover pattern is what makes welcome docs feel like an
+ * agency onboarding package rather than a wall of text.
+ */
+
 import * as React from "react";
-import {
-  Document,
-  Image,
-  Page,
-  StyleSheet,
-  Text,
-  View,
-} from "@react-pdf/renderer";
+import { Document, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
 import type { WelcomeDocumentSection } from "@/features/welcome-documents/types";
 import { welcomeMarkdownToPlain } from "@/features/welcome-documents/markdown";
-import { pdfColors, pdfFonts, pdfSizes, pdfSpacing } from "./theme";
+import {
+  pdfColors,
+  pdfFonts,
+  pdfLineHeights,
+  pdfPage,
+  pdfRadii,
+  pdfSizes,
+  pdfSpacing,
+  pdfTracking,
+} from "./theme";
+import { resolveBrand, type ResolvedBrand } from "./brand";
+import {
+  DocumentFooter,
+  DocumentHeader,
+  DocumentPage,
+  NoteBlock,
+  Section,
+  formatDate,
+} from "./primitives";
+import type { UserProfileRow } from "@/lib/supabase/types";
 
-/**
- * The welcome-document PDF leans into the *onboarding-guide* feel: no
- * signature blocks, no money strip, no legal-doc framing. Big airy
- * spacing, a subtle accent rail down the left edge, and a friendly
- * sender block at the top.
- *
- * If the freelancer set a brand colour we use it for the rail + section
- * numbers; otherwise we fall back to the default primary.
- */
+// --- Data shape (preserved) -------------------------------------------------
 
 export interface WelcomeDocumentPdfData {
   title: string;
@@ -47,282 +78,336 @@ export interface WelcomeDocumentPdfData {
   } | null;
 }
 
-const s = StyleSheet.create({
+// --- Cover page styles ------------------------------------------------------
+
+const coverStyles = StyleSheet.create({
   page: {
     fontFamily: pdfFonts.base,
-    fontSize: pdfSizes.base,
     color: pdfColors.foreground,
-    paddingTop: 36,
-    paddingBottom: 56,
-    paddingHorizontal: pdfSpacing.page,
-    lineHeight: 1.6,
+    backgroundColor: pdfColors.surface,
+    padding: 0,
   },
-  // Vertical accent ribbon on the left edge — runs the full page.
-  accentRail: {
-    position: "absolute",
-    top: 0,
-    bottom: 0,
-    left: 0,
-    width: 6,
-  },
-  // Header
-  header: {
-    flexDirection: "row",
-    alignItems: "flex-start",
+  hero: {
+    width: pdfPage.width,
+    height: pdfPage.height * 0.6,
+    padding: pdfSpacing["3xl"],
     justifyContent: "space-between",
-    marginBottom: 22,
   },
-  brand: {
-    flexDirection: "row",
-    gap: 10,
-    alignItems: "center",
-  },
-  brandText: {},
-  brandName: {
+  eyebrow: {
     fontFamily: pdfFonts.bold,
-    fontSize: pdfSizes.md,
-  },
-  brandMeta: {
-    fontSize: pdfSizes.xs,
-    color: pdfColors.mutedForeground,
-  },
-  logo: { width: 38, height: 38, objectFit: "contain" },
-  logoFallback: {
-    width: 38,
-    height: 38,
-    borderRadius: 6,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  logoFallbackText: {
-    color: "#FFFFFF",
-    fontFamily: pdfFonts.bold,
-    fontSize: pdfSizes.sm,
-  },
-  kindPill: {
-    fontFamily: pdfFonts.bold,
-    fontSize: pdfSizes.xs,
+    fontSize: pdfSizes.eyebrow,
     textTransform: "uppercase",
-    letterSpacing: 1.4,
+    letterSpacing: pdfTracking.widest,
+    opacity: 0.85,
   },
-  // Title block
-  titleBlock: { marginTop: 8, marginBottom: 22 },
+  titleBlock: { marginTop: pdfSpacing["3xl"] },
   title: {
     fontFamily: pdfFonts.bold,
-    fontSize: 28,
-    lineHeight: 1.18,
+    fontSize: pdfSizes["3xl"],
+    lineHeight: pdfLineHeights.tight,
+    letterSpacing: pdfTracking.tight,
+    marginBottom: pdfSpacing.md,
   },
-  subtitle: {
-    marginTop: 8,
-    fontSize: pdfSizes.md,
-    color: pdfColors.mutedForeground,
-  },
-  // Recipient strip
-  recipientBox: {
-    marginBottom: 22,
-    padding: 12,
-    borderRadius: 6,
-    backgroundColor: pdfColors.subtle,
-    borderLeft: `3px solid ${pdfColors.border}`,
-  },
-  recipientLabel: {
-    fontSize: pdfSizes.xs,
-    color: pdfColors.mutedForeground,
-    textTransform: "uppercase",
-    letterSpacing: 1,
-    marginBottom: 2,
-  },
-  recipientName: { fontFamily: pdfFonts.bold, fontSize: pdfSizes.md },
-  recipientMeta: { fontSize: pdfSizes.xs, color: pdfColors.mutedForeground },
-  // Intro
   intro: {
     fontSize: pdfSizes.md,
-    lineHeight: 1.7,
-    color: pdfColors.foreground,
-    marginBottom: 26,
+    lineHeight: pdfLineHeights.normal,
+    opacity: 0.9,
+    maxWidth: 420,
   },
-  // Sections
-  section: {
-    marginBottom: 18,
-    paddingLeft: 28,
-    position: "relative",
+  metaRow: {
+    flexDirection: "row",
+    marginTop: pdfSpacing["3xl"],
+    gap: pdfSpacing.lg,
   },
-  sectionNumber: {
-    position: "absolute",
-    top: 1,
-    left: 0,
+  metaCard: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: pdfRadii.pill,
+    backgroundColor: "rgba(255,255,255,0.18)",
+  },
+  metaLabel: {
+    fontSize: pdfSizes.xs,
+    opacity: 0.75,
+    textTransform: "uppercase",
+    letterSpacing: pdfTracking.wide,
+  },
+  metaValue: {
     fontFamily: pdfFonts.bold,
     fontSize: pdfSizes.sm,
-    width: 22,
-    textAlign: "left",
+    marginTop: 1,
   },
-  sectionHeading: {
+
+  // Lower-half cover content
+  belowHero: {
+    flex: 1,
+    paddingHorizontal: pdfSpacing["3xl"],
+    paddingTop: pdfSpacing["2xl"],
+    paddingBottom: pdfSpacing["2xl"],
+    justifyContent: "space-between",
+  },
+  preparedFor: {
+    flexDirection: "row",
+    gap: pdfSpacing["3xl"],
+  },
+  preparedCell: { flex: 1 },
+  preparedEyebrow: {
     fontFamily: pdfFonts.bold,
-    fontSize: pdfSizes.lg,
-    marginBottom: 6,
-  },
-  sectionBody: {
-    fontSize: pdfSizes.sm,
-    lineHeight: 1.7,
-    color: pdfColors.foreground,
-  },
-  // Acknowledgement strip at the bottom of the last page
-  ackBox: {
-    marginTop: 26,
-    padding: 14,
-    borderRadius: 6,
-    backgroundColor: "#F4F8FE",
-    border: `1px solid #DBE7FB`,
-  },
-  ackTitle: {
-    fontFamily: pdfFonts.bold,
-    fontSize: pdfSizes.sm,
+    fontSize: pdfSizes.eyebrow,
+    color: pdfColors.mutedForeground,
+    textTransform: "uppercase",
+    letterSpacing: pdfTracking.wider,
     marginBottom: 4,
   },
-  ackBody: {
+  preparedValue: {
+    fontFamily: pdfFonts.bold,
+    fontSize: pdfSizes.md,
+    color: pdfColors.foreground,
+  },
+  preparedMuted: {
+    fontSize: pdfSizes.sm,
+    color: pdfColors.mutedForeground,
+    marginTop: 2,
+  },
+  coverFooter: {
     fontSize: pdfSizes.xs,
     color: pdfColors.mutedForeground,
-    lineHeight: 1.6,
-  },
-  ackLink: {
-    marginTop: 6,
-    fontSize: pdfSizes.xs,
-    color: pdfColors.primary,
-  },
-  // Footer
-  footer: {
-    position: "absolute",
-    left: pdfSpacing.page,
-    right: pdfSpacing.page,
-    bottom: 24,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    fontSize: pdfSizes.xs,
-    color: pdfColors.mutedForeground,
+    textAlign: "center",
   },
 });
 
+// --- Body styles ------------------------------------------------------------
+
+const bodyStyles = StyleSheet.create({
+  section: { marginBottom: pdfSpacing.xl },
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    marginBottom: 6,
+  },
+  sectionNumber: {
+    fontFamily: pdfFonts.bold,
+    fontSize: pdfSizes.eyebrow,
+    color: pdfColors.mutedForeground,
+    letterSpacing: pdfTracking.wider,
+    marginRight: 10,
+    minWidth: 22,
+  },
+  sectionHeading: {
+    fontFamily: pdfFonts.bold,
+    fontSize: pdfSizes.md,
+    color: pdfColors.foreground,
+    letterSpacing: pdfTracking.tight,
+  },
+  sectionBody: {
+    fontSize: pdfSizes.sm,
+    lineHeight: pdfLineHeights.relaxed,
+    color: pdfColors.text,
+  },
+  intro: {
+    fontSize: pdfSizes.md,
+    lineHeight: pdfLineHeights.relaxed,
+    color: pdfColors.text,
+    marginBottom: pdfSpacing.xl,
+  },
+});
+
+// --- Template ---------------------------------------------------------------
+
 export function WelcomeDocumentPdf({
   data,
+  seller,
+  logoDataUrl,
 }: {
   data: WelcomeDocumentPdfData;
+  seller?: UserProfileRow | null;
+  logoDataUrl?: string | null;
 }) {
-  const accent = (data.brandColor ?? pdfColors.primary).trim();
-  const initials = data.seller.businessName.slice(0, 2).toUpperCase();
+  const brand = buildBrandFromData(data, seller, logoDataUrl);
+  const intro = data.intro?.trim() ? welcomeMarkdownToPlain(data.intro) : null;
 
   return (
-    <Document
-      title={data.title}
-      author={data.seller.businessName}
-      subject="Welcome guide"
-    >
-      <Page size="A4" style={s.page}>
-        <View style={[s.accentRail, { backgroundColor: accent }]} fixed />
-
-        {/* Header */}
-        <View style={s.header}>
-          <View style={s.brand}>
-            {data.seller.logoDataUrl ? (
-              // eslint-disable-next-line jsx-a11y/alt-text
-              <Image src={data.seller.logoDataUrl} style={s.logo} />
-            ) : (
-              <View
-                style={[s.logoFallback, { backgroundColor: accent }]}
-              >
-                <Text style={s.logoFallbackText}>{initials}</Text>
-              </View>
-            )}
-            <View style={s.brandText}>
-              <Text style={s.brandName}>{data.seller.businessName}</Text>
-              {data.seller.email && (
-                <Text style={s.brandMeta}>{data.seller.email}</Text>
-              )}
-              {data.seller.website && (
-                <Text style={s.brandMeta}>{data.seller.website}</Text>
-              )}
+    <Document title={`Welcome guide – ${data.title}`} author={brand.businessName}>
+      {/* COVER */}
+      <Page size="A4" style={coverStyles.page}>
+        <View
+          style={[
+            coverStyles.hero,
+            { backgroundColor: brand.accent, color: brand.onAccent },
+          ]}
+        >
+          <View>
+            <Text style={[coverStyles.eyebrow, { color: brand.onAccent }]}>
+              Welcome Guide
+            </Text>
+            <View style={coverStyles.titleBlock}>
+              <Text style={[coverStyles.title, { color: brand.onAccent }]}>
+                {data.title}
+              </Text>
+              {intro ? (
+                <Text style={[coverStyles.intro, { color: brand.onAccent }]}>
+                  {intro}
+                </Text>
+              ) : null}
             </View>
           </View>
-          <Text style={[s.kindPill, { color: accent }]}>Welcome guide</Text>
+
+          <View style={coverStyles.metaRow}>
+            {data.publishedAt ? (
+              <View style={coverStyles.metaCard}>
+                <Text style={[coverStyles.metaLabel, { color: brand.onAccent }]}>
+                  Published
+                </Text>
+                <Text style={[coverStyles.metaValue, { color: brand.onAccent }]}>
+                  {formatDate(data.publishedAt)}
+                </Text>
+              </View>
+            ) : null}
+            <View style={coverStyles.metaCard}>
+              <Text style={[coverStyles.metaLabel, { color: brand.onAccent }]}>
+                Pages
+              </Text>
+              <Text style={[coverStyles.metaValue, { color: brand.onAccent }]}>
+                {1 + Math.max(1, Math.ceil(data.sections.length / 3))}
+              </Text>
+            </View>
+            <View style={coverStyles.metaCard}>
+              <Text style={[coverStyles.metaLabel, { color: brand.onAccent }]}>
+                Read time
+              </Text>
+              <Text style={[coverStyles.metaValue, { color: brand.onAccent }]}>
+                {estimateReadMinutes(data)} min
+              </Text>
+            </View>
+          </View>
         </View>
 
-        {/* Title */}
-        <View style={s.titleBlock}>
-          <Text style={s.title}>{data.title}</Text>
-          {data.publishedAt && (
-            <Text style={s.subtitle}>
-              Prepared {formatDate(data.publishedAt)}
+        <View style={coverStyles.belowHero}>
+          <View style={coverStyles.preparedFor}>
+            <View style={coverStyles.preparedCell}>
+              <Text style={coverStyles.preparedEyebrow}>Prepared for</Text>
+              <Text style={coverStyles.preparedValue}>
+                {data.recipient?.name ?? "Your team"}
+              </Text>
+              {data.recipient?.company ? (
+                <Text style={coverStyles.preparedMuted}>{data.recipient.company}</Text>
+              ) : null}
+              {data.recipient?.email ? (
+                <Text style={coverStyles.preparedMuted}>{data.recipient.email}</Text>
+              ) : null}
+            </View>
+            <View style={coverStyles.preparedCell}>
+              <Text style={coverStyles.preparedEyebrow}>Prepared by</Text>
+              <Text style={coverStyles.preparedValue}>{brand.businessName}</Text>
+              {brand.contact.email ? (
+                <Text style={coverStyles.preparedMuted}>{brand.contact.email}</Text>
+              ) : null}
+              {brand.contact.website ? (
+                <Text style={coverStyles.preparedMuted}>{brand.contact.website}</Text>
+              ) : null}
+            </View>
+          </View>
+
+          <Text style={coverStyles.coverFooter}>
+            {brand.businessName}
+            {brand.contact.website ? ` · ${brand.contact.website}` : ""}
+          </Text>
+        </View>
+      </Page>
+
+      {/* BODY */}
+      <DocumentPage brand={brand}>
+        <DocumentHeader
+          brand={brand}
+          eyebrow="Welcome Guide"
+          title={truncate(data.title, 38)}
+          compact
+        />
+
+        {intro && data.sections.length > 0 ? (
+          <Text style={bodyStyles.intro}>{intro}</Text>
+        ) : null}
+
+        <View>
+          {data.sections.length > 0 ? (
+            data.sections.map((section, i) => (
+              <View key={i} style={bodyStyles.section} wrap={true}>
+                <View style={bodyStyles.sectionHeader}>
+                  <Text style={bodyStyles.sectionNumber}>
+                    {String(i + 1).padStart(2, "0")}
+                  </Text>
+                  <Text style={bodyStyles.sectionHeading}>{section.heading}</Text>
+                </View>
+                <Text style={bodyStyles.sectionBody}>
+                  {welcomeMarkdownToPlain(section.body)}
+                </Text>
+              </View>
+            ))
+          ) : intro ? (
+            <Text style={bodyStyles.sectionBody}>{intro}</Text>
+          ) : (
+            <Text style={bodyStyles.sectionBody}>
+              This guide is being prepared — content will follow shortly.
             </Text>
           )}
         </View>
 
-        {/* Recipient (only if we know who) */}
-        {data.recipient?.name && (
-          <View style={s.recipientBox}>
-            <Text style={s.recipientLabel}>For</Text>
-            <Text style={s.recipientName}>{data.recipient.name}</Text>
-            {(data.recipient.company || data.recipient.email) && (
-              <Text style={s.recipientMeta}>
-                {[data.recipient.company, data.recipient.email]
-                  .filter(Boolean)
-                  .join(" · ")}
-              </Text>
-            )}
-          </View>
-        )}
+        <Section eyebrow="What happens next">
+          <NoteBlock accent={brand.accent}>
+            {data.acknowledgementRequired && data.publicUrl
+              ? `Once you've read through the guide, please confirm at the bottom of the online version (${data.publicUrl}). That's the handshake to kick the project off.`
+              : `Reply to the email this guide arrived on with any questions — we'll incorporate them into the kickoff conversation.`}
+          </NoteBlock>
+        </Section>
 
-        {/* Intro */}
-        {data.intro && data.intro.trim() && (
-          <Text style={s.intro}>{welcomeMarkdownToPlain(data.intro)}</Text>
-        )}
-
-        {/* Sections */}
-        {data.sections.map((sec, i) => (
-          <View key={sec.id ?? i} style={s.section} wrap={false}>
-            <Text style={[s.sectionNumber, { color: accent }]}>
-              {String(i + 1).padStart(2, "0")}
-            </Text>
-            <Text style={s.sectionHeading}>{sec.heading}</Text>
-            <Text style={s.sectionBody}>
-              {welcomeMarkdownToPlain(sec.body)}
-            </Text>
-          </View>
-        ))}
-
-        {/* Optional acknowledgement nudge */}
-        {data.acknowledgementRequired && data.publicUrl && (
-          <View style={s.ackBox}>
-            <Text style={s.ackTitle}>Please confirm you&rsquo;ve read this</Text>
-            <Text style={s.ackBody}>
-              Once you&rsquo;ve had a chance to read through, open the link
-              below and tap &ldquo;I&rsquo;ve read and understood&rdquo;.
-              That&rsquo;s our handshake to get started.
-            </Text>
-            <Text style={s.ackLink}>{data.publicUrl}</Text>
-          </View>
-        )}
-
-        <View style={s.footer} fixed>
-          <Text>{data.seller.businessName}</Text>
-          <Text
-            render={({ pageNumber, totalPages }) =>
-              `Page ${pageNumber} of ${totalPages}`
-            }
-          />
-        </View>
-      </Page>
+        <DocumentFooter brand={brand} label={`Welcome guide · ${data.title}`} />
+      </DocumentPage>
     </Document>
   );
 }
 
-function formatDate(iso: string | null): string {
-  if (!iso) return "";
-  try {
-    return new Date(iso).toLocaleDateString("en-IN", {
-      day: "2-digit",
-      month: "long",
-      year: "numeric",
-    });
-  } catch {
-    return "";
-  }
+// --- Helpers ----------------------------------------------------------------
+
+function estimateReadMinutes(data: WelcomeDocumentPdfData): number {
+  const words =
+    (data.intro?.split(/\s+/).length ?? 0) +
+    data.sections.reduce(
+      (sum, s) => sum + (s.body?.split(/\s+/).length ?? 0),
+      0,
+    );
+  return Math.max(1, Math.round(words / 220));
+}
+
+function truncate(s: string, max: number): string {
+  return s.length > max ? `${s.slice(0, max - 1)}…` : s;
+}
+
+function buildBrandFromData(
+  data: WelcomeDocumentPdfData,
+  seller?: UserProfileRow | null,
+  logoDataUrl?: string | null,
+): ResolvedBrand {
+  if (seller) return resolveBrand(seller, logoDataUrl ?? data.seller.logoDataUrl);
+  const shim = {
+    business_name: data.seller.businessName,
+    company_name: null,
+    legal_name: data.seller.legalName,
+    full_name: null,
+    brand_color: data.brandColor,
+    brand_tagline: null,
+    business_email: data.seller.email,
+    email: null,
+    business_phone: data.seller.phone,
+    phone: null,
+    website: data.seller.website,
+    address_line1: data.seller.addressLines[0] ?? null,
+    address_line2: data.seller.addressLines[1] ?? null,
+    city: data.seller.addressLines[2] ?? null,
+    postal_code: data.seller.addressLines[3] ?? null,
+    country: null,
+    gstin: null,
+    gst_number: null,
+    pan: null,
+    state_code: null,
+  } as unknown as UserProfileRow;
+  return resolveBrand(shim, data.seller.logoDataUrl);
 }

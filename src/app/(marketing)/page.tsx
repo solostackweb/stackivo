@@ -13,14 +13,14 @@ import { getMarketingAuthState } from "@/features/marketing/auth-state";
 import { siteConfig } from "@/config/site";
 
 export const metadata: Metadata = {
-  title: "Freelancer Invoicing Software & Business OS for India",
+  title: "Stackivo — The operating system for independent work",
   description:
-    "Stackivo helps freelancers in India manage clients, GST invoicing, contracts, projects, payments, time tracking, and business analytics from one professional workspace.",
+    "Stackivo helps freelancers, creators, consultants, and small studios manage clients, invoicing, contracts, projects, payments, time tracking, and analytics from one professional workspace. Simple or GST invoices — your call.",
   alternates: { canonical: "/" },
   openGraph: {
-    title: "Stackivo - Freelancer Invoicing Software & Business OS",
+    title: "Stackivo — The operating system for independent work",
     description:
-      "GST invoicing, clients, contracts, projects, time tracking, payments, and analytics for Indian freelancers.",
+      "Clients, invoices, contracts, projects, time tracking, and payments — one workspace, built for every independent professional.",
     url: siteConfig.url,
   },
 };

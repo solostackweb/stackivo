@@ -2,7 +2,8 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { PanelLeftClose, PanelLeftOpen, Zap } from "lucide-react";
+import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { StackivoMark } from "@/components/brand/stackivo-logo";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -45,9 +46,7 @@ export function AppSidebar() {
           className="flex items-center gap-2.5 font-semibold"
           aria-label="Stackivo home"
         >
-          <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary text-primary-foreground shadow-sm">
-            <Zap className="h-4 w-4" />
-          </div>
+          <StackivoMark className="h-7 w-7" />
           {!collapsed && (
             <span className="text-[15px] font-semibold tracking-tight">
               Stackivo

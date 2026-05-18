@@ -71,6 +71,21 @@ export function SupportButton() {
   const chatAvailable = env.crispWebsiteId !== "";
   const helpUrl = env.zohoDeskHelpUrl;
 
+  // Layout strategy: both bubbles live in the bottom-right corner. When
+  // Crisp is loaded we STACK vertically — the SupportButton sits ABOVE
+  // the Crisp bubble — so they never overlap on narrow mobile viewports.
+  // Crisp's bubble is ~56px tall; offset our button up by 72px (56+16)
+  // when Crisp is present. Both honour the mobile bottom-nav height and
+  // the device safe-area. z-[60] keeps our popover above Crisp's z-40.
+  const baseBottom =
+    "calc(env(safe-area-inset-bottom, 0px) + var(--mobile-bottom-nav-h, 16px) + 16px)";
+  const stackedBottom = chatAvailable
+    ? `calc(${baseBottom} + 72px)`
+    : baseBottom;
+  const popoverBottom = chatAvailable
+    ? `calc(${baseBottom} + 72px + 56px)`
+    : `calc(${baseBottom} + 56px)`;
+
   return (
     <>
       <button
@@ -79,13 +94,8 @@ export function SupportButton() {
         aria-label="Open support"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
-        className="fixed right-4 z-40 flex h-11 w-11 items-center justify-center rounded-full border bg-card text-foreground shadow-lg transition hover:scale-105 hover:shadow-xl active:scale-95"
-        style={{
-          // Keep the button clear of the mobile bottom nav (h-14) +
-          // device safe-area inset.
-          bottom:
-            "calc(env(safe-area-inset-bottom, 0px) + var(--mobile-bottom-nav-h, 16px) + 16px)",
-        }}
+        className="fixed right-4 z-[60] flex h-11 w-11 items-center justify-center rounded-full border bg-card text-foreground shadow-lg transition hover:scale-105 hover:shadow-xl active:scale-95"
+        style={{ bottom: stackedBottom }}
       >
         {open ? (
           <X className="h-5 w-5" aria-hidden />
@@ -99,11 +109,8 @@ export function SupportButton() {
           ref={popoverRef}
           role="dialog"
           aria-label="Support menu"
-          className="fixed right-4 z-40 w-72 overflow-hidden rounded-lg border bg-card shadow-xl"
-          style={{
-            bottom:
-              "calc(env(safe-area-inset-bottom, 0px) + var(--mobile-bottom-nav-h, 16px) + 72px)",
-          }}
+          className="fixed right-4 z-[60] w-72 overflow-hidden rounded-lg border bg-card shadow-xl"
+          style={{ bottom: popoverBottom }}
         >
           <div className="border-b bg-muted/30 px-3 py-2.5">
             <div className="text-sm font-semibold">How can we help?</div>

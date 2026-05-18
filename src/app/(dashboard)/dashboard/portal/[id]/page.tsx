@@ -50,7 +50,11 @@ export default async function PortalDetailPage({
         portalId={id}
         portalName={snapshot.access.portal.name}
         brandColor={snapshot.access.portal.brand_color ?? "#6366F1"}
+        portalStatus={snapshot.access.portal.status}
+        currentUserId={snapshot.access.userId}
         role="owner"
+        clientId={snapshot.client?.id ?? snapshot.access.portal.client_id}
+        clientEmail={snapshot.client?.email ?? null}
         members={snapshot.members.map((m) => ({
           user_id: m.user_id,
           role: m.role,
@@ -64,8 +68,11 @@ export default async function PortalDetailPage({
         files={snapshot.files}
         messages={snapshot.messages}
         contracts={snapshot.contracts}
+        availableContracts={snapshot.availableContracts}
         invoices={snapshot.invoices}
+        availableInvoices={snapshot.availableInvoices}
         welcomeDocuments={snapshot.welcomeDocuments}
+        availableWelcomeDocuments={snapshot.availableWelcomeDocuments}
         activity={snapshot.activity}
         storageUsage={snapshot.storageUsage}
         storageCap={limitFor(sub, "storage_bytes")}

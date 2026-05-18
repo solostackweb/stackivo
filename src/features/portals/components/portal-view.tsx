@@ -25,11 +25,32 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   invitePortalMemberAction,
   postPortalMessageAction,
   deletePortalFileAction,
   revokePortalMemberAction,
+  attachContractToPortalAction,
+  attachInvoiceToPortalAction,
+  archivePortalAction,
+  deletePortalAction,
 } from "../actions";
+import { attachWelcomeToPortalAction } from "@/features/welcome-documents/actions";
+import { PORTAL_DASHBOARD_INDEX } from "@/features/portals/routes";
 import type {
   PortalActivityRow,
   PortalFileRow,
@@ -41,7 +62,11 @@ interface ViewProps {
   portalId: string;
   portalName: string;
   brandColor: string;
+  portalStatus: string;
   role: PortalRole;
+  currentUserId: string;
+  clientId?: string | null;
+  clientEmail?: string | null;
   members: Array<{
     user_id: string;
     role: PortalRole;
@@ -64,6 +89,11 @@ interface ViewProps {
     status: string;
     public_token: string | null;
   }>;
+  availableContracts: Array<{
+    id: string;
+    title: string;
+    status: string;
+  }>;
   invoices: Array<{
     id: string;
     invoice_number: string;
@@ -72,11 +102,24 @@ interface ViewProps {
     status: string;
     public_token: string | null;
   }>;
+  availableInvoices: Array<{
+    id: string;
+    invoice_number: string;
+    total_amount: number;
+    currency: string;
+    status: string;
+  }>;
   welcomeDocuments: Array<{
     id: string;
     title: string;
     status: string;
     public_token: string | null;
+    acknowledgement_required: boolean;
+  }>;
+  availableWelcomeDocuments: Array<{
+    id: string;
+    title: string;
+    status: string;
     acknowledgement_required: boolean;
   }>;
   activity: PortalActivityRow[];
@@ -101,17 +144,27 @@ export function PortalView(props: ViewProps) {
       <div className="space-y-6 lg:col-span-2">
         <WelcomeDocumentsSection
           documents={props.welcomeDocuments}
+          available={props.availableWelcomeDocuments}
           isOwner={isOwner}
+          portalId={props.portalId}
         />
         <ContractsSection
           contracts={props.contracts}
+          available={props.availableContracts}
           isOwner={isOwner}
+          portalId={props.portalId}
         />
-        <InvoicesSection invoices={props.invoices} isOwner={isOwner} />
+        <InvoicesSection
+          invoices={props.invoices}
+          available={props.availableInvoices}
+          isOwner={isOwner}
+          portalId={props.portalId}
+        />
         <FilesSection
           portalId={props.portalId}
           files={props.files}
           isOwner={isOwner}
+          currentUserId={props.currentUserId}
           r2Enabled={props.r2Enabled}
           usage={props.storageUsage}
           cap={props.storageCap}
@@ -122,11 +175,19 @@ export function PortalView(props: ViewProps) {
         />
       </div>
       <div className="space-y-6">
+        <PortalSettingsSection
+          portalId={props.portalId}
+          status={props.portalStatus}
+          portalName={props.portalName}
+          isOwner={isOwner}
+        />
         <MembersSection
           portalId={props.portalId}
           members={props.members}
           pendingInvitations={props.pendingInvitations}
           isOwner={isOwner}
+          clientId={props.clientId ?? null}
+          clientEmail={props.clientEmail ?? null}
         />
         <ActivitySection activity={props.activity} />
       </div>
@@ -140,10 +201,14 @@ export function PortalView(props: ViewProps) {
 
 function WelcomeDocumentsSection({
   documents,
+  available,
   isOwner,
+  portalId,
 }: {
   documents: ViewProps["welcomeDocuments"];
+  available: ViewProps["availableWelcomeDocuments"];
   isOwner: boolean;
+  portalId: string;
 }) {
   return (
     <Card>
@@ -152,8 +217,25 @@ function WelcomeDocumentsSection({
           <Sparkles className="h-4 w-4" /> Welcome guides
         </CardTitle>
         {isOwner && (
-          <Button asChild size="sm" variant="ghost">
-            <Link href="/dashboard/welcome">Attach existing</Link>
+          <AttachExistingDialog
+            triggerLabel="Attach existing"
+            title="Attach a welcome guide"
+            description="Pick a welcome document to share in this portal."
+            emptyMessage="No welcome documents available to attach."
+            items={available.map((doc) => ({
+              id: doc.id,
+              label: doc.title,
+              meta: `${doc.status.replace(/_/g, " ")}${doc.acknowledgement_required ? " · acknowledgement" : ""}`,
+            }))}
+            onAttach={async (id) => attachWelcomeToPortalAction({
+              portalId,
+              documentId: id,
+            })}
+          />
+        )}
+        {!isOwner && (
+          <Button size="sm" variant="ghost" disabled>
+            Owner managed
           </Button>
         )}
       </CardHeader>
@@ -201,10 +283,14 @@ function WelcomeDocumentsSection({
 
 function ContractsSection({
   contracts,
+  available,
   isOwner,
+  portalId,
 }: {
   contracts: ViewProps["contracts"];
+  available: ViewProps["availableContracts"];
   isOwner: boolean;
+  portalId: string;
 }) {
   return (
     <Card>
@@ -213,8 +299,25 @@ function ContractsSection({
           <FileText className="h-4 w-4" /> Contracts
         </CardTitle>
         {isOwner && (
-          <Button asChild size="sm" variant="ghost">
-            <Link href="/dashboard/contracts">Attach existing</Link>
+          <AttachExistingDialog
+            triggerLabel="Attach existing"
+            title="Attach a contract"
+            description="Pick a contract to attach to this portal."
+            emptyMessage="No contracts available to attach."
+            items={available.map((contract) => ({
+              id: contract.id,
+              label: contract.title,
+              meta: contract.status.replace(/_/g, " "),
+            }))}
+            onAttach={async (id) => attachContractToPortalAction({
+              portalId,
+              contractId: id,
+            })}
+          />
+        )}
+        {!isOwner && (
+          <Button size="sm" variant="ghost" disabled>
+            Owner managed
           </Button>
         )}
       </CardHeader>
@@ -259,10 +362,14 @@ function ContractsSection({
 
 function InvoicesSection({
   invoices,
+  available,
   isOwner,
+  portalId,
 }: {
   invoices: ViewProps["invoices"];
+  available: ViewProps["availableInvoices"];
   isOwner: boolean;
+  portalId: string;
 }) {
   return (
     <Card>
@@ -271,8 +378,25 @@ function InvoicesSection({
           <Receipt className="h-4 w-4" /> Invoices
         </CardTitle>
         {isOwner && (
-          <Button asChild size="sm" variant="ghost">
-            <Link href="/dashboard/invoices">Attach existing</Link>
+          <AttachExistingDialog
+            triggerLabel="Attach existing"
+            title="Attach an invoice"
+            description="Pick an invoice to share in this portal."
+            emptyMessage="No invoices available to attach."
+            items={available.map((invoice) => ({
+              id: invoice.id,
+              label: invoice.invoice_number,
+              meta: `${invoice.currency} ${invoice.total_amount} · ${invoice.status}`,
+            }))}
+            onAttach={async (id) => attachInvoiceToPortalAction({
+              portalId,
+              invoiceId: id,
+            })}
+          />
+        )}
+        {!isOwner && (
+          <Button size="sm" variant="ghost" disabled>
+            Owner managed
           </Button>
         )}
       </CardHeader>
@@ -330,6 +454,7 @@ function FilesSection({
   portalId,
   files,
   isOwner,
+  currentUserId,
   r2Enabled,
   usage,
   cap,
@@ -337,6 +462,7 @@ function FilesSection({
   portalId: string;
   files: PortalFileRow[];
   isOwner: boolean;
+  currentUserId: string;
   r2Enabled: boolean;
   usage: { totalBytes: number; fileCount: number };
   cap: number;
@@ -399,7 +525,7 @@ function FilesSection({
                     {formatBytes(f.size_bytes)}
                   </span>
                 </a>
-                {(isOwner || true) && (
+                {(isOwner || f.uploaded_by === currentUserId) && (
                   <Button
                     size="sm"
                     variant="ghost"
@@ -556,21 +682,59 @@ function MessagesSection({
     <Card>
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-base">
-          <MessageSquare className="h-4 w-4" /> Comments
+          <MessageSquare className="h-4 w-4" /> Conversation
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
+        <div className="rounded-md border bg-muted/10 p-3">
+          <form onSubmit={onSubmit} className="space-y-2">
+            <div className="space-y-1">
+              <Label htmlFor="portal-message" className="text-xs">
+                Share an update
+              </Label>
+              <Textarea
+                id="portal-message"
+                placeholder="Share a progress update, ask a question, or request feedback..."
+                value={body}
+                onChange={(e) => setBody(e.target.value)}
+                maxLength={8000}
+                rows={3}
+                required
+              />
+              <p className="text-[11px] text-muted-foreground">
+                Keep files in the Files section so they stay organized.
+              </p>
+            </div>
+            {error && (
+              <p className="rounded-md bg-destructive/10 p-2 text-xs text-destructive">
+                {error}
+              </p>
+            )}
+            <div className="flex justify-end">
+              <Button
+                type="submit"
+                size="sm"
+                disabled={pending || body.trim().length === 0}
+              >
+                {pending ? (
+                  <Loader2 className="animate-spin" />
+                ) : (
+                  <>
+                    <Send /> Send update
+                  </>
+                )}
+              </Button>
+            </div>
+          </form>
+        </div>
         {ordered.length === 0 ? (
           <p className="rounded-md border border-dashed p-6 text-center text-xs text-muted-foreground">
-            No comments yet. Start the thread below.
+            No conversation yet. Use the form above to start.
           </p>
         ) : (
           <ul className="space-y-3">
             {ordered.map((m) => (
-              <li
-                key={m.id}
-                className="rounded-md border bg-muted/20 p-3"
-              >
+              <li key={m.id} className="rounded-md border p-3">
                 <div className="mb-1 flex items-center gap-2 text-[11px] text-muted-foreground">
                   <span className="font-medium text-foreground">
                     {m.author?.full_name ?? m.author?.email ?? "Someone"}
@@ -585,38 +749,263 @@ function MessagesSection({
             ))}
           </ul>
         )}
-        <form onSubmit={onSubmit} className="space-y-2">
-          <Textarea
-            placeholder="Write a comment…"
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-            maxLength={8000}
-            rows={3}
-            required
-          />
-          {error && (
-            <p className="rounded-md bg-destructive/10 p-2 text-xs text-destructive">
-              {error}
-            </p>
-          )}
-          <div className="flex justify-end">
-            <Button
-              type="submit"
-              size="sm"
-              disabled={pending || body.trim().length === 0}
-            >
-              {pending ? (
-                <Loader2 className="animate-spin" />
-              ) : (
-                <>
-                  <Send /> Post
-                </>
-              )}
-            </Button>
-          </div>
-        </form>
       </CardContent>
     </Card>
+  );
+}
+
+function PortalSettingsSection({
+  portalId,
+  status,
+  portalName,
+  isOwner,
+}: {
+  portalId: string;
+  status: string;
+  portalName: string;
+  isOwner: boolean;
+}) {
+  const router = useRouter();
+  const [pending, setPending] = React.useState(false);
+  const [deleteOpen, setDeleteOpen] = React.useState(false);
+  const [confirmName, setConfirmName] = React.useState("");
+  const [error, setError] = React.useState<string | null>(null);
+  const archived = status === "archived";
+
+  // Two separate error slots so the destructive-dialog error never bleeds
+  // back to the card behind it (the prior implementation re-used `error`
+  // and the failure message appeared underneath the open dialog instead
+  // of inside it).
+  const [dialogError, setDialogError] = React.useState<string | null>(null);
+
+  async function onArchive() {
+    if (pending || archived) return;
+    setPending(true);
+    setError(null);
+    const res = await archivePortalAction({ portalId });
+    setPending(false);
+    if (!res.ok) {
+      setError(res.error ?? "Could not deactivate portal.");
+      return;
+    }
+    router.refresh();
+  }
+
+  async function onDelete() {
+    if (pending) return;
+    if (confirmName.trim() !== portalName) {
+      setDialogError("Portal name does not match.");
+      return;
+    }
+    setPending(true);
+    setDialogError(null);
+    const res = await deletePortalAction({ portalId });
+    setPending(false);
+    if (!res.ok) {
+      setDialogError(res.error ?? "Could not delete portal.");
+      return;
+    }
+    setConfirmName("");
+    setDeleteOpen(false);
+    router.push(PORTAL_DASHBOARD_INDEX);
+    router.refresh();
+  }
+
+  if (!isOwner) return null;
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base">Portal settings</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <p className="text-xs text-muted-foreground">
+          Deactivate to pause client access. Delete to permanently remove the
+          portal and all attachments.
+        </p>
+        <p className="text-[11px] text-muted-foreground">
+          You&apos;ll be asked to type the portal name to confirm deletion.
+        </p>
+        {error && (
+          <p className="rounded-md bg-destructive/10 p-2 text-xs text-destructive">
+            {error}
+          </p>
+        )}
+        <div className="grid gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onArchive}
+            disabled={pending || archived}
+          >
+            {archived ? "Portal deactivated" : "Deactivate portal"}
+          </Button>
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={() => {
+              setError(null);
+              setDeleteOpen(true);
+            }}
+            disabled={pending}
+          >
+            Delete portal
+          </Button>
+        </div>
+        <Dialog
+          open={deleteOpen}
+          onOpenChange={(next) => {
+            setDeleteOpen(next);
+            // Clear any previous failure when the user reopens / closes.
+            if (!next) setDialogError(null);
+          }}
+        >
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Delete this portal?</DialogTitle>
+              <DialogDescription>
+                This permanently removes the portal and its attachments. Type
+                the portal name to confirm.
+                <span className="mt-2 block text-xs text-muted-foreground">
+                  Type <strong>{portalName}</strong> to confirm.
+                </span>
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-2">
+              <Label htmlFor="portal-delete-name">Portal name</Label>
+              <Input
+                id="portal-delete-name"
+                value={confirmName}
+                onChange={(e) => setConfirmName(e.target.value)}
+                placeholder={portalName}
+              />
+              {dialogError && (
+                <p className="rounded-md bg-destructive/10 p-2 text-xs text-destructive">
+                  {dialogError}
+                </p>
+              )}
+            </div>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => {
+                  setConfirmName("");
+                  setDeleteOpen(false);
+                }}
+                disabled={pending}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                onClick={onDelete}
+                disabled={pending || confirmName.trim().length === 0}
+              >
+                {pending ? <Loader2 className="animate-spin" /> : "Delete"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </CardContent>
+    </Card>
+  );
+}
+
+function AttachExistingDialog({
+  triggerLabel,
+  title,
+  description,
+  emptyMessage,
+  items,
+  onAttach,
+}: {
+  triggerLabel: string;
+  title: string;
+  description: string;
+  emptyMessage: string;
+  items: Array<{ id: string; label: string; meta?: string }>;
+  onAttach: (id: string) => Promise<{ ok: boolean; error?: string | null }>;
+}) {
+  const router = useRouter();
+  const [open, setOpen] = React.useState(false);
+  const [selectedId, setSelectedId] = React.useState("");
+  const [pending, setPending] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+
+  async function handleAttach() {
+    if (!selectedId || pending) return;
+    setPending(true);
+    setError(null);
+    const res = await onAttach(selectedId);
+    setPending(false);
+    if (!res.ok) {
+      setError(res.error ?? "Could not attach. Please try again.");
+      return;
+    }
+    setSelectedId("");
+    setOpen(false);
+    router.refresh();
+  }
+
+  return (
+    <>
+      <Button size="sm" variant="ghost" onClick={() => setOpen(true)}>
+        {triggerLabel}
+      </Button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{title}</DialogTitle>
+            <DialogDescription>{description}</DialogDescription>
+          </DialogHeader>
+          {items.length === 0 ? (
+            <p className="rounded-md border border-dashed p-3 text-xs text-muted-foreground">
+              {emptyMessage}
+            </p>
+          ) : (
+            <div className="space-y-2">
+              <Label htmlFor="attach-select">Select item</Label>
+              <Select value={selectedId} onValueChange={setSelectedId}>
+                <SelectTrigger id="attach-select">
+                  <SelectValue placeholder="Choose one" />
+                </SelectTrigger>
+                <SelectContent>
+                  {items.map((item) => (
+                    <SelectItem key={item.id} value={item.id}>
+                      {item.label}{item.meta ? ` · ${item.meta}` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {error && (
+                <p className="rounded-md bg-destructive/10 p-2 text-xs text-destructive">
+                  {error}
+                </p>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setOpen(false)}
+              disabled={pending}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={handleAttach}
+              disabled={pending || !selectedId || items.length === 0}
+            >
+              {pending ? <Loader2 className="animate-spin" /> : "Attach"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
@@ -625,11 +1014,15 @@ function MembersSection({
   members,
   pendingInvitations,
   isOwner,
+  clientId,
+  clientEmail,
 }: {
   portalId: string;
   members: ViewProps["members"];
   pendingInvitations: ViewProps["pendingInvitations"];
   isOwner: boolean;
+  clientId: string | null;
+  clientEmail: string | null;
 }) {
   const router = useRouter();
   const [open, setOpen] = React.useState(false);
@@ -637,6 +1030,10 @@ function MembersSection({
   const [name, setName] = React.useState("");
   const [pending, setPending] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const hasClient = members.length > 0;
+  const hasPending = pendingInvitations.length > 0;
+  const missingClientEmail = !clientEmail;
+  const inviteDisabled = hasClient || hasPending || missingClientEmail;
 
   async function onInvite(e: React.FormEvent) {
     e.preventDefault();
@@ -668,20 +1065,45 @@ function MembersSection({
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-        <CardTitle className="text-base">Members</CardTitle>
+        <CardTitle className="text-base">Client access</CardTitle>
         {isOwner && (
           <Button
             size="sm"
             variant="outline"
             onClick={() => setOpen((o) => !o)}
+            disabled={inviteDisabled}
           >
             <UserPlus /> Invite
           </Button>
         )}
       </CardHeader>
       <CardContent className="space-y-3">
-        {open && isOwner && (
+        {isOwner && missingClientEmail && (
+          <div className="space-y-2 rounded-md border border-amber-500/30 bg-amber-500/5 p-3">
+            <p className="text-[11px] text-amber-700 dark:text-amber-300">
+              Add an email to the client profile before inviting.
+            </p>
+            {clientId && (
+              <Button asChild size="sm" variant="outline">
+                <Link href={`/dashboard/clients/${clientId}`}>
+                  Add client email
+                </Link>
+              </Button>
+            )}
+          </div>
+        )}
+        {isOwner && (hasClient || hasPending) && (
+          <p className="rounded-md border border-amber-500/30 bg-amber-500/5 p-3 text-[11px] text-amber-700 dark:text-amber-300">
+            This portal supports one client at a time. Revoke access or wait
+            for the pending invite before inviting another.
+          </p>
+        )}
+        {open && isOwner && !inviteDisabled && (
           <form onSubmit={onInvite} className="space-y-2 rounded-md border p-3">
+            <p className="text-[11px] text-muted-foreground">
+              Only the client linked to this portal can be invited. Use the
+              client email on file.
+            </p>
             <div className="space-y-1">
               <Label htmlFor="invite-email" className="text-xs">
                 Client email
@@ -721,54 +1143,72 @@ function MembersSection({
             </Button>
           </form>
         )}
-        <ul className="space-y-2">
-          {members.map((m) => (
-            <li
-              key={m.user_id}
-              className="flex items-center justify-between gap-2 rounded-md border bg-muted/20 px-3 py-2"
-            >
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium">
-                  {m.profile?.full_name ?? m.profile?.email ?? m.user_id.slice(0, 8)}
-                </p>
-                <p className="truncate text-[11px] text-muted-foreground">
-                  {m.profile?.email}
-                </p>
-              </div>
-              <Badge
-                variant={m.role === "owner" ? "default" : "secondary"}
-                className="capitalize"
-              >
-                {m.role}
-              </Badge>
-              {isOwner && m.role !== "owner" && (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => onRevoke(m.user_id)}
-                  aria-label="Revoke"
+        {members.length > 1 && (
+          <p className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-[11px] text-destructive">
+            Multiple clients are attached to this portal. This portal should
+            only have one client.
+          </p>
+        )}
+        {members.length === 0 ? (
+          <p className="rounded-md border border-dashed p-6 text-center text-xs text-muted-foreground">
+            No client connected yet.
+          </p>
+        ) : (
+          <ul className="divide-y rounded-md border">
+            {members.map((member) => {
+              const displayName = getMemberDisplayName(member.profile);
+              const email = getMemberEmail(member.profile);
+              const isOwnerMember = member.role === "owner";
+              return (
+                <li
+                  key={member.user_id}
+                  className="flex items-center justify-between gap-3 px-3 py-2.5"
                 >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
-              )}
-            </li>
-          ))}
-        </ul>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">
+                      {displayName}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground">
+                      {email ?? "No email on file"}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant={isOwnerMember ? "default" : "secondary"}>
+                      {isOwnerMember ? "Owner" : "Client"}
+                    </Badge>
+                    {isOwner && !isOwnerMember && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => onRevoke(member.user_id)}
+                      >
+                        Revoke
+                      </Button>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
         {isOwner && pendingInvitations.length > 0 && (
-          <div className="space-y-1.5">
-            <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-              Pending invitations
+          <div className="space-y-2">
+            <p className="text-[11px] font-medium text-muted-foreground">
+              Pending invitation
             </p>
-            <ul className="space-y-1.5">
+            <ul className="divide-y rounded-md border">
               {pendingInvitations.map((inv) => (
                 <li
                   key={inv.id}
-                  className="flex items-center justify-between gap-2 rounded-md border border-dashed px-3 py-2 text-xs"
+                  className="flex items-center justify-between gap-3 px-3 py-2.5"
                 >
-                  <span className="truncate">{inv.email}</span>
-                  <span className="shrink-0 text-muted-foreground">
-                    expires {new Date(inv.expires_at).toLocaleDateString()}
-                  </span>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">{inv.email}</p>
+                    <p className="text-[11px] text-muted-foreground">
+                      Expires {formatDate(inv.expires_at)}
+                    </p>
+                  </div>
+                  <Badge variant="outline">Pending</Badge>
                 </li>
               ))}
             </ul>
@@ -779,63 +1219,96 @@ function MembersSection({
   );
 }
 
-function ActivitySection({ activity }: { activity: PortalActivityRow[] }) {
-  if (activity.length === 0) {
-    return (
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Activity</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="rounded-md border border-dashed p-4 text-center text-xs text-muted-foreground">
-            Nothing yet — actions in this portal will show up here.
-          </p>
-        </CardContent>
-      </Card>
-    );
-  }
+function ActivitySection({
+  activity,
+}: {
+  activity: ViewProps["activity"];
+}) {
+  const ordered = [...activity].sort(
+    (a, b) => Date.parse(b.created_at) - Date.parse(a.created_at),
+  );
+
   return (
     <Card>
       <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-base">
-          <ShieldCheck className="h-4 w-4" /> Activity
-        </CardTitle>
+        <CardTitle className="text-base">Activity</CardTitle>
       </CardHeader>
       <CardContent>
-        <ul className="space-y-2 text-xs">
-          {activity.slice(0, 12).map((a) => (
-            <li key={a.id} className="flex items-start gap-2">
-              <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-primary/60" />
-              <div className="min-w-0">
-                <p className="truncate font-medium text-foreground">
-                  {humanizeActivity(a.type)}
-                </p>
-                <p className="text-muted-foreground">
-                  {new Date(a.created_at).toLocaleString()}
-                </p>
-              </div>
-            </li>
-          ))}
-        </ul>
+        {ordered.length === 0 ? (
+          <p className="rounded-md border border-dashed p-6 text-center text-xs text-muted-foreground">
+            No activity yet.
+          </p>
+        ) : (
+          <ul className="divide-y rounded-md border">
+            {ordered.map((item) => {
+              const title = formatActivityTitle(item);
+              const description = formatActivityDescription(item);
+              return (
+                <li
+                  key={item.id}
+                  className="flex items-start gap-3 px-3 py-2.5"
+                >
+                  <span className="mt-0.5">
+                    {getActivityIcon(item)}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium">{title}</p>
+                    {description && (
+                      <p className="text-[11px] text-muted-foreground">
+                        {description}
+                      </p>
+                    )}
+                  </div>
+                  <span className="shrink-0 text-[11px] text-muted-foreground">
+                    {formatDateTime(item.created_at)}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </CardContent>
     </Card>
   );
 }
 
-// ============================================================================
-// helpers
-// ============================================================================
-
-function formatBytes(bytes: number): string {
-  if (!Number.isFinite(bytes)) return "∞";
-  if (bytes === 0) return "0 B";
-  const units = ["B", "KB", "MB", "GB", "TB"];
-  const i = Math.min(units.length - 1, Math.floor(Math.log10(bytes) / 3));
-  return `${(bytes / Math.pow(1000, i)).toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
+function getMemberDisplayName(
+  profile: ViewProps["members"][number]["profile"],
+): string {
+  return profile?.full_name ?? profile?.email ?? "Unknown member";
 }
 
-function humanizeActivity(type: string): string {
-  switch (type) {
+function getMemberEmail(
+  profile: ViewProps["members"][number]["profile"],
+): string | null {
+  if (!profile) return null;
+  if (profile.full_name && profile.email) return profile.email;
+  return profile.email ?? null;
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes === Infinity) return "Infinity";
+  if (bytes < 1024) return `${bytes} B`;
+  const units = ["KB", "MB", "GB", "TB"];
+  let v = bytes / 1024;
+  let i = 0;
+  while (v >= 1024 && i < units.length - 1) {
+    v /= 1024;
+    i++;
+  }
+  return `${v.toFixed(v >= 10 ? 0 : 1)} ${units[i]}`;
+}
+
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString();
+}
+
+function formatDateTime(iso: string): string {
+  return new Date(iso).toLocaleString();
+}
+
+function formatActivityTitle(item: PortalActivityRow): string {
+  switch (item.type) {
     case "portal.created":
       return "Portal created";
     case "portal.renamed":
@@ -846,21 +1319,62 @@ function humanizeActivity(type: string): string {
       return "Member joined";
     case "portal.member_revoked":
       return "Member revoked";
-    case "file.uploaded":
-      return "File uploaded";
-    case "file.deleted":
-      return "File deleted";
-    case "message.posted":
-      return "New comment";
     case "contract.attached":
       return "Contract attached";
-    case "contract.signed":
-      return "Contract signed";
     case "invoice.attached":
       return "Invoice attached";
-    case "invoice.paid":
-      return "Invoice paid";
+    case "message.posted":
+      return "Comment posted";
+    case "file.deleted":
+      return "File deleted";
     default:
-      return type.replace(/[._]/g, " ");
+      return item.type.replace(/_/g, " ");
   }
+}
+
+function formatActivityDescription(item: PortalActivityRow): string | null {
+  const payload = parsePayload(item.payload);
+  if (item.type === "portal.renamed" && typeof payload.name === "string") {
+    return `Renamed to ${payload.name}`;
+  }
+  if (item.type === "portal.member_invited" && typeof payload.email === "string") {
+    return payload.email;
+  }
+  if (item.type === "portal.member_joined" && typeof payload.email === "string") {
+    return payload.email;
+  }
+  if (item.type === "contract.attached" && typeof payload.title === "string") {
+    return payload.title;
+  }
+  if (item.type === "invoice.attached" && typeof payload.number === "string") {
+    return `Invoice ${payload.number}`;
+  }
+  if (item.type === "message.posted" && typeof payload.preview === "string") {
+    return `\"${payload.preview}\"`;
+  }
+  if (item.type === "file.deleted" && typeof payload.name === "string") {
+    return payload.name;
+  }
+  if (typeof payload.name === "string") return payload.name;
+  if (typeof payload.title === "string") return payload.title;
+  if (typeof payload.email === "string") return payload.email;
+  return null;
+}
+
+function getActivityIcon(item: PortalActivityRow) {
+  const className = "h-3.5 w-3.5 text-muted-foreground";
+  if (item.type.startsWith("contract.")) return <FileText className={className} />;
+  if (item.type.startsWith("invoice.")) return <Receipt className={className} />;
+  if (item.type.startsWith("message.")) return <MessageSquare className={className} />;
+  if (item.type.startsWith("file.")) return <Paperclip className={className} />;
+  if (item.type.startsWith("portal.member")) return <UserPlus className={className} />;
+  if (item.type.startsWith("portal.")) return <ShieldCheck className={className} />;
+  return <Sparkles className={className} />;
+}
+
+function parsePayload(payload: PortalActivityRow["payload"]): Record<string, unknown> {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    return {};
+  }
+  return payload as Record<string, unknown>;
 }

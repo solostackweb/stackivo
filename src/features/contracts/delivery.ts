@@ -16,7 +16,10 @@ import { ensureContractPublicToken } from "@/features/share/server";
 import { buildContractPdfData } from "@/features/documents/builders";
 import { renderPdfToBuffer } from "@/features/documents/pdf/render";
 import { ContractPdf } from "@/features/documents/pdf/contract-pdf";
-import { renderContractSentEmail } from "@/features/email/templates";
+import {
+  buildEmailBrand,
+  renderContractSentEmail,
+} from "@/features/email/templates";
 import { dispatchDelivery, pdfAttachment } from "@/features/email/send";
 import { getEmailSender } from "@/features/email/senders";
 import { recordActivity } from "@/features/activity/server";
@@ -83,7 +86,9 @@ export async function sendContractAction(
 
   const { data: profile } = await supabase
     .from("user_profiles")
-    .select("business_name, legal_name, full_name, email")
+    .select(
+      "business_name, legal_name, full_name, email, brand_color, logo_url, business_email, business_phone, website",
+    )
     .eq("id", user.id)
     .maybeSingle();
   const p = profile as
@@ -92,10 +97,29 @@ export async function sendContractAction(
         legal_name?: string | null;
         full_name?: string | null;
         email?: string | null;
+        brand_color?: string | null;
+        logo_url?: string | null;
+        business_email?: string | null;
+        business_phone?: string | null;
+        website?: string | null;
       }
     | null;
   const senderName =
     p?.business_name ?? p?.legal_name ?? p?.full_name ?? "Stackivo";
+
+  // Reuse the logo URL already resolved for the PDF so the email shows
+  // the same brand mark.
+  const emailBrand = buildEmailBrand({
+    businessName: p?.business_name ?? null,
+    legalName: p?.legal_name ?? null,
+    fullName: p?.full_name ?? null,
+    brandColor: p?.brand_color ?? null,
+    logoUrl: pdfData.seller.logoDataUrl,
+    businessEmail: p?.business_email ?? null,
+    businessPhone: p?.business_phone ?? null,
+    email: p?.email ?? null,
+    website: p?.website ?? null,
+  });
 
   await supabase
     .from("contracts")
@@ -117,6 +141,7 @@ export async function sendContractAction(
     senderEmail: getEmailSender("share").email,
     message: parsed.data.message ?? null,
     publicUrl,
+    brand: emailBrand,
   });
 
   const slug = contract.title

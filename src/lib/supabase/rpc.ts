@@ -33,7 +33,8 @@ type AnyClient = SupabaseClient<Database>;
  * surface. Everything downstream of this cast is fully typed.
  */
 function untypedRpc(client: AnyClient) {
-  return client.rpc as unknown as (
+  // Bind to preserve `this` so supabase-js can access `this.rest`.
+  return client.rpc.bind(client) as unknown as (
     fn: string,
     args?: Record<string, unknown>,
   ) => Promise<{ data: unknown; error: { message: string } | null }>;

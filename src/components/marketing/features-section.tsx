@@ -35,9 +35,9 @@ interface Feature {
 const FEATURES: Feature[] = [
   {
     icon: Receipt,
-    title: "GST-ready invoicing",
+    title: "Invoicing that just works",
     description:
-      "CGST, SGST and IGST split automatically based on place of supply. Standard invoices for non-GST freelancers, with compliant footers every time.",
+      "Send polished invoices in seconds. Simple invoices for non-registered freelancers; full CGST/SGST/IGST split when you need GST — Stackivo handles the difference for you.",
     span: 3,
     accent: true,
   },
@@ -52,7 +52,7 @@ const FEATURES: Feature[] = [
     icon: Users,
     title: "Client management",
     description:
-      "GST-aware client records with billing addresses and contact history — built for B2B and B2C.",
+      "Clean records with billing addresses and contact history. Works for B2C, B2B, and everything in between.",
     span: 2,
   },
   {
@@ -85,9 +85,9 @@ const FEATURES: Feature[] = [
   },
   {
     icon: ShieldCheck,
-    title: "Compliance-ready",
+    title: "Compliance when you need it",
     description:
-      "GSTIN validation, place-of-supply rules, immutable history. Audit-ready by default.",
+      "GSTIN validation, place-of-supply rules, immutable history — only switched on when you turn GST on. Audit-ready from day one.",
     span: 2,
   },
 ];

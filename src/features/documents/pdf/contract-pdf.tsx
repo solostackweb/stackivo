@@ -1,20 +1,58 @@
 import "server-only";
 
+/**
+ * Contract / Proposal PDF.
+ *
+ * Same shape covers both — the only difference is the eyebrow label and
+ * whether a signature pair renders at the end.
+ *
+ * Design intent: legally serious, not generic. Wide line height, clear
+ * section numbering, real signature blocks with date + IP capture for
+ * countersigned contracts.
+ *
+ * Layout:
+ *   1. Branded header (logo, eyebrow "CONTRACT" / "PROPOSAL", title).
+ *   2. Meta grid — Issued / Expires / Value.
+ *   3. Party pair — "Between" (seller) / "And" (client).
+ *   4. Body: parsed sections rendered with section numbers and snug
+ *      typography. Falls back to a paragraph dump when content lacks
+ *      structure.
+ *   5. (Contracts only) Signature pair — countersigned + counterparty.
+ *      Each block keeps `wrap={false}` so it never splits across pages.
+ *   6. Fixed branded footer.
+ */
+
 import * as React from "react";
-import {
-  Document,
-  Image,
-  Page,
-  StyleSheet,
-  Text,
-  View,
-} from "@react-pdf/renderer";
+import { Document, StyleSheet, Text, View } from "@react-pdf/renderer";
 import { parseContractContent } from "@/features/contracts/content";
 import {
   hasSignatureReference,
   type ContractSignatureReference,
 } from "@/features/contracts/signatures";
-import { pdfColors, pdfFonts, pdfSizes, pdfSpacing } from "./theme";
+import {
+  pdfColors,
+  pdfFonts,
+  pdfSizes,
+  pdfSpacing,
+  pdfTracking,
+  pdfLineHeights,
+} from "./theme";
+import { resolveBrand, type ResolvedBrand } from "./brand";
+import {
+  Badge,
+  DocumentFooter,
+  DocumentHeader,
+  DocumentPage,
+  MetaGrid,
+  PartyPair,
+  SignatureBlock,
+  formatCurrency,
+  formatDate,
+  type SignatureData,
+} from "./primitives";
+import type { UserProfileRow } from "@/lib/supabase/types";
+
+// --- Data shape (preserved) -------------------------------------------------
 
 export interface ContractPdfParty {
   name: string;
@@ -33,12 +71,14 @@ export interface ContractPdfData {
   signedAt: string | null;
   signerName: string | null;
   signerEmail: string | null;
-  clientSignature: (ContractSignatureReference & {
-    legalName: string | null;
-    signedAt: string | null;
-    signerEmail: string | null;
-    signedIp: string | null;
-  }) | null;
+  clientSignature:
+    | (ContractSignatureReference & {
+        legalName: string | null;
+        signedAt: string | null;
+        signerEmail: string | null;
+        signedIp: string | null;
+      })
+    | null;
   publicUrl: string | null;
   brandColor: string | null;
   seller: {
@@ -48,332 +88,249 @@ export interface ContractPdfData {
     phone: string | null;
     addressLines: string[];
     logoDataUrl: string | null;
-    signature: (ContractSignatureReference & {
-      legalName: string | null;
-      signedAt: string | null;
-    }) | null;
+    signature:
+      | (ContractSignatureReference & {
+          legalName: string | null;
+          signedAt: string | null;
+        })
+      | null;
   };
   client: ContractPdfParty;
 }
 
-const s = StyleSheet.create({
-  page: {
-    fontFamily: pdfFonts.base,
-    fontSize: pdfSizes.base,
+// --- Body typography --------------------------------------------------------
+
+const bodyStyles = StyleSheet.create({
+  section: { marginBottom: pdfSpacing.lg },
+  numberRow: { flexDirection: "row", alignItems: "baseline", marginBottom: 4 },
+  number: {
+    fontFamily: pdfFonts.bold,
+    fontSize: pdfSizes.eyebrow,
+    color: pdfColors.mutedForeground,
+    letterSpacing: pdfTracking.wider,
+    marginRight: 8,
+    minWidth: 22,
+  },
+  heading: {
+    fontFamily: pdfFonts.bold,
+    fontSize: pdfSizes.md,
     color: pdfColors.foreground,
-    padding: pdfSpacing.page,
-    lineHeight: 1.55,
+    letterSpacing: pdfTracking.tight,
   },
-  topRule: { height: 4, marginBottom: 18, borderRadius: 999 },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: 16,
-  },
-  brandBlock: { flexDirection: "row", gap: 10, alignItems: "flex-start" },
-  logo: { width: 42, height: 42, objectFit: "contain" },
-  brandName: { fontFamily: pdfFonts.bold, fontSize: pdfSizes.lg },
-  brandMeta: { color: pdfColors.mutedForeground, fontSize: pdfSizes.xs },
-  kindPill: {
-    fontFamily: pdfFonts.bold,
-    fontSize: pdfSizes.xs,
-    textTransform: "uppercase",
-    letterSpacing: 1,
-    color: pdfColors.primary,
-  },
-  title: {
-    fontFamily: pdfFonts.bold,
-    fontSize: pdfSizes.h1,
-    lineHeight: 1.25,
-    marginTop: 2,
-    textAlign: "right",
-  },
-  metaStrip: {
-    flexDirection: "row",
-    borderTop: `1px solid ${pdfColors.border}`,
-    borderBottom: `1px solid ${pdfColors.border}`,
-    paddingVertical: 10,
-    marginTop: pdfSpacing.sectionGap,
-    marginBottom: pdfSpacing.sectionGap,
-  },
-  metaCell: { flex: 1, paddingRight: 10 },
-  metaLabel: {
-    fontSize: pdfSizes.xs,
-    color: pdfColors.mutedForeground,
-    textTransform: "uppercase",
-    letterSpacing: 0.6,
-    marginBottom: 2,
-  },
-  metaValue: { fontFamily: pdfFonts.bold, fontSize: pdfSizes.md },
-  parties: {
-    flexDirection: "row",
-    gap: 16,
-    marginBottom: pdfSpacing.sectionGap,
-  },
-  partyBlock: {
-    flex: 1,
-    padding: 12,
-    borderRadius: 6,
-    backgroundColor: pdfColors.subtle,
-    border: `1px solid ${pdfColors.border}`,
-  },
-  partyHeading: {
-    fontSize: pdfSizes.xs,
-    color: pdfColors.mutedForeground,
-    textTransform: "uppercase",
-    letterSpacing: 0.6,
-    marginBottom: 4,
-  },
-  partyName: { fontFamily: pdfFonts.bold, fontSize: pdfSizes.md, marginBottom: 2 },
-  partyMuted: { fontSize: pdfSizes.xs, color: pdfColors.mutedForeground },
-  body: { fontSize: pdfSizes.sm, lineHeight: 1.7 },
-  paragraph: { marginBottom: 10 },
-  section: { marginBottom: 12 },
-  sectionTitle: {
-    fontFamily: pdfFonts.bold,
+  paragraph: {
     fontSize: pdfSizes.sm,
-    marginBottom: 4,
+    color: pdfColors.text,
+    lineHeight: pdfLineHeights.relaxed,
+    marginTop: 6,
   },
-  sectionNumber: { color: pdfColors.mutedForeground, fontSize: pdfSizes.xs },
-  signature: { marginTop: 30, flexDirection: "row", gap: 18 },
-  signatureBlock: {
-    flex: 1,
-    minHeight: 104,
-    border: `1px solid ${pdfColors.border}`,
-    borderRadius: 6,
-    padding: 10,
-  },
-  signatureLine: {
-    height: 36,
-    justifyContent: "flex-end",
-    borderBottom: `1px solid ${pdfColors.border}`,
-    marginVertical: 8,
-  },
-  signatureImage: { maxHeight: 34, objectFit: "contain" },
-  signatureText: { fontSize: 22, lineHeight: 1.1 },
-  signatureLabel: {
-    fontSize: pdfSizes.xs,
-    color: pdfColors.mutedForeground,
-    textTransform: "uppercase",
-    letterSpacing: 0.6,
-  },
-  signatureName: { fontFamily: pdfFonts.bold, fontSize: pdfSizes.sm, marginTop: 2 },
-  signedStamp: { marginTop: 4, fontSize: pdfSizes.xs, color: pdfColors.success },
-  footer: {
-    position: "absolute",
-    left: pdfSpacing.page,
-    right: pdfSpacing.page,
-    bottom: 24,
+  signaturePair: {
     flexDirection: "row",
+    marginTop: pdfSpacing["3xl"],
     justifyContent: "space-between",
-    fontSize: pdfSizes.xs,
-    color: pdfColors.mutedForeground,
   },
+  signatureSpacer: { width: pdfSpacing.lg },
+  signatureSlot: { flex: 1 },
 });
 
-export function ContractPdf({ data }: { data: ContractPdfData }) {
-  const label = data.kind === "proposal" ? "Proposal" : "Contract";
-  const accent = data.brandColor ?? pdfColors.primary;
+// --- Template ---------------------------------------------------------------
+
+export function ContractPdf({
+  data,
+  seller,
+  logoDataUrl,
+}: {
+  data: ContractPdfData;
+  seller?: UserProfileRow | null;
+  logoDataUrl?: string | null;
+}) {
+  const brand = buildBrandFromData(data, seller, logoDataUrl);
+  const isContract = data.kind === "contract";
+  const eyebrow = isContract ? "CONTRACT" : "PROPOSAL";
   const parsedContent = parseContractContent(data.content);
 
+  const decorationTone =
+    data.status === "signed"
+      ? "success"
+      : data.status === "declined"
+        ? "danger"
+        : data.status === "expired"
+          ? "warning"
+          : "brand";
+
   return (
-    <Document title={`${label} - ${data.title}`} author={data.seller.businessName}>
-      <Page size="A4" style={s.page}>
-        <View style={[s.topRule, { backgroundColor: accent }]} />
-        <View style={s.header}>
-          <View style={s.brandBlock}>
-            {data.seller.logoDataUrl && (
-              // eslint-disable-next-line jsx-a11y/alt-text
-              <Image src={data.seller.logoDataUrl} style={s.logo} />
-            )}
-            <View>
-              <Text style={s.brandName}>{data.seller.businessName}</Text>
-              {data.seller.legalName &&
-                data.seller.legalName !== data.seller.businessName && (
-                  <Text style={s.brandMeta}>{data.seller.legalName}</Text>
-                )}
-              {data.seller.addressLines.map((line, i) => (
-                <Text key={i} style={s.brandMeta}>
-                  {line}
-                </Text>
-              ))}
-              {data.seller.email && <Text style={s.brandMeta}>{data.seller.email}</Text>}
-            </View>
-          </View>
-          <View>
-            <Text style={[s.kindPill, { color: accent }]}>{label}</Text>
-            <Text style={s.title}>{data.title}</Text>
-          </View>
-        </View>
+    <Document title={`${eyebrow} – ${data.title}`} author={brand.businessName}>
+      <DocumentPage brand={brand}>
+        <DocumentHeader
+          brand={brand}
+          eyebrow={eyebrow}
+          title={data.title}
+          subtitle={data.status === "signed" ? "Signed copy" : undefined}
+          decoration={
+            <Badge
+              tone={decorationTone}
+              brandAccent={brand.accent}
+              label={data.status.replace(/_/g, " ")}
+            />
+          }
+        />
 
-        <View style={s.metaStrip}>
-          <View style={s.metaCell}>
-            <Text style={s.metaLabel}>Issued</Text>
-            <Text style={s.metaValue}>{formatDate(data.issuedAt)}</Text>
-          </View>
-          {data.expiresAt && (
-            <View style={s.metaCell}>
-              <Text style={s.metaLabel}>Expires</Text>
-              <Text style={s.metaValue}>{formatDate(data.expiresAt)}</Text>
-            </View>
-          )}
-          {data.valueAmount !== null && (
-            <View style={s.metaCell}>
-              <Text style={s.metaLabel}>Value</Text>
-              <Text style={s.metaValue}>
-                {formatCurrency(data.valueAmount, data.currency)}
-              </Text>
-            </View>
-          )}
-        </View>
+        <MetaGrid
+          items={[
+            { label: "Issued", value: formatDate(data.issuedAt) },
+            {
+              label: "Expires",
+              value: data.expiresAt ? formatDate(data.expiresAt) : "Open",
+            },
+            {
+              label: "Value",
+              value:
+                data.valueAmount !== null
+                  ? formatCurrency(data.valueAmount, data.currency)
+                  : "To be agreed",
+            },
+          ]}
+        />
 
-        <View style={s.parties}>
-          <View style={s.partyBlock}>
-            <Text style={s.partyHeading}>Between</Text>
-            <Text style={s.partyName}>{data.seller.businessName}</Text>
-            {data.seller.legalName && (
-              <Text style={s.partyMuted}>{data.seller.legalName}</Text>
-            )}
-            {data.seller.addressLines.map((line, i) => (
-              <Text key={i} style={s.partyMuted}>
-                {line}
-              </Text>
-            ))}
-          </View>
-          <View style={s.partyBlock}>
-            <Text style={s.partyHeading}>And</Text>
-            <Text style={s.partyName}>{data.client.name}</Text>
-            {data.client.detailLines.map((line, i) => (
-              <Text key={i} style={s.partyMuted}>
-                {line}
-              </Text>
-            ))}
-          </View>
-        </View>
+        <PartyPair
+          left={{
+            label: "Between",
+            name: brand.businessName,
+            lines: [
+              ...(brand.legalName ? [brand.legalName] : []),
+              ...brand.addressLines.slice(0, 4),
+              ...(brand.contact.email ? [brand.contact.email] : []),
+              ...(brand.contact.phone ? [brand.contact.phone] : []),
+            ],
+          }}
+          right={{
+            label: "And",
+            name: data.client.name,
+            lines: data.client.detailLines.slice(0, 6),
+          }}
+        />
 
-        <View style={s.body}>
-          {parsedContent.sections.length > 0
-            ? parsedContent.sections.map((section, i) => (
-                <View key={i} style={s.section}>
-                  <Text style={s.sectionTitle}>
-                    <Text style={s.sectionNumber}>
-                      {String(i + 1).padStart(2, "0")}{" "}
-                    </Text>
-                    {section.heading}
+        {/* Body — sectioned with leading numbers when structured, paragraphs otherwise. */}
+        <View>
+          {parsedContent.sections.length > 0 ? (
+            parsedContent.sections.map((section, i) => (
+              <View key={i} style={bodyStyles.section} wrap={true}>
+                <View style={bodyStyles.numberRow}>
+                  <Text style={bodyStyles.number}>
+                    {String(i + 1).padStart(2, "0")}
                   </Text>
-                  <Text style={s.paragraph}>{section.body}</Text>
+                  <Text style={bodyStyles.heading}>{section.heading}</Text>
                 </View>
-              ))
-            : parsedContent.paragraphs.map((p, i) => (
-                <Text key={i} style={s.paragraph}>
-                  {p}
-                </Text>
-              ))}
+                <Text style={bodyStyles.paragraph}>{section.body}</Text>
+              </View>
+            ))
+          ) : (
+            parsedContent.paragraphs.map((p, i) => (
+              <Text key={i} style={bodyStyles.paragraph}>
+                {p}
+              </Text>
+            ))
+          )}
         </View>
 
-        {data.kind === "contract" && (
-          <View style={s.signature} wrap={false}>
-            <PdfSignatureBlock
-              label={`For ${data.seller.businessName}`}
-              name={
-                data.seller.signature?.legalName ??
-                data.seller.legalName ??
-                data.seller.businessName
-              }
-              email={data.seller.email}
-              signedAt={data.seller.signature?.signedAt ?? data.issuedAt}
-              signature={data.seller.signature}
-            />
-            <PdfSignatureBlock
-              label={`For ${data.client.name}`}
-              name={
-                data.clientSignature?.legalName ??
-                data.signerName ??
-                data.client.name
-              }
-              email={data.clientSignature?.signerEmail ?? data.signerEmail}
-              signedAt={data.clientSignature?.signedAt ?? data.signedAt}
-              signature={data.clientSignature}
-              pendingLabel="Awaiting client signature"
-            />
+        {isContract ? (
+          <View style={bodyStyles.signaturePair} wrap={false}>
+            <View style={bodyStyles.signatureSlot}>
+              <SignatureBlock
+                label={`Signed for ${brand.businessName}`}
+                signature={
+                  data.seller.signature
+                    ? coerceSignature(
+                        data.seller.signature,
+                        data.seller.signature.signedAt ?? data.issuedAt,
+                      )
+                    : null
+                }
+                fallbackName={
+                  data.seller.signature?.legalName ??
+                  data.seller.legalName ??
+                  brand.businessName
+                }
+                width={240}
+              />
+            </View>
+            <View style={bodyStyles.signatureSpacer} />
+            <View style={bodyStyles.signatureSlot}>
+              <SignatureBlock
+                label={`Signed for ${data.client.name}`}
+                signature={
+                  hasSignatureReference(data.clientSignature)
+                    ? coerceSignature(
+                        data.clientSignature!,
+                        data.clientSignature!.signedAt ?? data.signedAt,
+                        data.clientSignature?.signedIp ?? null,
+                      )
+                    : null
+                }
+                fallbackName={
+                  data.clientSignature?.legalName ??
+                  data.signerName ??
+                  data.client.name
+                }
+                width={240}
+              />
+            </View>
           </View>
-        )}
+        ) : null}
 
-        <View style={s.footer} fixed>
-          <Text>
-            {label} - {data.status}
-          </Text>
-          <Text
-            render={({ pageNumber, totalPages }) =>
-              `Page ${pageNumber} of ${totalPages}`
-            }
-          />
-        </View>
-      </Page>
+        <DocumentFooter
+          brand={brand}
+          label={`${eyebrow.charAt(0)}${eyebrow.slice(1).toLowerCase()} · ${data.title}`}
+        />
+      </DocumentPage>
     </Document>
   );
 }
 
-function PdfSignatureBlock({
-  label,
-  name,
-  email,
-  signedAt,
-  signature,
-  pendingLabel = "Signature on file",
-}: {
-  label: string;
-  name: string;
-  email?: string | null;
-  signedAt?: string | null;
-  signature: ContractSignatureReference | null | undefined;
-  pendingLabel?: string;
-}) {
-  const hasSignature = hasSignatureReference(signature);
+// --- Helpers ----------------------------------------------------------------
 
-  return (
-    <View style={s.signatureBlock}>
-      <Text style={s.signatureLabel}>{label}</Text>
-      <View style={s.signatureLine}>
-        {signature?.type === "type" && signature.textValue ? (
-          <Text style={[s.signatureText, { fontFamily: pdfFonts.base }]}>
-            {signature.textValue}
-          </Text>
-        ) : signature?.imageUrl ? (
-          // eslint-disable-next-line jsx-a11y/alt-text
-          <Image src={signature.imageUrl} style={s.signatureImage} />
-        ) : (
-          <Text style={s.partyMuted}>{pendingLabel}</Text>
-        )}
-      </View>
-      <Text style={s.signatureName}>{name}</Text>
-      {signedAt && hasSignature ? (
-        <Text style={s.signedStamp}>
-          Signed on {formatDate(signedAt)}
-          {email ? ` - ${email}` : ""}
-        </Text>
-      ) : (
-        <Text style={s.partyMuted}>{hasSignature ? "Signed" : pendingLabel}</Text>
-      )}
-    </View>
-  );
+function coerceSignature(
+  ref: ContractSignatureReference,
+  signedAt: string | null,
+  signedIp: string | null = null,
+): SignatureData {
+  return {
+    type: ref.type,
+    imageUrl: ref.imageUrl ?? null,
+    textValue: ref.textValue ?? null,
+    fontFamily: ref.fontFamily ?? null,
+    legalName: (ref as { legalName?: string | null }).legalName ?? null,
+    signedAt,
+    signedIp,
+  };
 }
 
-function formatDate(iso: string): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return "Not recorded";
-  return date.toLocaleDateString("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
-}
-
-function formatCurrency(value: number, currency: string): string {
-  const amount = new Intl.NumberFormat("en-IN", {
-    minimumFractionDigits: Number.isInteger(value) ? 0 : 2,
-    maximumFractionDigits: 2,
-  }).format(value);
-  return `${currency} ${amount}`;
+function buildBrandFromData(
+  data: ContractPdfData,
+  seller?: UserProfileRow | null,
+  logoDataUrl?: string | null,
+): ResolvedBrand {
+  if (seller) return resolveBrand(seller, logoDataUrl ?? data.seller.logoDataUrl);
+  const shim = {
+    business_name: data.seller.businessName,
+    company_name: null,
+    legal_name: data.seller.legalName,
+    full_name: null,
+    brand_color: data.brandColor,
+    brand_tagline: null,
+    business_email: data.seller.email,
+    email: null,
+    business_phone: data.seller.phone,
+    phone: null,
+    website: null,
+    address_line1: data.seller.addressLines[0] ?? null,
+    address_line2: data.seller.addressLines[1] ?? null,
+    city: data.seller.addressLines[2] ?? null,
+    postal_code: data.seller.addressLines[3] ?? null,
+    country: null,
+    gstin: null,
+    gst_number: null,
+    pan: null,
+    state_code: null,
+  } as unknown as UserProfileRow;
+  return resolveBrand(shim, data.seller.logoDataUrl);
 }

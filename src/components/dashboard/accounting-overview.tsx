@@ -1,7 +1,7 @@
 import {
   CircleDashed,
   CircleAlert,
-  Receipt,
+  FolderKanban,
   Wallet,
 } from "lucide-react";
 import {
@@ -16,33 +16,29 @@ import { cn } from "@/lib/utils";
 
 /**
  * Accounting overview — explicit separation of invoice-issued vs.
- * cash-collected.
+ * cash-collected, plus an operational counterweight (active projects).
  *
- * This widget exists because aggregate dashboards trick freelancers into
- * thinking issued invoices are revenue. They aren't — they're receivables.
- * Each tile below is labelled in plain accounting language so the
- * distinction is unmistakable.
+ * Four tiles, deliberately chosen:
+ *   1. Collected revenue (paid invoices — real money in bank).
+ *   2. Outstanding (issued but unpaid — receivables / accrued income).
+ *   3. Overdue (subset of outstanding that's past due).
+ *   4. Active projects (operational state, not money).
  *
- * Inputs are the new shape returned by `getInvoiceAggregates()`:
- *   - totalInvoiced    : everything ever billed (drafts excluded).
- *   - collectedAllTime : actual money received (paid invoices).
- *   - outstanding      : issued but unpaid — i.e. accrued income.
- *   - overdueAmount    : subset of outstanding that's past due.
- *
- * Replaces the stubbed `PendingPayments` placeholder.
+ * Anything beyond these belongs on a feature-specific page, not the
+ * dashboard.
  */
 export interface AccountingOverviewProps {
-  totalInvoiced: number;
   collectedAllTime: number;
   outstanding: number;
   overdueAmount: number;
+  activeProjects: number;
 }
 
 export function AccountingOverview({
-  totalInvoiced,
   collectedAllTime,
   outstanding,
   overdueAmount,
+  activeProjects,
 }: AccountingOverviewProps) {
   const overdueShare =
     outstanding > 0 ? Math.min(100, (overdueAmount / outstanding) * 100) : 0;
@@ -50,33 +46,26 @@ export function AccountingOverview({
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">Accounting overview</CardTitle>
+        <CardTitle className="text-base">Business overview</CardTitle>
         <CardDescription>
-          Invoices issued are <span className="font-medium">receivables</span>,
-          not revenue. Cash collected is what actually moved into your bank.
+          Issued invoices are <span className="font-medium">receivables</span>,
+          not revenue — cash collected is what actually moved into your bank.
         </CardDescription>
       </CardHeader>
       <CardContent>
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <Tile
-            icon={Receipt}
-            label="Total invoiced"
-            value={formatINR(totalInvoiced, { compact: true })}
-            sub="Issued amount"
-            tone="default"
-          />
-          <Tile
             icon={Wallet}
-            label="Collected (all time)"
+            label="Collected"
             value={formatINR(collectedAllTime, { compact: true })}
-            sub="Paid invoices only"
+            sub="Paid invoices · all time"
             tone="success"
           />
           <Tile
             icon={CircleDashed}
             label="Outstanding"
             value={formatINR(outstanding, { compact: true })}
-            sub="Accrued / receivable"
+            sub="Issued but unpaid"
             tone="warning"
           />
           <Tile
@@ -89,6 +78,13 @@ export function AccountingOverview({
                 : "Nothing past due"
             }
             tone="danger"
+          />
+          <Tile
+            icon={FolderKanban}
+            label="Active projects"
+            value={String(activeProjects)}
+            sub={activeProjects === 1 ? "1 in flight" : "Currently in flight"}
+            tone="default"
           />
         </div>
       </CardContent>

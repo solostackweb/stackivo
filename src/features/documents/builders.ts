@@ -25,6 +25,10 @@ import type {
 import type { InvoicePdfData } from "./pdf/invoice-pdf";
 import type { ContractPdfData } from "./pdf/contract-pdf";
 import type { WelcomeDocumentPdfData } from "./pdf/welcome-document-pdf";
+import type { ReceiptPdfData } from "./pdf/receipt-pdf";
+import { resolveBrand } from "./pdf/brand";
+import { getLatestReceiptForInvoice } from "@/features/invoices/receipts";
+import type { InvoiceReceiptRow } from "@/lib/supabase/types";
 import { getPublicAppUrl } from "./urls";
 import { isValidPublicShareToken } from "@/features/share/server";
 import {
@@ -515,4 +519,92 @@ function assembleWelcomePdfData(args: {
         }
       : null,
   };
+}
+
+// --- Receipts (authenticated + public) -----------------------------------
+//
+// The receipt is generated AFTER a successful payment. When neither flow
+// has run yet we return null and the route layer 404s.
+
+async function assembleReceiptPdfData(args: {
+  receipt: InvoiceReceiptRow;
+  invoice: InvoiceRow;
+  seller: UserProfileRow | null;
+  client: ClientRow | null;
+  logoUrl: string | null;
+}): Promise<ReceiptPdfData> {
+  const { receipt, invoice, seller, client, logoUrl } = args;
+  const brand = resolveBrand(seller, logoUrl);
+  return {
+    receiptNumber: receipt.receipt_number,
+    invoiceNumber: invoice.invoice_number,
+    paidAt: receipt.paid_at,
+    paymentMethod: receipt.payment_method,
+    reference: receipt.reference,
+    amount: Number(receipt.amount) || 0,
+    currency: receipt.currency || invoice.currency || "INR",
+    notes: receipt.notes,
+    brand,
+    client: {
+      name: client?.full_name ?? receipt.payer_name ?? "Client",
+      companyName: client?.business_name ?? client?.company_name ?? null,
+      email: client?.email ?? receipt.payer_email ?? null,
+      addressLines: composeAddress(client?.billing_address ?? client?.address),
+      gstin: client?.gst_number ?? null,
+    },
+  };
+}
+
+export async function buildReceiptPdfData(
+  invoiceId: string,
+): Promise<ReceiptPdfData | null> {
+  const supabase = await getServerSupabase();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+  const { data: invoiceRow } = await supabase
+    .from("invoices")
+    .select("*")
+    .eq("id", invoiceId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (!invoiceRow) return null;
+  const invoice = invoiceRow as unknown as InvoiceRow;
+  const receipt = await getLatestReceiptForInvoice(invoice.id);
+  if (!receipt) return null;
+  const [seller, client] = await Promise.all([
+    fetchSellerProfile(invoice.user_id),
+    invoice.client_id ? fetchClient(invoice.client_id) : null,
+  ]);
+  const logoUrl = await createSignedStorageUrl(
+    "branding-assets",
+    seller?.logo_url,
+    supabase,
+  );
+  return assembleReceiptPdfData({ receipt, invoice, seller, client, logoUrl });
+}
+
+export async function buildReceiptPdfDataByToken(
+  token: string,
+): Promise<ReceiptPdfData | null> {
+  if (!isValidPublicShareToken(token)) return null;
+  const admin = getAdminSupabase();
+  const { data: invoiceRow } = await admin
+    .from("invoices")
+    .select("*")
+    .eq("public_token", token)
+    .maybeSingle();
+  if (!invoiceRow) return null;
+  const invoice = invoiceRow as unknown as InvoiceRow;
+  const receipt = await getLatestReceiptForInvoice(invoice.id);
+  if (!receipt) return null;
+  const [seller, client] = await Promise.all([
+    fetchSellerProfile(invoice.user_id, admin),
+    invoice.client_id ? fetchClient(invoice.client_id, admin) : null,
+  ]);
+  const logoUrl = await createSignedStorageUrl(
+    "branding-assets",
+    seller?.logo_url,
+    admin,
+  );
+  return assembleReceiptPdfData({ receipt, invoice, seller, client, logoUrl });
 }

@@ -18,6 +18,8 @@ import crypto from "crypto";
  * signed legal document.
  */
 const ALLOWED_SIGNATURE_URL_PREFIX = `${env.supabaseUrl}/storage/v1/object/`;
+const MAX_SIGNATURE_IMAGE_LENGTH = 200000;
+const DATA_URL_SIGNATURE_REGEX = /^data:image\/(png|jpeg|webp);base64,/i;
 
 /**
  * Public signing action for `/c/:token`.
@@ -49,7 +51,12 @@ export async function signContractPublicAction(
   // When the signer uploaded an image, validate it actually came from this
   // app's Supabase storage. Reject `data:`, external URLs, javascript:, etc.
   if (signatureImageUrl) {
-    if (!signatureImageUrl.startsWith(ALLOWED_SIGNATURE_URL_PREFIX)) {
+    if (signatureImageUrl.length > MAX_SIGNATURE_IMAGE_LENGTH) {
+      return { ok: false, error: "Signature image too large" };
+    }
+    const isSupabaseUrl = signatureImageUrl.startsWith(ALLOWED_SIGNATURE_URL_PREFIX);
+    const isDataUrl = DATA_URL_SIGNATURE_REGEX.test(signatureImageUrl);
+    if (!isSupabaseUrl && !isDataUrl) {
       return { ok: false, error: "Invalid signature image source" };
     }
   }
