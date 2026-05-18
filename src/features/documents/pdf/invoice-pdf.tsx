@@ -296,7 +296,7 @@ export function InvoicePdf({
           <View
             style={[
               paymentCardStyles.card,
-              !isPaid ? paymentCardStyles.cardEmpty : null,
+              ...(isPaid ? [] : [paymentCardStyles.cardEmpty]),
             ]}
           >
             <Text style={paymentCardStyles.label}>
