@@ -386,7 +386,10 @@ export function Section({
   style?: ViewProps["style"];
 }) {
   return (
-    <View style={[sectionStyles.wrap, style]} wrap={true}>
+    <View
+      style={style ? [sectionStyles.wrap, style] : sectionStyles.wrap}
+      wrap={true}
+    >
       {eyebrow ? <Text style={sectionStyles.eyebrow}>{eyebrow}</Text> : null}
       {title ? <Text style={sectionStyles.title}>{title}</Text> : null}
       {children}
@@ -399,17 +402,13 @@ export function EyebrowLabel({ children }: { children: React.ReactNode }) {
 }
 
 export function Divider({ style }: { style?: ViewProps["style"] }) {
+  const base = {
+    height: 0.5,
+    backgroundColor: pdfColors.border,
+    marginVertical: pdfSpacing.md,
+  };
   return (
-    <View
-      style={[
-        {
-          height: 0.5,
-          backgroundColor: pdfColors.border,
-          marginVertical: pdfSpacing.md,
-        },
-        style,
-      ]}
-    />
+    <View style={style ? [base, style] : base} />
   );
 }
 
