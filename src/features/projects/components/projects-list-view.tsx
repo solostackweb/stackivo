@@ -95,8 +95,11 @@ export function ProjectsListView({ projects, clients }: ProjectsListViewProps) {
         }
       />
 
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="relative flex-1 min-w-[200px] max-w-md">
+      {/* Two-row toolbar on mobile: search on its own line for full width,
+          filter + view-toggle share a second line. Collapses back to a
+          single inline row on sm+. */}
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+        <div className="relative w-full sm:max-w-md sm:flex-1">
           <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="Search projects…"
@@ -105,38 +108,40 @@ export function ProjectsListView({ projects, clients }: ProjectsListViewProps) {
             className="h-9 pl-9"
           />
         </div>
-        <Select
-          value={statusFilter}
-          onValueChange={(v) =>
-            setStatusFilter(v as ProjectStatusRow | "all")
-          }
-        >
-          <SelectTrigger className="h-9 w-[160px]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All statuses</SelectItem>
-            {PROJECT_STATUSES.map((s) => (
-              <SelectItem key={s} value={s}>
-                {PROJECT_STATUS_LABEL[s]}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="flex items-center gap-2">
+          <Select
+            value={statusFilter}
+            onValueChange={(v) =>
+              setStatusFilter(v as ProjectStatusRow | "all")
+            }
+          >
+            <SelectTrigger className="h-9 w-full min-w-[140px] sm:w-[160px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All statuses</SelectItem>
+              {PROJECT_STATUSES.map((s) => (
+                <SelectItem key={s} value={s}>
+                  {PROJECT_STATUS_LABEL[s]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
-        <div className="ml-auto inline-flex rounded-md bg-muted p-0.5">
-          <ViewToggleButton
-            active={view === "grid"}
-            onClick={() => setView("grid")}
-            icon={LayoutGrid}
-            label="Grid"
-          />
-          <ViewToggleButton
-            active={view === "kanban"}
-            onClick={() => setView("kanban")}
-            icon={Columns3}
-            label="Kanban"
-          />
+          <div className="ml-auto inline-flex shrink-0 rounded-md bg-muted p-0.5">
+            <ViewToggleButton
+              active={view === "grid"}
+              onClick={() => setView("grid")}
+              icon={LayoutGrid}
+              label="Grid"
+            />
+            <ViewToggleButton
+              active={view === "kanban"}
+              onClick={() => setView("kanban")}
+              icon={Columns3}
+              label="Kanban"
+            />
+          </div>
         </div>
       </div>
 

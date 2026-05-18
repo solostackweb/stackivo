@@ -17,6 +17,12 @@ const config: Config = {
       },
     },
     extend: {
+      // Extra `xs` breakpoint so we can tune the smallest phones (≈360–414px)
+      // independently of `sm` (640px). Everything below `xs` falls back to
+      // the mobile-first base styles.
+      screens: {
+        xs: "420px",
+      },
       fontFamily: {
         sans: ["var(--font-sans)", "system-ui", "sans-serif"],
         mono: ["var(--font-mono)", "ui-monospace", "monospace"],

@@ -238,23 +238,33 @@ export function CreateInvoiceView({
   return (
     <FormProvider {...form}>
       <div className="-mx-4 sm:-mx-6 lg:-mx-8 -mt-4 sm:-mt-6 lg:-mt-8 flex min-h-[calc(100vh-4rem)] flex-col">
-        {/* Top action bar */}
-        <div className="sticky top-0 z-20 flex flex-wrap items-center justify-between gap-3 border-b bg-background/80 px-4 py-3 backdrop-blur sm:px-6 lg:px-8">
-          <div className="flex items-center gap-3">
-            <Button asChild variant="ghost" size="icon" className="h-8 w-8">
+        {/* Top action bar — sticks under TopNav. Pushes the long CTA into a
+            fixed bottom action bar on mobile so the primary action is always
+            reachable above the bottom-nav + iOS home indicator. */}
+        <div
+          className="sticky z-20 flex items-center justify-between gap-2 border-b bg-background/80 px-3 py-2.5 backdrop-blur sm:px-6 sm:py-3 lg:px-8"
+          style={{ top: "calc(env(safe-area-inset-top, 0px) + 3.5rem)" }}
+        >
+          <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+            <Button
+              asChild
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 shrink-0"
+            >
               <Link href="/dashboard/invoices" aria-label="Back to invoices">
                 <ArrowLeft />
               </Link>
             </Button>
-            <div className="flex items-center gap-1.5 text-sm">
+            <div className="flex min-w-0 items-center gap-1.5 text-sm">
               <Link
                 href="/dashboard/invoices"
-                className="text-muted-foreground hover:text-foreground"
+                className="hidden text-muted-foreground hover:text-foreground sm:inline"
               >
                 Invoices
               </Link>
-              <span className="text-muted-foreground/50">/</span>
-              <span className="font-medium">New invoice</span>
+              <span className="hidden text-muted-foreground/50 sm:inline">/</span>
+              <span className="truncate font-medium">New invoice</span>
             </div>
           </div>
 
@@ -269,13 +279,16 @@ export function CreateInvoiceView({
               {previewOpen ? <EyeOff /> : <Eye />}
               {previewOpen ? "Hide preview" : "Show preview"}
             </Button>
+            {/* Desktop primary action lives in the toolbar. On mobile we hide
+                it here because it's duplicated in the fixed bottom bar below. */}
             <Button
               type="button"
               size="sm"
               onClick={onSend}
               disabled={isSubmitting}
+              className="hidden sm:inline-flex"
             >
-              <Send /> Create & send invoice
+              <Send /> Create &amp; send invoice
             </Button>
           </div>
         </div>
@@ -384,7 +397,10 @@ export function CreateInvoiceView({
 
               {/* Line items */}
               <SectionCard label="Line items" error={errors.items?.message}>
-                <div className="-mx-6 overflow-hidden border-y">
+                {/* Negative margins must match SectionCard horizontal padding
+                    at each breakpoint (p-4 mobile, p-6 sm+) so the row
+                    dividers reach all the way to the card edges. */}
+                <div className="-mx-4 overflow-hidden border-y sm:-mx-6">
                   <InvoiceItemsHeader />
                   {fields.map((field, index) => (
                     <InvoiceItemRow
@@ -489,7 +505,7 @@ export function CreateInvoiceView({
               {/* Payment */}
               <SectionCard label="Payment">
                 <div className="space-y-5">
-                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4 sm:gap-3">
                     {PAYMENT_METHODS.map((method) => {
                       const Icon = PAYMENT_ICON[method];
                       const active = watched.paymentMethod === method;
@@ -534,7 +550,7 @@ export function CreateInvoiceView({
               </SectionCard>
 
               {/* Notes + Terms */}
-              <div className="grid gap-6 md:grid-cols-2">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6">
                 <SectionCard label="Notes" error={errors.notes?.message}>
                   <Textarea
                     {...register("notes")}
@@ -552,6 +568,10 @@ export function CreateInvoiceView({
                   />
                 </SectionCard>
               </div>
+
+              {/* Bottom spacer so mobile fixed action bar never overlaps the
+                  last field while scrolled to bottom. */}
+              <div aria-hidden className="h-16 sm:hidden" />
             </form>
 
             {/* RIGHT: sticky summary + preview */}
@@ -578,6 +598,25 @@ export function CreateInvoiceView({
             )}
           </div>
         </div>
+
+        {/* Mobile-only fixed action bar. Pinned above MobileBottomNav so the
+            primary CTA stays in thumb reach without ever colliding with the
+            iOS home indicator. */}
+        <div
+          className="fixed inset-x-0 z-30 border-t bg-background/95 px-4 py-3 backdrop-blur sm:hidden"
+          style={{
+            bottom: "calc(var(--mobile-bottom-nav-h, 0px) + env(safe-area-inset-bottom, 0px))",
+          }}
+        >
+          <Button
+            type="button"
+            onClick={onSend}
+            disabled={isSubmitting}
+            className="h-11 w-full text-[15px]"
+          >
+            <Send /> Create &amp; send invoice
+          </Button>
+        </div>
       </div>
     </FormProvider>
   );
@@ -599,13 +638,15 @@ function SectionCard({
 }) {
   return (
     <Card>
-      <CardContent className="space-y-4 p-6">
-        <div className="flex items-center justify-between">
+      <CardContent className="space-y-4 p-4 sm:p-6">
+        <div className="flex items-center justify-between gap-3">
           <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
             {label}
           </p>
           {error && (
-            <p className="text-xs font-medium text-destructive">{error}</p>
+            <p className="text-right text-xs font-medium text-destructive">
+              {error}
+            </p>
           )}
         </div>
         {children}

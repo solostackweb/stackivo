@@ -12,16 +12,20 @@ export function PageHeader({ title, description, actions, className }: PageHeade
   return (
     <div
       className={cn(
-        "flex flex-col gap-4 border-b pb-6 sm:flex-row sm:items-center sm:justify-between",
+        // Tighter bottom padding on mobile so the header doesn't eat as
+        // much of the visible viewport.
+        "flex flex-col gap-3 border-b pb-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:pb-6",
         className,
       )}
     >
-      <div className="space-y-1.5">
-        <h1 className="text-2xl font-bold tracking-tight sm:text-[28px] sm:leading-tight">
+      <div className="min-w-0 space-y-1 sm:space-y-1.5">
+        <h1 className="text-xl font-bold tracking-tight sm:text-[28px] sm:leading-tight">
           {title}
         </h1>
         {description ? (
-          <p className="text-sm leading-relaxed text-muted-foreground">
+          // Description is supporting text — hide it on phones to cut
+          // visual clutter. Stays visible from sm: upward.
+          <p className="hidden text-sm leading-relaxed text-muted-foreground sm:block">
             {description}
           </p>
         ) : null}

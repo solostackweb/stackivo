@@ -88,13 +88,18 @@ export function SupportButton() {
 
   return (
     <>
+      {/* Hidden on phones — on mobile the canonical entry point is the
+          "Help & support" item in the MobileNav drawer, which avoids
+          stacking yet-another floating widget on top of the Crisp bubble
+          and the bottom-nav. The `?` keyboard shortcut still works for
+          power users on any breakpoint. */}
       <button
         ref={buttonRef}
         type="button"
         aria-label="Open support"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
-        className="fixed right-4 z-[60] flex h-11 w-11 items-center justify-center rounded-full border bg-card text-foreground shadow-lg transition hover:scale-105 hover:shadow-xl active:scale-95"
+        className="fixed right-4 z-[60] hidden h-11 w-11 items-center justify-center rounded-full border bg-card text-foreground shadow-lg transition hover:scale-105 hover:shadow-xl active:scale-95 md:flex"
         style={{ bottom: stackedBottom }}
       >
         {open ? (

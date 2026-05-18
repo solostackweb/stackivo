@@ -9,6 +9,7 @@ import {
   Clock,
   Activity,
   Settings,
+  LifeBuoy,
   type LucideIcon,
 } from "lucide-react";
 
@@ -33,6 +34,7 @@ export const primaryNav: NavItem[] = [
 
 export const secondaryNav: NavItem[] = [
   { title: "Settings", href: "/dashboard/settings", icon: Settings },
+  { title: "Help & support", href: "/help", icon: LifeBuoy },
 ];
 
 /** Flat list of every nav item — useful for breadcrumbs and command palette. */

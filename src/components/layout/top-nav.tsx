@@ -19,16 +19,18 @@ export function TopNav() {
     >
       <MobileNavTrigger />
 
-      {/* Mobile-only brand wordmark — keeps app-shell identity even when sidebar is hidden */}
+      {/* Mobile: compact brand mark only (no wordmark). The full Stackivo
+          wordmark already lives in the navigation drawer header, so we
+          don't need to repeat it in the always-visible top bar — that
+          gives the page title and notifications room to breathe. */}
       <Link
         href="/dashboard"
-        className="flex items-center gap-2 font-semibold md:hidden"
+        className="flex items-center md:hidden"
         aria-label="Stackivo home"
       >
         <span className="flex h-7 w-7 items-center justify-center rounded-md bg-primary text-primary-foreground shadow-sm">
           <Zap className="h-4 w-4" />
         </span>
-        <span className="text-[15px] tracking-tight">Stackivo</span>
       </Link>
 
       {/* Desktop breadcrumbs */}

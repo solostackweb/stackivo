@@ -169,6 +169,73 @@
     border-radius: 3px;
   }
 
+  /*
+   * Safe-area helpers — let consumers avoid repeating
+   * `style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}`.
+   * Each variant uses `max(...)` so the safe-area inset stacks on top of
+   * any baseline padding already applied via Tailwind (e.g. pb-4).
+   * Pair these with explicit Tailwind padding when you want a minimum.
+   */
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .pt-safe {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+  .pl-safe {
+    padding-left: env(safe-area-inset-left, 0px);
+  }
+  .pr-safe {
+    padding-right: env(safe-area-inset-right, 0px);
+  }
+  .px-safe {
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
+  }
+  .py-safe {
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  /* Reserve room for the fixed mobile bottom-nav (CSS var defined above). */
+  .pb-mobile-nav {
+    padding-bottom: var(--mobile-bottom-nav-h, 0px);
+  }
+  /* Stacks both safe-area inset and bottom-nav height — useful for
+     fixed bars and floating buttons that must sit ABOVE the bottom-nav. */
+  .bottom-mobile-nav {
+    bottom: calc(
+      var(--mobile-bottom-nav-h, 0px) + env(safe-area-inset-bottom, 0px)
+    );
+  }
+
+  /* WCAG-recommended 44×44 minimum touch target. Use sparingly — most
+     icon buttons should rely on padding instead, but this is a handy
+     escape hatch for compact interactive chips. */
+  .min-tap {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Horizontal scroll containers with edge fade. Applied to tab strips,
+     filter chip rows, and chart legends so scrollable content advertises
+     itself instead of getting clipped silently. */
+  .scroll-fade-x {
+    -webkit-mask-image: linear-gradient(
+      to right,
+      transparent,
+      black 12px,
+      black calc(100% - 12px),
+      transparent
+    );
+    mask-image: linear-gradient(
+      to right,
+      transparent,
+      black 12px,
+      black calc(100% - 12px),
+      transparent
+    );
+  }
+
   /* Toast slide-in helpers used by PWA toasts (install / update / offline)
      so we don't have to load framer-motion just for a single keyframe.
      `prefers-reduced-motion` above collapses these to ~0ms. */

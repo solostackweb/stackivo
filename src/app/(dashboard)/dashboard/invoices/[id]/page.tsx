@@ -45,65 +45,73 @@ export default async function InvoiceDetailPage({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <Button asChild variant="ghost" size="icon" className="h-8 w-8">
-          <Link href="/dashboard/invoices" aria-label="Back to invoices">
-            <ArrowLeft />
-          </Link>
-        </Button>
-        <div className="flex flex-1 items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-semibold tracking-tight">
+      {/* Header: stacks vertically on mobile so action buttons get full width
+          and don't collide with the invoice number. */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:gap-3">
+        <div className="flex min-w-0 items-start gap-3">
+          <Button asChild variant="ghost" size="icon" className="h-8 w-8 shrink-0">
+            <Link href="/dashboard/invoices" aria-label="Back to invoices">
+              <ArrowLeft />
+            </Link>
+          </Button>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+              <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">
                 {invoice.invoiceNumber}
               </h1>
               <InvoiceStatusBadge status={invoice.status} />
             </div>
-            <p className="text-sm text-muted-foreground">
+            <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
               Issued {fmtDate(invoice.issueDate)} · Payment date {fmtDate(invoice.dueDate)}
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            <Button asChild variant="outline" size="sm">
-              <a href={`/api/invoices/${invoice.id}/pdf`} target="_blank" rel="noreferrer">
-                <Download className="h-4 w-4" />
-                View/download PDF
-              </a>
-            </Button>
-            <MarkPaidManuallyDialog
-              invoiceId={invoice.id}
-              invoiceNumber={invoice.invoiceNumber}
-              amountLabel={formatINR(invoice.totalAmount)}
-              alreadyPaid={invoice.status === "paid"}
-            />
-          </div>
+        </div>
+        <div className="flex items-center gap-2 sm:ml-auto">
+          <Button asChild variant="outline" size="sm" className="flex-1 sm:flex-none">
+            <a
+              href={`/api/invoices/${invoice.id}/pdf`}
+              target="_blank"
+              rel="noreferrer"
+              aria-label="View or download PDF"
+            >
+              <Download className="h-4 w-4" />
+              <span className="hidden sm:inline">View/download PDF</span>
+              <span className="sm:hidden">PDF</span>
+            </a>
+          </Button>
+          <MarkPaidManuallyDialog
+            invoiceId={invoice.id}
+            invoiceNumber={invoice.invoiceNumber}
+            amountLabel={formatINR(invoice.totalAmount)}
+            alreadyPaid={invoice.status === "paid"}
+          />
         </div>
       </div>
 
       <Card>
-        <CardContent className="space-y-6 p-6">
-          <div className="grid gap-6 sm:grid-cols-2">
-            <div>
+        <CardContent className="space-y-6 p-4 sm:p-6">
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-6">
+            <div className="min-w-0">
               <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                 Bill to
               </p>
-              <p className="mt-2 text-sm font-medium">
+              <p className="mt-2 truncate text-sm font-medium">
                 {client ? getClientDisplayName(client) : "—"}
               </p>
               {client?.email && (
-                <p className="text-xs text-muted-foreground">{client.email}</p>
+                <p className="truncate text-xs text-muted-foreground">{client.email}</p>
               )}
               {client?.gstin && (
-                <p className="text-xs text-muted-foreground tabular-nums">
+                <p className="truncate text-xs text-muted-foreground tabular-nums">
                   GSTIN {client.gstin}
                 </p>
               )}
             </div>
-            <div className="text-right">
+            <div className="min-w-0 sm:text-right">
               <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                 Total
               </p>
-              <p className="mt-2 text-3xl font-semibold tabular-nums">
+              <p className="mt-2 text-2xl font-semibold tabular-nums sm:text-3xl">
                 {formatINR(invoice.totalAmount)}
               </p>
               {invoice.taxTotal > 0 && (
@@ -119,47 +127,93 @@ export default async function InvoiceDetailPage({
             </div>
           </div>
 
-          <div className="overflow-hidden rounded-lg border">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/40">
-                <tr className="text-left text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  <th className="px-4 py-2">Description</th>
-                  <th className="px-4 py-2 text-right">Qty</th>
-                  <th className="px-4 py-2 text-right">Rate</th>
-                  <th className="px-4 py-2 text-right">GST</th>
-                  <th className="px-4 py-2 text-right">Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.length === 0 && (
-                  <tr>
-                    <td
-                      colSpan={5}
-                      className="px-4 py-6 text-center text-xs text-muted-foreground"
-                    >
-                      No line items
-                    </td>
-                  </tr>
-                )}
+          {/* Mobile: stacked line-item cards. Desktop: classic table.
+              We render both and toggle with md: utilities — the
+              underlying data is the same. */}
+          <div className="md:hidden">
+            {items.length === 0 ? (
+              <div className="rounded-lg border bg-muted/20 px-4 py-6 text-center text-xs text-muted-foreground">
+                No line items
+              </div>
+            ) : (
+              <ul className="space-y-2">
                 {items.map((item) => (
-                  <tr key={item.id} className="border-t">
-                    <td className="px-4 py-3">{item.description}</td>
-                    <td className="px-4 py-3 text-right tabular-nums">
-                      {item.quantity}
-                    </td>
-                    <td className="px-4 py-3 text-right tabular-nums">
-                      {formatINR(item.unitPrice)}
-                    </td>
-                    <td className="px-4 py-3 text-right tabular-nums">
-                      {invoice.taxMode === "non_gst" ? "N/A" : `${item.gstRate}%`}
-                    </td>
-                    <td className="px-4 py-3 text-right tabular-nums">
-                      {formatINR(item.amount)}
-                    </td>
-                  </tr>
+                  <li
+                    key={item.id}
+                    className="rounded-lg border bg-card p-3 text-sm"
+                  >
+                    <p className="break-words font-medium leading-snug">
+                      {item.description}
+                    </p>
+                    <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                      <dt>Qty</dt>
+                      <dd className="text-right tabular-nums text-foreground">
+                        {item.quantity}
+                      </dd>
+                      <dt>Rate</dt>
+                      <dd className="text-right tabular-nums text-foreground">
+                        {formatINR(item.unitPrice)}
+                      </dd>
+                      <dt>GST</dt>
+                      <dd className="text-right tabular-nums text-foreground">
+                        {invoice.taxMode === "non_gst"
+                          ? "N/A"
+                          : `${item.gstRate}%`}
+                      </dd>
+                      <dt className="font-medium text-foreground">Amount</dt>
+                      <dd className="text-right text-sm font-semibold tabular-nums">
+                        {formatINR(item.amount)}
+                      </dd>
+                    </dl>
+                  </li>
                 ))}
-              </tbody>
-            </table>
+              </ul>
+            )}
+          </div>
+
+          <div className="hidden overflow-hidden rounded-lg border md:block">
+            <div className="w-full overflow-x-auto overscroll-x-contain scrollbar-thin">
+              <table className="w-full min-w-[560px] text-sm">
+                <thead className="bg-muted/40">
+                  <tr className="text-left text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    <th className="px-4 py-2">Description</th>
+                    <th className="px-4 py-2 text-right">Qty</th>
+                    <th className="px-4 py-2 text-right">Rate</th>
+                    <th className="px-4 py-2 text-right">GST</th>
+                    <th className="px-4 py-2 text-right">Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.length === 0 && (
+                    <tr>
+                      <td
+                        colSpan={5}
+                        className="px-4 py-6 text-center text-xs text-muted-foreground"
+                      >
+                        No line items
+                      </td>
+                    </tr>
+                  )}
+                  {items.map((item) => (
+                    <tr key={item.id} className="border-t">
+                      <td className="px-4 py-3">{item.description}</td>
+                      <td className="px-4 py-3 text-right tabular-nums">
+                        {item.quantity}
+                      </td>
+                      <td className="px-4 py-3 text-right tabular-nums">
+                        {formatINR(item.unitPrice)}
+                      </td>
+                      <td className="px-4 py-3 text-right tabular-nums">
+                        {invoice.taxMode === "non_gst" ? "N/A" : `${item.gstRate}%`}
+                      </td>
+                      <td className="px-4 py-3 text-right tabular-nums">
+                        {formatINR(item.amount)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
@@ -185,7 +239,7 @@ export default async function InvoiceDetailPage({
             </div>
           </div>
 
-          <dl className="grid gap-3 border-t pt-4 sm:grid-cols-2 sm:justify-self-end sm:max-w-sm sm:ml-auto">
+          <dl className="ml-auto grid w-full max-w-sm grid-cols-[1fr_auto] gap-x-4 gap-y-2 border-t pt-4 sm:w-auto">
             <Row label="Subtotal" value={formatINR(invoice.subtotal)} />
             {invoice.cgstAmount > 0 && (
               <Row label="CGST" value={formatINR(invoice.cgstAmount)} />

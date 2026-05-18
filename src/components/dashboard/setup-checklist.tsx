@@ -20,6 +20,7 @@ import * as React from "react";
 import Link from "next/link";
 import {
   CheckCircle2,
+  ChevronDown,
   Circle,
   FileText,
   PenLine,
@@ -43,6 +44,9 @@ export function DashboardSetupChecklist({ hasSignature, hasClient }: Props) {
   const [mounted, setMounted] = React.useState(false);
   const [dismissed, setDismissed] = React.useState(false);
   const [invoiceVisited, setInvoiceVisited] = React.useState(false);
+  // Mobile pill expansion state. Defaults to collapsed so the dashboard
+  // doesn't open with a full setup card competing for the fold.
+  const [mobileExpanded, setMobileExpanded] = React.useState(false);
 
   React.useEffect(() => {
     setMounted(true);
@@ -121,7 +125,104 @@ export function DashboardSetupChecklist({ hasSignature, hasClient }: Props) {
   const percent = Math.round((done / total) * 100);
 
   return (
-    <Card className="relative overflow-hidden p-5">
+    <>
+      {/* Mobile: compact pill. Tap to expand → shows the desktop card
+          inline. Dismiss "X" still works. Hidden on sm+ where the
+          original full card renders. */}
+      <div className="sm:hidden">
+        {!mobileExpanded ? (
+          <div className="flex items-center gap-2 rounded-lg border bg-primary/[0.04] p-3">
+            <button
+              type="button"
+              onClick={() => setMobileExpanded(true)}
+              className="flex flex-1 items-center gap-3 text-left"
+              aria-expanded={false}
+            >
+              <span className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
+                <CheckCircle2 className="h-4 w-4" aria-hidden />
+                <span className="absolute -bottom-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold tabular-nums text-primary-foreground ring-2 ring-background">
+                  {remaining}
+                </span>
+              </span>
+              <span className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold">
+                  Finish setting up
+                </p>
+                <p className="truncate text-[11px] text-muted-foreground">
+                  {remaining} {remaining === 1 ? "task" : "tasks"} left ·{" "}
+                  {percent}% done
+                </p>
+              </span>
+              <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+            </button>
+            <button
+              type="button"
+              aria-label="Dismiss setup checklist"
+              onClick={onDismiss}
+              className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        ) : (
+          <ChecklistFullCard
+            items={items}
+            done={done}
+            total={total}
+            percent={percent}
+            remaining={remaining}
+            onDismiss={onDismiss}
+            collapsible
+            onCollapse={() => setMobileExpanded(false)}
+          />
+        )}
+      </div>
+
+      {/* Desktop / tablet: full card always visible. */}
+      <div className="hidden sm:block">
+        <ChecklistFullCard
+          items={items}
+          done={done}
+          total={total}
+          percent={percent}
+          remaining={remaining}
+          onDismiss={onDismiss}
+        />
+      </div>
+    </>
+  );
+}
+
+interface FullCardProps {
+  items: Array<{
+    label: string;
+    description: string;
+    href: string;
+    icon: React.ReactNode;
+    done: boolean;
+    onClick?: () => void;
+  }>;
+  done: number;
+  total: number;
+  percent: number;
+  remaining: number;
+  onDismiss: () => void;
+  collapsible?: boolean;
+  onCollapse?: () => void;
+}
+
+function ChecklistFullCard({
+  items,
+  done,
+  total,
+  percent,
+  remaining,
+  onDismiss,
+  collapsible,
+  onCollapse,
+}: FullCardProps) {
+  return (
+    <Card className="relative overflow-hidden p-4 sm:p-5">
       <div
         aria-hidden
         className="pointer-events-none absolute -right-16 -top-16 h-44 w-44 rounded-full bg-primary/10 blur-3xl"
@@ -200,6 +301,17 @@ export function DashboardSetupChecklist({ hasSignature, hasClient }: Props) {
             </li>
           ))}
         </ul>
+
+        {collapsible ? (
+          <button
+            type="button"
+            onClick={onCollapse}
+            className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-muted-foreground transition hover:text-foreground"
+          >
+            <ChevronDown className="h-3.5 w-3.5 rotate-180" aria-hidden />
+            Show less
+          </button>
+        ) : null}
       </div>
     </Card>
   );
