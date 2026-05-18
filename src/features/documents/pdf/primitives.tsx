@@ -385,11 +385,11 @@ export function Section({
   children: React.ReactNode;
   style?: ViewProps["style"];
 }) {
+  const mergedStyle = style
+    ? [sectionStyles.wrap, ...(Array.isArray(style) ? style : [style])]
+    : sectionStyles.wrap;
   return (
-    <View
-      style={style ? [sectionStyles.wrap, style] : sectionStyles.wrap}
-      wrap={true}
-    >
+    <View style={mergedStyle} wrap={true}>
       {eyebrow ? <Text style={sectionStyles.eyebrow}>{eyebrow}</Text> : null}
       {title ? <Text style={sectionStyles.title}>{title}</Text> : null}
       {children}
