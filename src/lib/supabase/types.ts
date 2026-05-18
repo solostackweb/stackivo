@@ -370,6 +370,7 @@ export interface EmailSuppressionRow {
 export type SecurityEventKind =
   | "auth_login_failed"
   | "auth_signup_failed"
+  | "auth_signup_duplicate"
   | "auth_ratelimit_tripped"
   | "auth_password_reset_requested"
   | "rls_guard_miss"
