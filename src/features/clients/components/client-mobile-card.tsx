@@ -70,7 +70,7 @@ export function ClientMobileCard({
         }
       }}
       className={cn(
-        "group relative flex w-full items-center gap-3 rounded-xl border bg-card p-3 text-left shadow-sm transition-colors active:bg-muted/40",
+        "tap-scale group relative flex w-full items-center gap-3 rounded-xl border bg-card p-3 text-left shadow-sm transition-colors active:bg-muted/40",
         isSelected && "border-primary/50 ring-1 ring-primary/30",
       )}
     >
@@ -122,7 +122,7 @@ export function ClientMobileCard({
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 text-muted-foreground"
+              className="h-9 w-9 text-muted-foreground"
               aria-label="Client actions"
               onClick={(e) => e.stopPropagation()}
             >

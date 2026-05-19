@@ -96,7 +96,7 @@ export function InvoiceMobileCard({
         }
       }}
       className={cn(
-        "group relative flex w-full flex-col gap-2 rounded-xl border bg-card p-3.5 text-left shadow-sm transition-colors active:bg-muted/40",
+        "tap-scale group relative flex w-full flex-col gap-2 rounded-xl border bg-card p-3.5 text-left shadow-sm transition-colors active:bg-muted/40",
         isSelected && "border-primary/50 ring-1 ring-primary/30",
       )}
     >
@@ -160,7 +160,7 @@ export function InvoiceMobileCard({
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-7 w-7 text-muted-foreground"
+                className="h-9 w-9 text-muted-foreground"
                 aria-label="Invoice actions"
                 onClick={(e) => e.stopPropagation()}
               >
