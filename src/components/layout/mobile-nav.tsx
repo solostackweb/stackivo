@@ -2,7 +2,8 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Menu, Zap } from "lucide-react";
+import { Menu } from "lucide-react";
+import { StackivoMark } from "@/components/brand/stackivo-logo";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -68,9 +69,7 @@ export function MobileNav() {
             onClick={() => setOpen(false)}
             className="flex items-center gap-2.5 font-bold tracking-tight"
           >
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-indigo-600 text-primary-foreground shadow-md shadow-primary/20">
-              <Zap className="h-4 w-4" />
-            </div>
+            <StackivoMark className="h-8 w-8" />
             <span className="text-[15px]">Stackivo</span>
           </Link>
         </div>

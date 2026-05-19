@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Zap } from "lucide-react";
+import { StackivoMark } from "@/components/brand/stackivo-logo";
 import { MobileNavTrigger } from "./mobile-nav";
 import { UserNav } from "./user-nav";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
@@ -28,9 +28,7 @@ export function TopNav() {
         className="flex items-center md:hidden"
         aria-label="Stackivo home"
       >
-        <span className="flex h-7 w-7 items-center justify-center rounded-md bg-primary text-primary-foreground shadow-sm">
-          <Zap className="h-4 w-4" />
-        </span>
+        <StackivoMark className="h-7 w-7" />
       </Link>
 
       {/* Desktop breadcrumbs */}

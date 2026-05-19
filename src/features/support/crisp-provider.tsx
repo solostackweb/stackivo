@@ -120,22 +120,18 @@ export function CrispProvider({ identity }: Props) {
           `,
         }}
       />
-      {/* On desktop: lift Crisp's bubble above the (zero-height) mobile
-          bottom-nav reservation so it sits naturally in the corner.
-          On mobile (≤768px): fully HIDE Crisp's own bubble. The chat
-          panel still works — `crisp.open()` is wired to the "Chat with
-          us" item in the mobile drawer — but we don't want two floating
-          icons stacked on top of the bottom-nav. Crisp's open panel
-          continues to render normally once invoked because we only hide
-          the trigger (`a.cc-1xry`/`.cc-unoo`/the wrapper bubble).  */}
+      {/* On desktop: lift Crisp's bubble above the mobile bottom-nav
+          reservation so it sits naturally in the corner.
+          On mobile (≤768px): hide the ENTIRE Crisp client container.
+          Crisp class names change across SDK versions so targeting the
+          stable `.crisp-client` root is the most reliable approach.
+          Users on mobile reach support via the "More → Chat with us"
+          item in the navigation drawer. */}
       <style>
         {`
           .crisp-client { margin-bottom: var(--mobile-bottom-nav-h, 0px); }
           @media (max-width: 768px) {
-            .crisp-client .cc-1brb6,
-            .crisp-client .cc-kxkl,
-            .crisp-client .cc-unoo,
-            .crisp-client a.cc-1xry { display: none !important; }
+            .crisp-client { display: none !important; }
           }
         `}
       </style>

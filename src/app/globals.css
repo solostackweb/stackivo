@@ -120,6 +120,12 @@
     scroll-behavior: smooth;
     /* Ensure mobile Safari treats the page as a touch-first surface */
     touch-action: manipulation;
+    /* Prevent horizontal scroll on any page — individual scrollable zones
+       (tables, code blocks, etc.) use overflow-x: auto on their own wrapper.
+       `clip` is preferred over `hidden` because it doesn't create a scroll
+       container, so position:fixed children (bottom-nav, modals) keep their
+       viewport-relative positioning. */
+    overflow-x: clip;
   }
   /* iOS Safari zooms on focus when input font-size < 16px. Lift form fields to 16px on mobile. */
   @media (max-width: 767px) {

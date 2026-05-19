@@ -7,7 +7,7 @@ import {
   LayoutDashboard,
   FileText,
   Users,
-  Activity,
+  ScrollText,
   Menu,
   type LucideIcon,
 } from "lucide-react";
@@ -25,7 +25,7 @@ const BOTTOM_NAV: BottomNavItem[] = [
   { title: "Home", href: "/dashboard", icon: LayoutDashboard },
   { title: "Invoices", href: "/dashboard/invoices", icon: FileText },
   { title: "Clients", href: "/dashboard/clients", icon: Users },
-  { title: "Pulse", href: "/dashboard/pulse", icon: Activity },
+  { title: "Contracts", href: "/dashboard/contracts", icon: ScrollText },
   { title: "More", icon: Menu, isMenu: true },
 ];
 

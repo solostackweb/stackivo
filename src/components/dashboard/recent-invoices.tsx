@@ -59,50 +59,67 @@ export function RecentInvoices({ items }: { items: InvoiceFeedItem[] }) {
             />
           </div>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow className="hover:bg-transparent">
-                <TableHead className="pl-6 text-[11px] font-semibold uppercase tracking-wider">Invoice</TableHead>
-                <TableHead className="text-[11px] font-semibold uppercase tracking-wider">Client</TableHead>
-                <TableHead className="text-right text-[11px] font-semibold uppercase tracking-wider">Amount</TableHead>
-                <TableHead className="text-[11px] font-semibold uppercase tracking-wider">Status</TableHead>
-                <TableHead className="pr-6 text-[11px] font-semibold uppercase tracking-wider">Date</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {items.map((inv) => (
-                <TableRow key={inv.id} className="transition-colors">
-                  <TableCell className="pl-6 font-semibold">
-                    <Link
-                      href={`/dashboard/invoices/${inv.id}`}
-                      className="transition-colors hover:text-primary"
-                    >
-                      {inv.number}
-                    </Link>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2.5">
-                      <Avatar className="h-7 w-7 ring-1 ring-border">
-                        <AvatarFallback className="bg-gradient-to-br from-primary/10 to-indigo-500/10 text-[10px] font-bold text-primary">
-                          {inv.clientInitials}
-                        </AvatarFallback>
-                      </Avatar>
-                      <span className="truncate text-sm font-medium">{inv.clientName}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right font-semibold tabular-nums">
-                    {formatINR(inv.amount)}
-                  </TableCell>
-                  <TableCell>
-                    <StatusBadge status={inv.status} />
-                  </TableCell>
-                  <TableCell className="pr-6 text-sm text-muted-foreground">
-                    {formatDate(inv.issueDate)}
-                  </TableCell>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="hidden pl-6 text-[11px] font-semibold uppercase tracking-wider md:table-cell">
+                    Invoice
+                  </TableHead>
+                  <TableHead className="pl-4 text-[11px] font-semibold uppercase tracking-wider md:pl-0">
+                    Client
+                  </TableHead>
+                  <TableHead className="text-right text-[11px] font-semibold uppercase tracking-wider">
+                    Amount
+                  </TableHead>
+                  <TableHead className="text-[11px] font-semibold uppercase tracking-wider">
+                    Status
+                  </TableHead>
+                  <TableHead className="pr-4 text-[11px] font-semibold uppercase tracking-wider md:pr-6">
+                    Date
+                  </TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {items.map((inv) => (
+                  <TableRow key={inv.id} className="transition-colors">
+                    <TableCell className="hidden pl-6 font-semibold md:table-cell">
+                      <Link
+                        href={`/dashboard/invoices/${inv.id}`}
+                        className="transition-colors hover:text-primary"
+                      >
+                        {inv.number}
+                      </Link>
+                    </TableCell>
+                    <TableCell className="pl-4 md:pl-0">
+                      <Link
+                        href={`/dashboard/invoices/${inv.id}`}
+                        className="flex items-center gap-2 transition-colors hover:text-primary"
+                      >
+                        <Avatar className="h-7 w-7 shrink-0 ring-1 ring-border">
+                          <AvatarFallback className="bg-gradient-to-br from-primary/10 to-indigo-500/10 text-[10px] font-bold text-primary">
+                            {inv.clientInitials}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span className="max-w-[110px] truncate text-sm font-medium sm:max-w-none">
+                          {inv.clientName}
+                        </span>
+                      </Link>
+                    </TableCell>
+                    <TableCell className="text-right font-semibold tabular-nums">
+                      {formatINR(inv.amount)}
+                    </TableCell>
+                    <TableCell>
+                      <StatusBadge status={inv.status} />
+                    </TableCell>
+                    <TableCell className="pr-4 text-sm text-muted-foreground md:pr-6">
+                      {formatDate(inv.issueDate)}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         )}
       </CardContent>
     </Card>
