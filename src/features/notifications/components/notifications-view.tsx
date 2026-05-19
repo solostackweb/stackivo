@@ -126,15 +126,17 @@ export function NotificationsView({ initial }: NotificationsViewProps) {
         onValueChange={(v) => setFilter(v as FilterKey)}
         className="space-y-4"
       >
-        <TabsList>
-          <TabsTrigger value="all">
-            All <Count value={items.length} />
-          </TabsTrigger>
-          <TabsTrigger value="unread">
-            Unread <Count value={unreadCount} />
-          </TabsTrigger>
-          <TabsTrigger value="mentions">Clients & contracts</TabsTrigger>
-        </TabsList>
+        <div className="overflow-x-auto">
+          <TabsList className="shrink-0">
+            <TabsTrigger value="all">
+              All <Count value={items.length} />
+            </TabsTrigger>
+            <TabsTrigger value="unread">
+              Unread <Count value={unreadCount} />
+            </TabsTrigger>
+            <TabsTrigger value="mentions">Clients & contracts</TabsTrigger>
+          </TabsList>
+        </div>
       </Tabs>
 
       {filtered.length === 0 ? (

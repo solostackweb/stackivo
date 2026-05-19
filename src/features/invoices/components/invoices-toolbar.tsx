@@ -45,7 +45,7 @@ export function InvoicesToolbar({
   return (
     <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
       <div className="flex flex-1 flex-wrap items-center gap-2">
-        <div className="relative w-full max-w-xs">
+        <div className="relative w-full sm:max-w-xs">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={search}
@@ -65,7 +65,7 @@ export function InvoicesToolbar({
               ?.setFilterValue(v === "all" ? undefined : v)
           }
         >
-          <SelectTrigger className="h-9 w-[150px] text-xs">
+          <SelectTrigger className="h-9 w-full sm:w-[150px] text-xs">
             <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>
@@ -86,7 +86,7 @@ export function InvoicesToolbar({
               ?.setFilterValue(v === "all" ? undefined : v)
           }
         >
-          <SelectTrigger className="h-9 w-[180px] text-xs">
+          <SelectTrigger className="h-9 w-full sm:w-[180px] text-xs">
             <SelectValue placeholder="Client" />
           </SelectTrigger>
           <SelectContent>

@@ -111,9 +111,9 @@ export async function PulseDashboardView({
         description="Your paid revenue, top clients, and business trends at a glance."
       />
 
-      <div className="flex items-center justify-between">
+      <div className="flex items-center overflow-x-auto">
         <Tabs value={range}>
-          <TabsList>
+          <TabsList className="shrink-0">
             {(Object.keys(RANGE_MONTHS) as Range[]).map((r) => (
               <TabsTrigger key={r} value={r} asChild>
                 <Link href={`/dashboard/pulse?range=${r}`} replace>

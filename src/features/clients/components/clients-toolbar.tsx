@@ -36,8 +36,8 @@ export function ClientsToolbar({ table }: ClientsToolbarProps) {
 
   return (
     <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-      <div className="flex flex-1 flex-wrap items-center gap-2">
-        <div className="relative w-full max-w-xs">
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-1 sm:flex-wrap sm:items-center">
+        <div className="relative w-full sm:max-w-xs">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={search}
@@ -57,7 +57,7 @@ export function ClientsToolbar({ table }: ClientsToolbarProps) {
               ?.setFilterValue(v === "all" ? undefined : v)
           }
         >
-          <SelectTrigger className="h-9 w-[160px] text-xs">
+          <SelectTrigger className="h-9 w-full text-xs sm:w-[160px]">
             <SelectValue placeholder="GST status" />
           </SelectTrigger>
           <SelectContent>
