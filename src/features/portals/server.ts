@@ -264,9 +264,13 @@ export async function getPortalSnapshot(
         .limit(200),
     ]);
 
-    const contractIds = (contractAutoRes.data ?? []).map((row) => row.id);
-    const invoiceIds = (invoiceAutoRes.data ?? []).map((row) => row.id);
-    const welcomeIds = (welcomeAutoRes.data ?? []).map((row) => row.id);
+    const contractRows = (contractAutoRes.data ?? []) as Array<{ id: string }>;
+    const invoiceRows = (invoiceAutoRes.data ?? []) as Array<{ id: string }>;
+    const welcomeRows = (welcomeAutoRes.data ?? []) as Array<{ id: string }>;
+
+    const contractIds = contractRows.map((row) => row.id);
+    const invoiceIds = invoiceRows.map((row) => row.id);
+    const welcomeIds = welcomeRows.map((row) => row.id);
 
     if (contractIds.length > 0) {
       await admin.from("portal_contracts").upsert(
