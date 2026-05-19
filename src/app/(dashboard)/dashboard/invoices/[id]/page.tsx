@@ -62,7 +62,10 @@ export default async function InvoiceDetailPage({
               <InvoiceStatusBadge status={invoice.status} />
             </div>
             <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
-              Issued {fmtDate(invoice.issueDate)} · Payment date {fmtDate(invoice.dueDate)}
+              Issued {fmtDate(invoice.issueDate)} · Due {fmtDate(invoice.dueDate)}
+              {invoice.status === "paid" && invoice.paidAt
+                ? ` · Paid ${fmtDate(invoice.paidAt)}`
+                : ""}
             </p>
           </div>
         </div>
@@ -72,13 +75,27 @@ export default async function InvoiceDetailPage({
               href={`/api/invoices/${invoice.id}/pdf`}
               target="_blank"
               rel="noreferrer"
-              aria-label="View or download PDF"
+              aria-label="View or download invoice PDF"
             >
               <Download className="h-4 w-4" />
-              <span className="hidden sm:inline">View/download PDF</span>
+              <span className="hidden sm:inline">Invoice PDF</span>
               <span className="sm:hidden">PDF</span>
             </a>
           </Button>
+          {invoice.status === "paid" && (
+            <Button asChild variant="outline" size="sm" className="flex-1 sm:flex-none">
+              <a
+                href={`/api/invoices/${invoice.id}/receipt/pdf`}
+                target="_blank"
+                rel="noreferrer"
+                aria-label="View or download receipt PDF"
+              >
+                <Download className="h-4 w-4" />
+                <span className="hidden sm:inline">Receipt PDF</span>
+                <span className="sm:hidden">Receipt</span>
+              </a>
+            </Button>
+          )}
           <MarkPaidManuallyDialog
             invoiceId={invoice.id}
             invoiceNumber={invoice.invoiceNumber}

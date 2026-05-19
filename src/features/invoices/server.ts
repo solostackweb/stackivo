@@ -64,6 +64,22 @@ export interface InvoiceRecord {
   updatedAt: string;
 }
 
+/**
+ * Compute effective status at read-time.
+ * An invoice that is `sent` or `viewed` and whose due_date is in the past
+ * is considered `overdue` — no cron required.
+ */
+function computeEffectiveStatus(row: InvoiceRow): InvoiceStatusRow {
+  if (
+    (row.status === "sent" || row.status === "viewed") &&
+    row.due_date &&
+    new Date(row.due_date) < new Date()
+  ) {
+    return "overdue";
+  }
+  return row.status;
+}
+
 function mapInvoiceRow(row: InvoiceRow): InvoiceRecord {
   return {
     id: row.id,
@@ -72,7 +88,7 @@ function mapInvoiceRow(row: InvoiceRow): InvoiceRecord {
     projectId: row.project_id,
     issueDate: row.issue_date,
     dueDate: row.due_date,
-    status: row.status,
+    status: computeEffectiveStatus(row),
     taxMode: row.tax_mode,
     classification: row.classification,
     currency: row.currency,

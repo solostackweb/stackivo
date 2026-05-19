@@ -103,9 +103,10 @@ export async function markInvoicePaidManuallyAction(
   // and want to record it. But we DO tag the manual confirmation with
   // whatever method is configured for clarity in the receipt.
   const method = await getUserPaymentMethod(userId);
-  // Default to upi_manual since that's the only method that produces
-  // manual confirmations in normal usage.
-  const paymentMethodForReceipt =
+  // Tag the receipt with the configured method type. Both manual flows
+  // (UPI and bank transfer) produce a "upi_manual" receipt by convention;
+  // the reference field carries the distinguishing detail.
+  const paymentMethodForReceipt: "upi_manual" =
     method?.type === "upi_manual" ? "upi_manual" : "upi_manual";
 
   const paidAtIso = parsed.data.paidAt ?? new Date().toISOString();
