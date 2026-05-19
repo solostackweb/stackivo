@@ -69,7 +69,7 @@ export default async function DashboardPage() {
   const greetingName = firstNameOf(profile);
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-5 sm:space-y-8">
       <PageHeader
         title={`Welcome back, ${greetingName}`}
         description="Here's what's happening with your business today."
@@ -108,14 +108,14 @@ export default async function DashboardPage() {
 
       <RevenueChartLazy series={pulse.revenueSeries} />
 
-      <div className="grid items-start gap-4 lg:grid-cols-3">
+      <div className="grid items-start gap-4 md:grid-cols-[1fr_280px] lg:grid-cols-3">
         <div className="lg:col-span-2">
           <RecentInvoices items={recentInvoices} />
         </div>
         <ActivityTimeline items={activity} />
       </div>
 
-      <div className="grid items-start gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid items-start gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <RecentClients items={recentClients} />
         <QuickActions />
         <UpcomingReminders items={reminders} />

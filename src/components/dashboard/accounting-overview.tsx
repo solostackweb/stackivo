@@ -53,7 +53,7 @@ export function AccountingOverview({
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <Tile
             icon={Wallet}
             label="Collected"
@@ -115,7 +115,7 @@ function Tile({ icon: Icon, label, value, sub, tone }: TileProps) {
         <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
           {label}
         </p>
-        <p className="text-xl font-bold tabular-nums tracking-tight">
+        <p className="text-lg font-bold tabular-nums tracking-tight sm:text-xl">
           {value}
         </p>
         <p className="text-[11px] text-muted-foreground">{sub}</p>

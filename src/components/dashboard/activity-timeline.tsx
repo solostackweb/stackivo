@@ -68,7 +68,7 @@ export function ActivityTimeline({ items }: { items: ActivityRecord[] }) {
           // so adding more activity rows never stretches the surrounding
           // dashboard grid — siblings stay height-balanced regardless of
           // how busy this column gets.
-          <ol className="relative max-h-[420px] space-y-5 overflow-y-auto px-6 py-5">
+          <ol className="relative max-h-[320px] space-y-5 overflow-y-auto px-6 py-5 sm:max-h-[420px]">
             {/* Vertical guideline */}
             <span
               className="absolute left-[38px] top-7 h-[calc(100%-2.5rem)] w-px bg-border"
