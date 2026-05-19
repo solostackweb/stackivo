@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
+import Script from "next/script";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { AppProviders } from "@/components/providers/app-providers";
@@ -80,11 +81,12 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: [
-      { url: "/favicon.ico" },
       { url: "/icon.svg", type: "image/svg+xml" },
+      { url: "/api/pwa-icon/32", type: "image/png", sizes: "32x32" },
+      { url: "/api/pwa-icon/192", type: "image/png", sizes: "192x192" },
     ],
-    apple: [{ url: "/apple-touch-icon.svg", sizes: "180x180" }],
-    shortcut: ["/favicon.ico"],
+    apple: [{ url: "/api/pwa-icon/180", type: "image/png", sizes: "180x180" }],
+    shortcut: ["/icon.svg"],
   },
   other: {
     "mobile-web-app-capable": "yes",
@@ -114,6 +116,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       className={`${fontSans.variable} ${fontMono.variable}`}
     >
       <body className="font-sans antialiased">
+        {/*
+          Capture beforeinstallprompt before React hydrates.
+          Chrome can fire this event just after DOMContentLoaded — before
+          useEffect listeners in child components attach. Storing it on
+          window.__pwa_prompt lets useInstallPrompt() pick it up reliably.
+        */}
+        <Script id="pwa-prompt-capture" strategy="beforeInteractive">
+          {`window.__pwa_prompt=null;window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();window.__pwa_prompt=e;});`}
+        </Script>
         <AppProviders>{children}</AppProviders>
         <Analytics />
         <SpeedInsights />

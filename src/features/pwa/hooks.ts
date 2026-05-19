@@ -73,6 +73,19 @@ export function useInstallPrompt() {
 
   React.useEffect(() => {
     if (typeof window === "undefined") return;
+
+    // Consume any event captured by the inline beforeInteractive script that
+    // ran before React hydrated (window.__pwa_prompt is set there).
+    const earlyCapture = (
+      window as Window & { __pwa_prompt?: BeforeInstallPromptEvent | null }
+    ).__pwa_prompt;
+    if (earlyCapture) {
+      setEvent(earlyCapture);
+      (
+        window as Window & { __pwa_prompt?: BeforeInstallPromptEvent | null }
+      ).__pwa_prompt = null;
+    }
+
     const onPrompt = (e: Event) => {
       e.preventDefault();
       setEvent(e as BeforeInstallPromptEvent);

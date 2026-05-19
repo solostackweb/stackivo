@@ -2,7 +2,8 @@
 
 import * as React from "react";
 import { usePathname } from "next/navigation";
-import { Download, Share, Plus, X, Zap } from "lucide-react";
+import { Download, Share, Plus, X } from "lucide-react";
+import { StackivoMark } from "@/components/brand/stackivo-logo";
 import { Button } from "@/components/ui/button";
 import {
   useDismissible,
@@ -153,7 +154,7 @@ function Banner({ title, body, action, onDismiss }: BannerProps) {
     >
       <div className="pointer-events-auto flex w-full max-w-md items-center gap-3 rounded-2xl border bg-background/90 p-3 shadow-xl backdrop-blur-xl ring-1 ring-black/5 dark:ring-white/5">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-indigo-600 text-primary-foreground shadow-md shadow-primary/25">
-          <Zap className="h-5 w-5" aria-hidden />
+          <StackivoMark variant="white" className="h-[22px] w-[22px]" />
         </div>
         <div className="min-w-0 flex-1">
           <p className="truncate text-[13px] font-semibold leading-tight">
