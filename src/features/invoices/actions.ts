@@ -24,6 +24,7 @@ import {
 import { calculateInvoice } from "./engine";
 import { recordActivity } from "@/features/activity/server";
 import { createNotification } from "@/features/notifications/server";
+import { generateReceiptForInvoice } from "./receipts";
 import type { ClientRow, UserProfileRow } from "@/lib/supabase/types";
 
 export type ActionResult<T = undefined> =
@@ -351,7 +352,7 @@ export async function setInvoiceStatusAction(
   if (!idParse.success || !statusParse.success) {
     return { ok: false, error: "Invalid input." };
   }
-  await requireUserId();
+  const userId = await requireUserId();
   const supabase = await getServerSupabase();
   const now = new Date().toISOString();
   const patch: Record<string, unknown> = { status: statusParse.data };
@@ -365,11 +366,12 @@ export async function setInvoiceStatusAction(
   const { data: invoiceRow, error } = await supabase
     .from("invoices")
     .update(patch as never)
-    .select("user_id, invoice_number, total_amount, currency")
+    .select("id, user_id, invoice_number, total_amount, currency")
     .eq("id", idParse.data);
   if (error) return { ok: false, error: error.message };
   const invoice = (invoiceRow?.[0] as
     | {
+        id: string;
         user_id: string;
         invoice_number: string;
         total_amount: number;
@@ -385,6 +387,19 @@ export async function setInvoiceStatusAction(
   });
 
   if (statusParse.data === "paid" && invoice) {
+    // Generate receipt row so the "Download Receipt" button on the detail
+    // page works even when paid from the list (no manual dialog used).
+    void generateReceiptForInvoice({
+      invoiceId: invoice.id,
+      userId,
+      paymentMethod: "upi_manual",
+      amount: Number(invoice.total_amount),
+      currency: invoice.currency,
+      paidAt: now,
+    }).catch(() => {
+      // Best-effort — don't fail the status flip if receipt minting fails.
+    });
+
     await createNotification({
       type: "invoice_paid",
       title: `Invoice ${invoice.invoice_number} marked paid`,

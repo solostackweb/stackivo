@@ -28,7 +28,7 @@ import "server-only";
 
 import * as React from "react";
 import { Document, Text, View, StyleSheet } from "@react-pdf/renderer";
-import { pdfColors, pdfFonts, pdfSizes, pdfSpacing, pdfRadii, pdfTracking } from "./theme";
+import { pdfColors, pdfFonts, pdfSizes, pdfSpacing, pdfRadii, pdfTracking, pdfPage } from "./theme";
 import { resolveBrand, type ResolvedBrand } from "./brand";
 import {
   AmountHero,
@@ -205,6 +205,18 @@ export function InvoicePdf({
       subject={`${docLabel} for ${data.client.name}`}
     >
       <DocumentPage brand={brand}>
+        {/* Accent rule — brand colour, full page width, fixed to top. */}
+        <View
+          fixed
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            width: pdfPage.width,
+            height: 4,
+            backgroundColor: brand.accent,
+          }}
+        />
         <DocumentHeader
           brand={brand}
           eyebrow={docLabel.toUpperCase()}
@@ -383,7 +395,8 @@ function INVOICE_COLUMNS(data: InvoicePdfData): TableColumn<InvoicePdfItem>[] {
     {
       key: "desc",
       header: "Description",
-      flex: 3.5,
+      // Narrower description to give number columns more room.
+      flex: 3,
       render: (it) => <TableCellText>{it.description}</TableCellText>,
     },
     {
@@ -400,7 +413,8 @@ function INVOICE_COLUMNS(data: InvoicePdfData): TableColumn<InvoicePdfItem>[] {
     {
       key: "rate",
       header: "Rate",
-      flex: 1.1,
+      // Wider so ₹1,50,000 style values don't visually bleed.
+      flex: 1.5,
       align: "right",
       render: (it) => (
         <TableCellText align="right">
@@ -422,7 +436,8 @@ function INVOICE_COLUMNS(data: InvoicePdfData): TableColumn<InvoicePdfItem>[] {
     {
       key: "amount",
       header: "Amount",
-      flex: 1.3,
+      // Widest column — always the rightmost and the largest number.
+      flex: 1.6,
       align: "right",
       render: (it) => (
         <TableCellText align="right" bold>

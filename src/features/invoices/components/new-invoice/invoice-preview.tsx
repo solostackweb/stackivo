@@ -2,16 +2,13 @@
 
 import * as React from "react";
 import { cn } from "@/lib/utils";
-import { formatINR } from "@/lib/format";
 import { InvoiceTotalsBreakdown } from "./invoice-totals";
-import { PAYMENT_METHOD_LABEL } from "../../schema";
 import { computeItemAmount } from "../../schema";
 import { useProfile } from "@/features/profile/context";
 import { hasFreelancerSignature } from "@/features/profile/signature";
 import type {
   InvoiceFormValues,
   InvoiceTotals,
-  PaymentMethod,
 } from "../../schema";
 
 interface InvoicePreviewProps {
@@ -22,10 +19,25 @@ interface InvoicePreviewProps {
   clientEmail?: string;
 }
 
+function fmtINR(n: number) {
+  if (!Number.isFinite(n)) return "₹0";
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    minimumFractionDigits: Number.isInteger(n) ? 0 : 2,
+    maximumFractionDigits: 2,
+  }).format(n);
+}
+
 /**
- * Professional paper-like invoice preview. Intentionally styled to mimic a
- * real document (serif-ish hierarchy, generous whitespace, no borders on the
- * "page" itself) so the user sees approximately what the recipient will see.
+ * Professional paper-like invoice preview. Shows what the recipient
+ * will approximately see — branding, line items, totals, and a single
+ * authorised signature block.
+ *
+ * Removed:
+ *   - "Payment method" block  → not needed for the client-facing preview
+ *   - Duplicate "Authorized Signature" → the freelancer signature IS the
+ *     authorised signature; one block is enough
  */
 export function InvoicePreview({
   values,
@@ -54,15 +66,18 @@ export function InvoicePreview({
   const tagline = profile?.brandTagline ?? "Freelance operations";
   const accent = profile?.brandColor ?? "#0F172A";
   const signatureReady = hasFreelancerSignature(profile);
+
+  // Show only the first 2 address lines so the preview stays clean.
   const fromLines = [
     profile?.addressLine1,
     profile?.addressLine2,
-    profile?.city,
-    profile?.postalCode ? `${profile.postalCode}` : null,
   ].filter((v): v is string => Boolean(v && v.trim()));
 
   return (
     <div className="overflow-hidden rounded-lg border bg-white shadow-xl shadow-black/5 ring-1 ring-black/5 dark:bg-white dark:text-slate-900">
+      {/* Top accent rule */}
+      <div className="h-1 w-full" style={{ backgroundColor: accent }} />
+
       <div className="relative p-8">
         {/* Header */}
         <div className="mb-8 flex items-start justify-between">
@@ -76,7 +91,7 @@ export function InvoicePreview({
               />
             ) : (
               <div
-                className="flex h-10 w-10 items-center justify-center rounded text-sm font-bold text-white"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded text-sm font-bold text-white"
                 style={{ backgroundColor: accent }}
               >
                 {businessName.slice(0, 1).toUpperCase()}
@@ -91,44 +106,33 @@ export function InvoicePreview({
             <p className="text-lg font-semibold tracking-tight">
               {values.invoiceNumber || "INV-—"}
             </p>
-            <p className="text-[11px] uppercase tracking-wider text-slate-500">
-              Tax invoice
+            <p className="text-[10px] uppercase tracking-wider text-slate-400">
+              Tax Invoice
             </p>
           </div>
         </div>
 
-        {/* From / Bill to / Dates */}
-        <div className="mb-8 grid grid-cols-3 gap-6 text-[11px]">
+        {/* From / Bill to / Dates — 3 columns */}
+        <div className="mb-8 grid grid-cols-3 gap-4 text-[11px]">
           <div>
-            <p className="mb-1 font-semibold uppercase tracking-wider text-slate-400">
+            <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
               From
             </p>
-            <p className="text-sm font-semibold text-slate-900">
-              {businessName}
-            </p>
-            <p className="text-[11px] leading-relaxed text-slate-500">
-              {fromLines.length > 0 ? (
-                <>
-                  {fromLines.map((line) => (
-                    <React.Fragment key={line}>
-                      {line}
-                      <br />
-                    </React.Fragment>
-                  ))}
-                </>
-              ) : (
-                "—"
-              )}
-              {profile?.gstRegistered && profile?.gstin ? (
-                <>GSTIN {profile.gstin}</>
-              ) : (
-                <>GST not registered</>
-              )}
-            </p>
+            <p className="text-sm font-semibold text-slate-900">{businessName}</p>
+            {fromLines.length > 0 ? (
+              <p className="mt-0.5 text-[11px] leading-relaxed text-slate-500">
+                {fromLines.join(", ")}
+              </p>
+            ) : null}
+            {profile?.gstRegistered && profile?.gstin ? (
+              <p className="text-[11px] text-slate-500">GSTIN {profile.gstin}</p>
+            ) : (
+              <p className="text-[11px] text-slate-400">GST not registered</p>
+            )}
           </div>
           <div>
-            <p className="mb-1 font-semibold uppercase tracking-wider text-slate-400">
-              Bill to
+            <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+              Bill To
             </p>
             <p className="text-sm font-semibold text-slate-900">
               {clientName || "—"}
@@ -141,58 +145,61 @@ export function InvoicePreview({
             )}
           </div>
           <div className="text-right">
-            <p className="mb-1 font-semibold uppercase tracking-wider text-slate-400">
+            <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
               Dates
             </p>
             <p className="text-[11px] text-slate-500">
-              Issued <span className="text-slate-900">{issueDate}</span>
+              Issued <span className="font-medium text-slate-900">{issueDate}</span>
             </p>
             <p className="text-[11px] text-slate-500">
-              Due <span className="text-slate-900">{dueDate}</span>
+              Due <span className="font-medium text-slate-900">{dueDate}</span>
             </p>
           </div>
         </div>
 
-        {/* Items */}
+        {/* Line items — proper table for correct column alignment */}
         <div className="mb-8">
-          <div className="grid grid-cols-12 border-b border-slate-200 pb-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-            <div className="col-span-6">Description</div>
-            <div className="col-span-2 text-right">Qty</div>
-            <div className="col-span-2 text-right">Rate</div>
-            <div className="col-span-2 text-right">Amount</div>
-          </div>
-          {values.items && values.items.length > 0 ? (
-            values.items.map((item, i) => (
-              <div
-                key={item.id ?? i}
-                className="grid grid-cols-12 border-b border-slate-100 py-3 text-sm last:border-b-0"
-              >
-                <div className="col-span-6 text-slate-900">
-                  {item.description || (
-                    <span className="text-slate-400">Untitled item</span>
-                  )}
-                </div>
-                <div className="col-span-2 text-right tabular-nums text-slate-600">
-                  {item.quantity || 0}
-                </div>
-                <div className="col-span-2 text-right tabular-nums text-slate-600">
-                  {formatINR(Number(item.rate) || 0)}
-                </div>
-                <div className="col-span-2 text-right font-medium tabular-nums text-slate-900">
-                  {formatINR(
-                    computeItemAmount({
-                      quantity: item.quantity,
-                      rate: item.rate,
-                    }),
-                  )}
-                </div>
-              </div>
-            ))
-          ) : (
-            <div className="py-6 text-center text-sm text-slate-400">
-              No items added yet
-            </div>
-          )}
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-slate-200 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                <th className="pb-2 text-left">Description</th>
+                <th className="pb-2 w-10 text-right">Qty</th>
+                <th className="pb-2 w-28 text-right pr-4">Rate</th>
+                <th className="pb-2 w-28 text-right">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              {values.items && values.items.length > 0 ? (
+                values.items.map((item, i) => (
+                  <tr
+                    key={item.id ?? i}
+                    className="border-b border-slate-100 last:border-b-0"
+                  >
+                    <td className="py-3 text-slate-900">
+                      {item.description || (
+                        <span className="text-slate-400">Untitled item</span>
+                      )}
+                    </td>
+                    <td className="py-3 text-right tabular-nums text-slate-600">
+                      {item.quantity || 0}
+                    </td>
+                    <td className="py-3 pr-4 text-right tabular-nums text-slate-600">
+                      {fmtINR(Number(item.rate) || 0)}
+                    </td>
+                    <td className="py-3 text-right font-medium tabular-nums text-slate-900">
+                      {fmtINR(computeItemAmount({ quantity: item.quantity, rate: item.rate }))}
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={4} className="py-6 text-center text-sm text-slate-400">
+                    No items added yet
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
 
         {/* Totals */}
@@ -208,82 +215,51 @@ export function InvoicePreview({
           </div>
         </div>
 
-        {/* Payment method */}
-        <div className="mb-6 rounded-md bg-slate-50 p-4 text-[11px]">
-          <p className="mb-1 font-semibold uppercase tracking-wider text-slate-400">
-            Payment method
+        {/* Signature — single authorised block, full width */}
+        <div className="border-t border-slate-200 pt-6">
+          <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+            Authorised Signature
           </p>
-          <p className="text-sm font-medium text-slate-900">
-            {PAYMENT_METHOD_LABEL[values.paymentMethod as PaymentMethod]}
-          </p>
-          {values.paymentMethod === "bank" && (
-            <p className="text-[11px] text-slate-500">
-              Payment instructions will appear from your invoice settings.
-            </p>
+          <div className="flex min-h-16 w-48 items-end border-b border-slate-300 pb-2">
+            {signatureReady && profile?.signatureType === "type" && profile.signatureTextValue ? (
+              <span
+                className="text-3xl italic text-slate-900"
+                style={{
+                  fontFamily:
+                    profile.signatureFontFamily === "great-vibes"
+                      ? '"Great Vibes", cursive'
+                      : profile.signatureFontFamily === "pacifico"
+                        ? '"Pacifico", cursive'
+                        : profile.signatureFontFamily === "satisfy"
+                          ? '"Satisfy", cursive'
+                          : '"Dancing Script", cursive',
+                }}
+              >
+                {profile.signatureTextValue}
+              </span>
+            ) : signatureReady && profile?.signatureImageUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={profile.signatureImageUrl}
+                alt="Authorised signature"
+                className="max-h-14 object-contain"
+              />
+            ) : (
+              <span className="text-sm italic text-slate-400">Awaiting signature setup</span>
+            )}
+          </div>
+          <p className="mt-2 text-[11px] font-medium text-slate-700">{businessName}</p>
+          {signatureReady && (
+            <p className="text-[10px] text-slate-400">For and on behalf of {businessName}</p>
           )}
-        </div>
-
-        {/* Freelancer signature */}
-        <div className="mb-6 grid grid-cols-2 gap-6 border-t border-slate-200 pt-6 text-[11px]">
-          <div>
-            <p className="mb-1 font-semibold uppercase tracking-wider text-slate-400">
-              Freelancer Signature
-            </p>
-            <div className="flex min-h-16 items-end border-b border-slate-200 pb-2">
-              {signatureReady && profile?.signatureType === "type" && profile.signatureTextValue ? (
-                <span
-                  className="text-3xl italic text-slate-900"
-                  style={{
-                    fontFamily:
-                      profile.signatureFontFamily === "great-vibes"
-                        ? '"Great Vibes", cursive'
-                        : profile.signatureFontFamily === "pacifico"
-                          ? '"Pacifico", cursive'
-                          : profile.signatureFontFamily === "satisfy"
-                            ? '"Satisfy", cursive'
-                            : '"Dancing Script", cursive',
-                  }}
-                >
-                  {profile.signatureTextValue}
-                </span>
-              ) : signatureReady && profile?.signatureImageUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={profile.signatureImageUrl}
-                  alt="Freelancer signature"
-                  className="max-h-14 object-contain"
-                />
-              ) : (
-                <span className="text-slate-400">Awaiting signature</span>
-              )}
-            </div>
-            <p className="mt-2 text-[11px] text-slate-500">{businessName}</p>
-          </div>
-          <div>
-            <p className="mb-1 font-semibold uppercase tracking-wider text-slate-400">
-              Authorized Signature
-            </p>
-            <div className="flex min-h-16 items-end border-b border-slate-200 pb-2">
-              {signatureReady ? (
-                <span className="text-sm italic text-slate-500">
-                  Digitally configured
-                </span>
-              ) : (
-                <span className="text-slate-400">Awaiting signature</span>
-              )}
-            </div>
-            <p className="mt-2 text-[11px] text-slate-500">
-              Signature used on outgoing invoices.
-            </p>
-          </div>
         </div>
 
         {/* Notes + terms */}
         {(values.notes || values.terms) && (
-          <div className="grid grid-cols-2 gap-6 border-t border-slate-200 pt-6 text-[11px]">
+          <div className="mt-6 grid grid-cols-2 gap-6 border-t border-slate-100 pt-6 text-[11px]">
             {values.notes && (
               <div>
-                <p className="mb-1 font-semibold uppercase tracking-wider text-slate-400">
+                <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
                   Notes
                 </p>
                 <p className="whitespace-pre-line leading-relaxed text-slate-600">
@@ -293,7 +269,7 @@ export function InvoicePreview({
             )}
             {values.terms && (
               <div>
-                <p className="mb-1 font-semibold uppercase tracking-wider text-slate-400">
+                <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
                   Terms
                 </p>
                 <p className="whitespace-pre-line leading-relaxed text-slate-600">
@@ -304,6 +280,7 @@ export function InvoicePreview({
           </div>
         )}
 
+        {/* Bottom accent rule */}
         <div
           className="pointer-events-none absolute inset-x-0 bottom-0 h-1"
           style={{ backgroundColor: accent }}
