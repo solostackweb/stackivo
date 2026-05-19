@@ -4,7 +4,7 @@
   "description": "Clients, invoices, contracts, projects, payments, time, and analytics — unified in one premium workspace with GST-ready billing for India.",
   "start_url": "/dashboard",
   "scope": "/",
-  "id": "/?source=pwa",
+  "id": "/stackivo",
   "display": "standalone",
   "display_override": ["standalone", "minimal-ui"],
   "orientation": "portrait-primary",
