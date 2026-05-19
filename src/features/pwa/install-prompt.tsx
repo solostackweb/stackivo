@@ -144,10 +144,10 @@ interface BannerProps {
 function Banner({ title, body, action, onDismiss }: BannerProps) {
   return (
     <div
-      className="animate-toast-up pointer-events-none fixed inset-x-0 z-[55] flex justify-center px-3"
+      className="animate-toast-up pointer-events-none fixed inset-x-0 z-50 flex justify-center px-3"
       style={{
-        // Sit above the bottom nav on mobile (h-16 + safe-area), graceful on desktop.
-        bottom: "calc(env(safe-area-inset-bottom, 0px) + 5rem)",
+        bottom:
+          "calc(env(safe-area-inset-bottom, 0px) + var(--mobile-bottom-nav-h, 0px) + 1rem)",
       }}
       role="dialog"
       aria-label={title}

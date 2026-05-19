@@ -50,7 +50,8 @@ export async function GET(
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        background: "linear-gradient(135deg, #6366F1 0%, #4338CA 100%)",
+        background: "linear-gradient(135deg, #2563EB 0%, #4F46E5 100%)",
+        borderRadius: Math.round(size * 0.22),
       },
     },
     h(

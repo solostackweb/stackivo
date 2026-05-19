@@ -81,12 +81,13 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: [
-      { url: "/icon.svg", type: "image/svg+xml" },
+      { url: "/api/pwa-icon/16", type: "image/png", sizes: "16x16" },
       { url: "/api/pwa-icon/32", type: "image/png", sizes: "32x32" },
       { url: "/api/pwa-icon/192", type: "image/png", sizes: "192x192" },
+      { url: "/icon.svg", type: "image/svg+xml" },
     ],
     apple: [{ url: "/api/pwa-icon/180", type: "image/png", sizes: "180x180" }],
-    shortcut: ["/icon.svg"],
+    shortcut: [{ url: "/api/pwa-icon/32", type: "image/png" }],
   },
   other: {
     "mobile-web-app-capable": "yes",

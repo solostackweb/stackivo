@@ -32,6 +32,17 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  async redirects() {
+    return [
+      {
+        // Conventional favicon.ico path — many crawlers, bookmark managers
+        // and browser address bars look here before respecting <link rel="icon">.
+        source: "/favicon.ico",
+        destination: "/api/pwa-icon/32",
+        permanent: false,
+      },
+    ];
+  },
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "images.unsplash.com" },
@@ -58,6 +69,19 @@ const nextConfig: NextConfig = {
           { key: "Pragma", value: "no-cache" },
           { key: "Expires", value: "0" },
           { key: "Service-Worker-Allowed", value: "/" },
+        ],
+      },
+      {
+        // PWA icons — long-lived immutable cache; the hash is embedded in the
+        // URL query string for maskable variants. Chrome and Samsung Internet
+        // validate these during manifest parsing to confirm installability.
+        source: "/api/pwa-icon/:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=31536000, immutable",
+          },
+          { key: "Access-Control-Allow-Origin", value: "*" },
         ],
       },
       {

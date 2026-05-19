@@ -13,7 +13,7 @@
  * cleaned on `activate`.
  */
 
-const CACHE_VERSION = "stackivo-v2";
+const CACHE_VERSION = "stackivo-v3";
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 const OFFLINE_URL = "/offline.html";
