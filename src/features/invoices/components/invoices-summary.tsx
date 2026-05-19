@@ -69,7 +69,7 @@ export function InvoicesSummary({
   const stats = React.useMemo(() => computeInvoiceStats(invoices), [invoices]);
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
       <SummaryCard
         label="Paid this month"
         value={formatINR(stats.paidThisMonthAmount)}

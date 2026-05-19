@@ -1260,7 +1260,7 @@ function ActivitySection({
                     )}
                   </div>
                   <span className="shrink-0 text-[11px] text-muted-foreground">
-                    {formatDateTime(item.created_at)}
+                    {formatDate(item.created_at)}
                   </span>
                 </li>
               );
