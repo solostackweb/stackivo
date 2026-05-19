@@ -8,7 +8,7 @@
  *   /portal/<id>/files             — client-side: files
  *   /portal/<id>/contracts         — client-side: contracts
  *   /portal/<id>/invoices          — client-side: invoices
- *   /portal/<id>/messages          — client-side: comments
+ *   /portal/<id>/messages          — client-side: chat
  *   /portal/accept?token=<...>     — accept an emailed invitation
  */
 

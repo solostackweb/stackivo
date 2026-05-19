@@ -8,6 +8,7 @@ import {
   Receipt,
   Files,
   MessageSquare,
+  Video,
   UserPlus,
   Trash2,
   Send,
@@ -731,6 +732,13 @@ function MessagesSection({
   const [body, setBody] = React.useState("");
   const [pending, setPending] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [meetingOpen, setMeetingOpen] = React.useState(false);
+  const [meetingTopic, setMeetingTopic] = React.useState("");
+  const [meetingTime, setMeetingTime] = React.useState("");
+  const [meetingLink, setMeetingLink] = React.useState("https://meet.google.com/new");
+  const [meetingNotes, setMeetingNotes] = React.useState("");
+  const [meetingPending, setMeetingPending] = React.useState(false);
+  const [meetingError, setMeetingError] = React.useState<string | null>(null);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -750,26 +758,72 @@ function MessagesSection({
     router.refresh();
   }
 
+  async function onMeetingRequest(e: React.FormEvent) {
+    e.preventDefault();
+    if (meetingPending) return;
+    setMeetingPending(true);
+    setMeetingError(null);
+
+    const lines = ["Meeting request"];
+    const topic = meetingTopic.trim();
+    const time = meetingTime.trim();
+    const link = meetingLink.trim();
+    const notes = meetingNotes.trim();
+
+    if (topic) lines.push(`Topic: ${topic}`);
+    if (time) lines.push(`Proposed time: ${time}`);
+    if (link) lines.push(`Meet link: ${link}`);
+    if (notes) lines.push(`Notes: ${notes}`);
+
+    const res = await postPortalMessageAction({
+      portalId,
+      body: lines.join("\n"),
+    });
+
+    setMeetingPending(false);
+    if (!res.ok) {
+      setMeetingError(res.error);
+      return;
+    }
+
+    setMeetingTopic("");
+    setMeetingTime("");
+    setMeetingLink("https://meet.google.com/new");
+    setMeetingNotes("");
+    setMeetingOpen(false);
+    router.refresh();
+  }
+
   // Reverse chronological from server → render oldest-first for natural reading.
   const ordered = [...messages].reverse();
 
   return (
     <Card>
-      <CardHeader className="pb-3">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
         <CardTitle className="flex items-center gap-2 text-base">
-          <MessageSquare className="h-4 w-4" /> Conversation
+          <MessageSquare className="h-4 w-4" /> Chat
         </CardTitle>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => {
+            setMeetingError(null);
+            setMeetingOpen(true);
+          }}
+        >
+          <Video className="h-3.5 w-3.5" /> Request meeting
+        </Button>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="rounded-md border bg-muted/10 p-3">
           <form onSubmit={onSubmit} className="space-y-2">
             <div className="space-y-1">
               <Label htmlFor="portal-message" className="text-xs">
-                Share an update
+                Send a message
               </Label>
               <Textarea
                 id="portal-message"
-                placeholder="Share a progress update, ask a question, or request feedback..."
+                placeholder="Write a message, ask a question, or share an update..."
                 value={body}
                 onChange={(e) => setBody(e.target.value)}
                 maxLength={8000}
@@ -795,16 +849,102 @@ function MessagesSection({
                   <Loader2 className="animate-spin" />
                 ) : (
                   <>
-                    <Send /> Send update
+                    <Send /> Send message
                   </>
                 )}
               </Button>
             </div>
           </form>
         </div>
+        <Dialog
+          open={meetingOpen}
+          onOpenChange={(next) => {
+            setMeetingOpen(next);
+            if (!next) setMeetingError(null);
+          }}
+        >
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Request a meeting</DialogTitle>
+              <DialogDescription>
+                Propose a time and drop a Google Meet link if you have one.
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={onMeetingRequest} className="space-y-3">
+              <div className="space-y-1">
+                <Label htmlFor="meeting-topic" className="text-xs">
+                  Topic
+                </Label>
+                <Input
+                  id="meeting-topic"
+                  placeholder="Project update"
+                  value={meetingTopic}
+                  onChange={(e) => setMeetingTopic(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="meeting-time" className="text-xs">
+                  Proposed time
+                </Label>
+                <Input
+                  id="meeting-time"
+                  placeholder="Tomorrow, 3pm IST"
+                  value={meetingTime}
+                  onChange={(e) => setMeetingTime(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="meeting-link" className="text-xs">
+                  Google Meet link
+                </Label>
+                <Input
+                  id="meeting-link"
+                  placeholder="https://meet.google.com/xxx-xxxx-xxx"
+                  value={meetingLink}
+                  onChange={(e) => setMeetingLink(e.target.value)}
+                />
+                <Button asChild size="sm" variant="ghost" className="px-0">
+                  <a href="https://meet.google.com/new" target="_blank" rel="noreferrer">
+                    Create a Google Meet link
+                  </a>
+                </Button>
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="meeting-notes" className="text-xs">
+                  Notes (optional)
+                </Label>
+                <Textarea
+                  id="meeting-notes"
+                  placeholder="What should we cover?"
+                  value={meetingNotes}
+                  onChange={(e) => setMeetingNotes(e.target.value)}
+                  rows={3}
+                />
+              </div>
+              {meetingError && (
+                <p className="rounded-md bg-destructive/10 p-2 text-xs text-destructive">
+                  {meetingError}
+                </p>
+              )}
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => setMeetingOpen(false)}
+                  disabled={meetingPending}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={meetingPending}>
+                  {meetingPending ? <Loader2 className="animate-spin" /> : "Send request"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
         {ordered.length === 0 ? (
           <p className="rounded-md border border-dashed p-6 text-center text-xs text-muted-foreground">
-            No conversation yet. Use the form above to start.
+            No messages yet. Use the form above to start.
           </p>
         ) : (
           <ul className="space-y-3">
@@ -1399,7 +1539,7 @@ function formatActivityTitle(item: PortalActivityRow): string {
     case "invoice.attached":
       return "Invoice attached";
     case "message.posted":
-      return "Comment posted";
+      return "Message sent";
     case "file.deleted":
       return "File deleted";
     default:

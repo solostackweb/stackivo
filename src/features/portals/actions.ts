@@ -681,7 +681,7 @@ export async function detachInvoiceFromPortalAction(input: {
 }
 
 // =============================================================================
-// MESSAGES (comments)
+// MESSAGES (chat)
 // =============================================================================
 
 const messageSchema = z.object({

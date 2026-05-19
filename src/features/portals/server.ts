@@ -240,6 +240,68 @@ export async function getPortalSnapshot(
   const access = await requirePortalAccess(portalId);
   const admin = getAdminSupabase();
 
+  const portalClientId = access.portal.client_id;
+  if (portalClientId) {
+    const ownerId = access.portal.owner_user_id;
+    const [contractAutoRes, invoiceAutoRes, welcomeAutoRes] = await Promise.all([
+      admin
+        .from("contracts")
+        .select("id")
+        .eq("client_id", portalClientId)
+        .eq("user_id", ownerId)
+        .limit(200),
+      admin
+        .from("invoices")
+        .select("id")
+        .eq("client_id", portalClientId)
+        .eq("user_id", ownerId)
+        .limit(200),
+      admin
+        .from("welcome_documents")
+        .select("id")
+        .eq("client_id", portalClientId)
+        .eq("user_id", ownerId)
+        .limit(200),
+    ]);
+
+    const contractIds = (contractAutoRes.data ?? []).map((row) => row.id);
+    const invoiceIds = (invoiceAutoRes.data ?? []).map((row) => row.id);
+    const welcomeIds = (welcomeAutoRes.data ?? []).map((row) => row.id);
+
+    if (contractIds.length > 0) {
+      await admin.from("portal_contracts").upsert(
+        contractIds.map((id) => ({
+          portal_id: portalId,
+          contract_id: id,
+          added_by: ownerId,
+        })) as never,
+        { onConflict: "portal_id,contract_id" },
+      );
+    }
+
+    if (invoiceIds.length > 0) {
+      await admin.from("portal_invoices").upsert(
+        invoiceIds.map((id) => ({
+          portal_id: portalId,
+          invoice_id: id,
+          added_by: ownerId,
+        })) as never,
+        { onConflict: "portal_id,invoice_id" },
+      );
+    }
+
+    if (welcomeIds.length > 0) {
+      await admin.from("portal_welcome_documents").upsert(
+        welcomeIds.map((id) => ({
+          portal_id: portalId,
+          document_id: id,
+          added_by: ownerId,
+        })) as never,
+        { onConflict: "portal_id,document_id" },
+      );
+    }
+  }
+
   const [
     membersRes,
     invitesRes,
