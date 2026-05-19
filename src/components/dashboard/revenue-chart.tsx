@@ -89,11 +89,11 @@ export function RevenueChart({ series }: RevenueChartProps) {
       </CardHeader>
       <CardContent className="pl-2">
         {totalPaid > 0 ? (
-          <div className="h-[260px] w-full">
+          <div className="h-[200px] w-full sm:h-[260px]">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart
                 data={series}
-                margin={{ top: 8, right: 16, left: 0, bottom: 0 }}
+                margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
               >
                 <defs>
                   <linearGradient id="paid-fill" x1="0" y1="0" x2="0" y2="1">
@@ -118,16 +118,17 @@ export function RevenueChart({ series }: RevenueChartProps) {
                 <XAxis
                   dataKey="month"
                   tickFormatter={formatMonthLabel}
-                  tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                  tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
                   tickLine={false}
                   axisLine={false}
+                  interval="preserveStartEnd"
                 />
                 <YAxis
-                  tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                  tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
                   tickLine={false}
                   axisLine={false}
                   tickFormatter={(v) => formatINR(v as number, { compact: true })}
-                  width={56}
+                  width={48}
                 />
                 <Tooltip
                   cursor={{
@@ -167,7 +168,7 @@ export function RevenueChart({ series }: RevenueChartProps) {
             </ResponsiveContainer>
           </div>
         ) : (
-          <div className="flex h-[260px] flex-col items-center justify-center gap-2 text-center">
+          <div className="flex h-[200px] flex-col items-center justify-center gap-2 text-center sm:h-[260px]">
             <p className="text-sm font-medium">No revenue yet</p>
             <p className="max-w-xs text-xs text-muted-foreground">
               Create paid invoices to see your revenue trend here.

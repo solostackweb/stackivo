@@ -4,27 +4,24 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 export function DashboardSkeleton() {
   return (
-    <div className="space-y-8">
+    <div className="space-y-5 sm:space-y-8">
       {/* Page header */}
       <div className="flex items-end justify-between gap-4">
         <div className="space-y-2">
           <Skeleton className="h-7 w-40" />
-          <Skeleton className="h-4 w-72" />
+          <Skeleton className="h-4 w-56 sm:w-72" />
         </div>
-        <div className="flex gap-2">
-          <Skeleton className="h-9 w-32" />
-          <Skeleton className="h-9 w-32" />
-        </div>
+        <Skeleton className="h-9 w-28" />
       </div>
 
       {/* KPI strip */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {Array.from({ length: 4 }).map((_, i) => (
           <Card key={i}>
-            <CardContent className="space-y-3 p-5">
-              <Skeleton className="h-3 w-20" />
-              <Skeleton className="h-7 w-28" />
-              <Skeleton className="h-3 w-16" />
+            <CardContent className="space-y-2 p-3 sm:p-4">
+              <Skeleton className="h-2.5 w-16" />
+              <Skeleton className="h-6 w-24" />
+              <Skeleton className="h-2.5 w-14" />
             </CardContent>
           </Card>
         ))}
@@ -62,7 +59,7 @@ export function DashboardSkeleton() {
       </div>
 
       {/* Invoices + activity */}
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-[1fr_280px] lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardHeader>
             <Skeleton className="h-4 w-32" />
@@ -92,7 +89,7 @@ export function DashboardSkeleton() {
       </div>
 
       {/* Bottom triple */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {Array.from({ length: 3 }).map((_, i) => (
           <Card key={i}>
             <CardHeader>

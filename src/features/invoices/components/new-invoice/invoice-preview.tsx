@@ -107,7 +107,7 @@ export function InvoicePreview({
               {values.invoiceNumber || "INV-—"}
             </p>
             <p className="text-[10px] uppercase tracking-wider text-slate-400">
-              {values.taxMode === "non_gst" ? "Invoice" : "Tax Invoice"}
+              Tax Invoice
             </p>
           </div>
         </div>

@@ -352,7 +352,7 @@ export async function setInvoiceStatusAction(
   if (!idParse.success || !statusParse.success) {
     return { ok: false, error: "Invalid input." };
   }
-  await requireUserId();
+  const userId = await requireUserId();
   const supabase = await getServerSupabase();
   const now = new Date().toISOString();
   const patch: Record<string, unknown> = { status: statusParse.data };
