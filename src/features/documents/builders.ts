@@ -13,7 +13,10 @@ import "server-only";
 
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getAdminSupabase } from "@/lib/supabase/admin";
-import { createSignedStorageUrl } from "@/features/profile/storage";
+import {
+  fetchStorageAsDataUrl,
+  normalizeImageForPdf,
+} from "@/features/profile/storage";
 import type {
   ClientRow,
   ContractRow,
@@ -66,7 +69,7 @@ export async function buildInvoicePdfData(
     fetchSellerProfile(user.id),
     invoice.client_id ? fetchClient(invoice.client_id) : null,
   ]);
-  const logoUrl = await createSignedStorageUrl(
+  const logoUrl = await fetchStorageAsDataUrl(
     "branding-assets",
     seller?.logo_url,
     supabase,
@@ -78,6 +81,7 @@ export async function buildInvoicePdfData(
     seller,
     client,
     logoUrl,
+    supabase,
   });
 }
 
@@ -105,7 +109,7 @@ export async function buildInvoicePdfDataByToken(
     fetchSellerProfile(inv.user_id, admin),
     inv.client_id ? fetchClient(inv.client_id, admin) : null,
   ]);
-  const logoUrl = await createSignedStorageUrl(
+  const logoUrl = await fetchStorageAsDataUrl(
     "branding-assets",
     seller?.logo_url,
     admin,
@@ -117,6 +121,7 @@ export async function buildInvoicePdfDataByToken(
     seller,
     client,
     logoUrl,
+    supabase: admin,
   });
 }
 
@@ -140,7 +145,7 @@ export async function buildContractPdfData(
     contract.client_id ? fetchClient(contract.client_id) : null,
   ]);
   const signature = await fetchLatestContractSignature(contract.id);
-  const logoUrl = await createSignedStorageUrl(
+  const logoUrl = await fetchStorageAsDataUrl(
     "branding-assets",
     seller?.logo_url,
     supabase,
@@ -151,6 +156,7 @@ export async function buildContractPdfData(
     client,
     logoUrl,
     signature,
+    supabase,
   });
 }
 
@@ -171,12 +177,19 @@ export async function buildContractPdfDataByToken(
     contract.client_id ? fetchClient(contract.client_id, admin) : null,
     fetchLatestContractSignature(contract.id, admin),
   ]);
-  const logoUrl = await createSignedStorageUrl(
+  const logoUrl = await fetchStorageAsDataUrl(
     "branding-assets",
     seller?.logo_url,
     admin,
   );
-  return assembleContractPdfData({ contract, seller, client, logoUrl, signature });
+  return assembleContractPdfData({
+    contract,
+    seller,
+    client,
+    logoUrl,
+    signature,
+    supabase: admin,
+  });
 }
 
 // --- Internal: fetchers ---------------------------------------------------
@@ -225,14 +238,22 @@ async function fetchLatestContractSignature(
 
 // --- Internal: assemblers -------------------------------------------------
 
-function assembleInvoicePdfData(args: {
+async function assembleInvoicePdfData(args: {
   invoice: InvoiceRow;
   items: InvoiceItemRow[];
   seller: UserProfileRow | null;
   client: ClientRow | null;
   logoUrl: string | null;
-}): InvoicePdfData {
-  const { invoice, items, seller, client, logoUrl } = args;
+  supabase: AnySupabase;
+}): Promise<InvoicePdfData> {
+  const { invoice, items, seller, client, logoUrl, supabase } = args;
+  const sellerSignatureImage = seller?.signature_image_url
+    ? await normalizeImageForPdf(
+        seller.signature_image_url,
+        "profile-images",
+        supabase,
+      )
+    : null;
   const publicUrl = invoice.public_token
     ? `${getPublicAppUrl()}/i/${invoice.public_token}`
     : null;
@@ -295,7 +316,7 @@ function assembleInvoicePdfData(args: {
       signature: seller?.signature_type
         ? {
             type: seller.signature_type,
-            imageUrl: seller.signature_image_url,
+            imageUrl: sellerSignatureImage,
             textValue: seller.signature_text_value,
             fontFamily: seller.signature_font_family,
             legalName:
@@ -319,14 +340,46 @@ function assembleInvoicePdfData(args: {
   };
 }
 
-function assembleContractPdfData(args: {
+async function assembleContractPdfData(args: {
   contract: ContractRow;
   seller: UserProfileRow | null;
   client: ClientRow | null;
   logoUrl: string | null;
   signature: ContractSignatureRow | null;
-}): ContractPdfData {
-  const { contract, seller, client, logoUrl, signature } = args;
+  supabase: AnySupabase;
+}): Promise<ContractPdfData> {
+  const { contract, seller, client, logoUrl, signature, supabase } = args;
+  // Resolve every signature image up-front. The DB column may hold a
+  // data: URL, a Supabase storage path, or a fully-qualified https URL.
+  // normalizeImageForPdf collapses all three into a base64 data URL the
+  // PDF renderer can embed without a network round-trip.
+  const [
+    clientContractSignatureImage,
+    contractInlineSignatureImage,
+    sellerSignatureImage,
+  ] = await Promise.all([
+    signature?.signature_image_url
+      ? normalizeImageForPdf(
+          signature.signature_image_url,
+          "profile-images",
+          supabase,
+        )
+      : null,
+    contract.signature_image_url
+      ? normalizeImageForPdf(
+          contract.signature_image_url,
+          "profile-images",
+          supabase,
+        )
+      : null,
+    seller?.signature_image_url
+      ? normalizeImageForPdf(
+          seller.signature_image_url,
+          "profile-images",
+          supabase,
+        )
+      : null,
+  ]);
   const publicUrl = contract.public_token
     ? `${getPublicAppUrl()}/c/${contract.public_token}`
     : null;
@@ -346,7 +399,7 @@ function assembleContractPdfData(args: {
     clientSignature: signature
       ? {
           type: signature.signature_type,
-          imageUrl: signature.signature_image_url,
+          imageUrl: clientContractSignatureImage,
           textValue: signature.signature_text_value,
           fontFamily: signature.signature_font_family,
           legalName: signature.legal_name,
@@ -357,7 +410,7 @@ function assembleContractPdfData(args: {
       : contract.signature_type
         ? {
             type: contract.signature_type,
-            imageUrl: contract.signature_image_url,
+            imageUrl: contractInlineSignatureImage,
             textValue: contract.signature_text_value,
             fontFamily: contract.signature_font_family,
             legalName: client?.full_name ?? null,
@@ -389,7 +442,7 @@ function assembleContractPdfData(args: {
       signature: seller?.signature_type
         ? {
             type: seller.signature_type,
-            imageUrl: seller.signature_image_url,
+            imageUrl: sellerSignatureImage,
             textValue: seller.signature_text_value,
             fontFamily: seller.signature_font_family,
             legalName:
@@ -441,7 +494,7 @@ export async function buildWelcomeDocumentPdfData(
     fetchSellerProfile(user.id),
     doc.client_id ? fetchClient(doc.client_id) : null,
   ]);
-  const logoUrl = await createSignedStorageUrl(
+  const logoUrl = await fetchStorageAsDataUrl(
     "branding-assets",
     seller?.logo_url,
     supabase,
@@ -466,7 +519,7 @@ export async function buildWelcomeDocumentPdfDataByToken(
     fetchSellerProfile(doc.user_id, admin),
     doc.client_id ? fetchClient(doc.client_id, admin) : null,
   ]);
-  const logoUrl = await createSignedStorageUrl(
+  const logoUrl = await fetchStorageAsDataUrl(
     "branding-assets",
     seller?.logo_url,
     admin,
@@ -575,7 +628,7 @@ export async function buildReceiptPdfData(
     fetchSellerProfile(invoice.user_id),
     invoice.client_id ? fetchClient(invoice.client_id) : null,
   ]);
-  const logoUrl = await createSignedStorageUrl(
+  const logoUrl = await fetchStorageAsDataUrl(
     "branding-assets",
     seller?.logo_url,
     supabase,
@@ -601,7 +654,7 @@ export async function buildReceiptPdfDataByToken(
     fetchSellerProfile(invoice.user_id, admin),
     invoice.client_id ? fetchClient(invoice.client_id, admin) : null,
   ]);
-  const logoUrl = await createSignedStorageUrl(
+  const logoUrl = await fetchStorageAsDataUrl(
     "branding-assets",
     seller?.logo_url,
     admin,

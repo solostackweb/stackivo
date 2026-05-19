@@ -39,30 +39,30 @@ const pageStyles = StyleSheet.create({
     paddingBottom: pdfSpacing.pagePadding + 28, // room for fixed footer
     lineHeight: pdfLineHeights.normal,
   },
-  accentRule: {
-    height: 3,
-    width: 64,
-    borderRadius: pdfRadii.pill,
-    marginBottom: pdfSpacing.lg,
-  },
   contentWrap: { flex: 1 },
 });
 
 /**
- * Standard A4 page used by every template. The top accent rule is
- * rendered automatically and tinted with the brand colour — a single
- * shared signature mark across all documents.
+ * Standard A4 page used by every template.
+ *
+ * Deliberately undecorated — no top accent rule, no colored ribbons.
+ * Generated accounting documents (invoices, receipts, contracts) read
+ * as more credible when they lean into the white-paper conventions of
+ * traditional business stationery. The brand colour only surfaces in
+ * two tiny places: a 0.5pt rule under the brand block in the header
+ * (defined in `DocumentHeader`) and the grand-total figure in
+ * `TotalsBlock`.
  */
 export function DocumentPage({
-  brand,
   children,
 }: {
-  brand: ResolvedBrand;
+  /** Brand is accepted but unused — kept in the signature for callsite
+   * stability while the page chrome is intentionally brand-agnostic. */
+  brand?: ResolvedBrand;
   children: React.ReactNode;
 }) {
   return (
     <Page size="A4" style={pageStyles.page}>
-      <View style={[pageStyles.accentRule, { backgroundColor: brand.accent }]} />
       <View style={pageStyles.contentWrap}>{children}</View>
     </Page>
   );
@@ -77,12 +77,19 @@ const headerStyles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
+    paddingBottom: pdfSpacing.md,
     marginBottom: pdfSpacing["2xl"],
+    borderBottomWidth: 0.5,
+    borderBottomColor: pdfColors.border,
   },
-  left: { flexDirection: "row", alignItems: "flex-start", maxWidth: "60%" },
+  left: { flexDirection: "row", alignItems: "flex-start", maxWidth: "62%" },
   logo: {
-    width: 44,
-    height: 44,
+    // Slightly larger logo so freelancers' brands actually read at A4.
+    // Width is bounded to keep wider wordmark logos in proportion;
+    // `objectFit: contain` preserves the original aspect ratio.
+    width: 80,
+    maxWidth: 96,
+    height: 48,
     objectFit: "contain",
     marginRight: pdfSpacing.md,
   },
@@ -267,7 +274,9 @@ export function DocumentFooter({
   return (
     <View style={footerStyles.wrap} fixed>
       <View style={footerStyles.left}>
-        <View style={[footerStyles.dot, { backgroundColor: brand.accent }]} />
+        {/* Footer kept text-only. We used to render a brand-colored
+            dot here; removing it for a cleaner, accounting-document
+            look. The freelancer's business name is enough signature. */}
         <Text style={footerStyles.txt}>
           {brand.businessName}
           {label ? ` · ${label}` : ""}
@@ -289,18 +298,10 @@ export function DocumentFooter({
 
 const badgeStyles = StyleSheet.create({
   base: {
-    flexDirection: "row",
-    alignItems: "center",
     alignSelf: "flex-start",
-    borderRadius: pdfRadii.pill,
-    paddingVertical: 5,
-    paddingHorizontal: 10,
-  },
-  dot: {
-    width: 5,
-    height: 5,
-    borderRadius: pdfRadii.pill,
-    marginRight: 6,
+    borderWidth: 0.5,
+    paddingVertical: 3,
+    paddingHorizontal: 7,
   },
   text: {
     fontFamily: pdfFonts.bold,
@@ -313,41 +314,44 @@ const badgeStyles = StyleSheet.create({
 export type BadgeTone = "neutral" | "brand" | "success" | "warning" | "danger";
 
 /**
- * Compact pill — used for invoice statuses, "PAID" stamps, etc. A small
- * leading dot keeps it readable at distance and in greyscale prints.
+ * Status label rendered as a small, hairline-outlined box.
+ *
+ * Used for "PAID" / "SENT" / "OVERDUE" markers on invoices. Deliberately
+ * not a colored pill — accounting documents look more credible when
+ * status is communicated by the word itself rather than by a saturated
+ * background. The outline keeps it scannable.
+ *
+ * Tone still subtly affects the text color so "OVERDUE" reads
+ * differently from "PAID" without shouting.
  */
 export function Badge({
   tone = "neutral",
-  brandAccent,
   label,
 }: {
   tone?: BadgeTone;
-  brandAccent: string;
+  brandAccent?: string;
   label: string;
 }) {
-  const palette = badgePalette(tone, brandAccent);
+  const color = badgeForeground(tone);
   return (
-    <View style={[badgeStyles.base, { backgroundColor: palette.bg }]}>
-      <View style={[badgeStyles.dot, { backgroundColor: palette.fg }]} />
-      <Text style={[badgeStyles.text, { color: palette.fg }]}>{label}</Text>
+    <View style={[badgeStyles.base, { borderColor: color }]}>
+      <Text style={[badgeStyles.text, { color }]}>{label}</Text>
     </View>
   );
 }
 
-function badgePalette(tone: BadgeTone, accent: string): { fg: string; bg: string } {
+function badgeForeground(tone: BadgeTone): string {
   switch (tone) {
     case "success":
-      return { fg: pdfColors.success, bg: pdfColors.successSoft };
-    case "warning":
-      return { fg: pdfColors.warning, bg: pdfColors.warningSoft };
+      return pdfColors.success;
     case "danger":
-      return { fg: pdfColors.danger, bg: pdfColors.dangerSoft };
+      return pdfColors.danger;
+    case "warning":
+      return pdfColors.warning;
     case "brand":
-      // Soft tint of the freelancer's brand colour. Always readable.
-      return { fg: accent, bg: pdfColors.surfaceSubtle };
     case "neutral":
     default:
-      return { fg: pdfColors.mutedForeground, bg: pdfColors.surfaceSubtle };
+      return pdfColors.mutedForeground;
   }
 }
 
@@ -422,12 +426,11 @@ export function Divider({ style }: { style?: ViewProps["style"] }) {
 const metaStyles = StyleSheet.create({
   wrap: {
     flexDirection: "row",
-    backgroundColor: pdfColors.surfaceMuted,
-    borderWidth: 0.5,
-    borderColor: pdfColors.border,
-    borderRadius: pdfRadii.md,
-    padding: pdfSpacing.md,
+    paddingTop: pdfSpacing.sm,
+    paddingBottom: pdfSpacing.md,
     marginBottom: pdfSpacing.sectionGap,
+    borderTopWidth: 0.5,
+    borderTopColor: pdfColors.border,
   },
   cell: { flex: 1, paddingRight: pdfSpacing.md },
   cellLast: { flex: 1 },
@@ -473,48 +476,56 @@ export function MetaGrid({ items }: { items: MetaItem[] }) {
 
 const amountStyles = StyleSheet.create({
   wrap: {
-    backgroundColor: pdfColors.foreground,
-    borderRadius: pdfRadii.md,
-    padding: pdfSpacing.lg,
-    marginBottom: pdfSpacing.sectionGap,
+    alignItems: "flex-end",
+    paddingBottom: pdfSpacing.md,
+    marginBottom: pdfSpacing.lg,
+    borderBottomWidth: 0.5,
+    borderBottomColor: pdfColors.border,
   },
   eyebrow: {
     fontFamily: pdfFonts.bold,
     fontSize: pdfSizes.eyebrow,
-    color: "#CBD5E1",
+    color: pdfColors.mutedForeground,
     textTransform: "uppercase",
     letterSpacing: pdfTracking.wider,
-    marginBottom: 6,
+    marginBottom: 4,
   },
   value: {
     fontFamily: pdfFonts.bold,
     fontSize: pdfSizes["2xl"],
-    color: pdfColors.white,
+    color: pdfColors.foreground,
     letterSpacing: pdfTracking.tight,
   },
   sub: {
     fontSize: pdfSizes.xs,
-    color: "#94A3B8",
+    color: pdfColors.mutedForeground,
     marginTop: 4,
   },
 });
 
+/**
+ * Right-aligned "amount" callout. Intentionally plain — black on white,
+ * a thin rule beneath. We used to render this as a dark filled box with
+ * white type, which made the document feel more like a marketing piece
+ * than an accounting record. Restraint reads as professional.
+ *
+ * The `variant` and `brandAccent` props are kept for API compatibility;
+ * they no longer paint a background. Templates can still drop in their
+ * own branded element above this if they really need to.
+ */
 export function AmountHero({
   eyebrow,
   amount,
   sub,
-  variant = "dark",
-  brandAccent,
 }: {
   eyebrow: string;
   amount: string;
   sub?: string;
   variant?: "dark" | "accent";
-  brandAccent: string;
+  brandAccent?: string;
 }) {
-  const bg = variant === "accent" ? brandAccent : pdfColors.foreground;
   return (
-    <View style={[amountStyles.wrap, { backgroundColor: bg }]}>
+    <View style={amountStyles.wrap}>
       <Text style={amountStyles.eyebrow}>{eyebrow}</Text>
       <Text style={amountStyles.value}>{amount}</Text>
       {sub ? <Text style={amountStyles.sub}>{sub}</Text> : null}
@@ -605,20 +616,26 @@ export function PartyCard({ data }: { data: PartyCardData }) {
 
 const tableStyles = StyleSheet.create({
   wrap: {
-    borderWidth: 0.5,
-    borderColor: pdfColors.border,
-    borderRadius: pdfRadii.md,
-    overflow: "hidden",
+    borderTopWidth: 0.5,
+    borderBottomWidth: 0.5,
+    borderColor: pdfColors.borderStrong,
     marginBottom: pdfSpacing.sectionGap,
   },
   headerRow: {
     flexDirection: "row",
     paddingVertical: pdfSpacing.sm + 2,
     paddingHorizontal: pdfSpacing.md,
+    borderBottomWidth: 0.5,
+    borderBottomColor: pdfColors.borderStrong,
+    // Neutral header. Brand colour intentionally suppressed here — a
+    // tinted header band reads more "branded marketing" than the
+    // accounting-document convention freelancers' clients are used to.
+    backgroundColor: pdfColors.surface,
   },
   headerCell: {
     fontFamily: pdfFonts.bold,
     fontSize: pdfSizes.eyebrow,
+    color: pdfColors.mutedForeground,
     textTransform: "uppercase",
     letterSpacing: pdfTracking.wider,
   },
@@ -629,7 +646,6 @@ const tableStyles = StyleSheet.create({
     borderTopWidth: 0.5,
     borderTopColor: pdfColors.border,
   },
-  rowAlt: { backgroundColor: pdfColors.surfaceMuted },
   cellTxt: {
     fontSize: pdfSizes.sm,
     color: pdfColors.foreground,
@@ -651,20 +667,28 @@ export interface TableColumn<T> {
   render: (row: T) => React.ReactNode;
 }
 
+/**
+ * Line-items table used by invoice + receipt PDFs.
+ *
+ * Restrained accounting styling: thin top/bottom rule, neutral header
+ * row, single hairline divider between rows, no zebra fills. The
+ * `brand` prop and `zebra` flag are accepted for API stability but
+ * intentionally not applied — uniform styling across all freelancers
+ * keeps generated documents reading like a financial record, not a
+ * brand piece.
+ */
 export function LineItemsTable<T>({
-  brand,
   columns,
   rows,
-  zebra = true,
 }: {
-  brand: ResolvedBrand;
+  brand?: ResolvedBrand;
   columns: TableColumn<T>[];
   rows: T[];
   zebra?: boolean;
 }) {
   return (
     <View style={tableStyles.wrap}>
-      <View style={[tableStyles.headerRow, { backgroundColor: brand.accent }]}>
+      <View style={tableStyles.headerRow}>
         {columns.map((col) => (
           <Text
             key={col.key}
@@ -672,7 +696,6 @@ export function LineItemsTable<T>({
               tableStyles.headerCell,
               {
                 flex: col.flex,
-                color: brand.onAccent,
                 textAlign: col.align ?? "left",
               },
             ]}
@@ -682,15 +705,7 @@ export function LineItemsTable<T>({
         ))}
       </View>
       {rows.map((row, idx) => (
-        <View
-          key={idx}
-          style={
-            zebra && idx % 2 === 1
-              ? [tableStyles.row, tableStyles.rowAlt]
-              : tableStyles.row
-          }
-          wrap={false}
-        >
+        <View key={idx} style={tableStyles.row} wrap={false}>
           {columns.map((col) => (
             <View
               key={col.key}
@@ -740,11 +755,8 @@ export function TableCellText({
 const totalsStyles = StyleSheet.create({
   wrap: {
     width: 240,
-    borderWidth: 0.5,
-    borderColor: pdfColors.border,
-    borderRadius: pdfRadii.md,
-    padding: pdfSpacing.md,
-    backgroundColor: pdfColors.surfaceMuted,
+    paddingHorizontal: pdfSpacing.md,
+    paddingTop: pdfSpacing.sm,
     alignSelf: "flex-end",
     marginBottom: pdfSpacing.sectionGap,
   },
@@ -789,11 +801,12 @@ export interface TotalsRowData {
 export function TotalsBlock({
   rows,
   grand,
-  brandAccent,
 }: {
   rows: TotalsRowData[];
   grand: TotalsRowData;
-  brandAccent: string;
+  /** Accepted for API stability; not applied. The grand-total figure is
+   * intentionally rendered in plain black for accounting clarity. */
+  brandAccent?: string;
 }) {
   return (
     <View style={totalsStyles.wrap}>
@@ -805,9 +818,7 @@ export function TotalsBlock({
       ))}
       <View style={totalsStyles.grand}>
         <Text style={totalsStyles.grandLabel}>{grand.label}</Text>
-        <Text style={[totalsStyles.grandValue, { color: brandAccent }]}>
-          {grand.value}
-        </Text>
+        <Text style={totalsStyles.grandValue}>{grand.value}</Text>
       </View>
     </View>
   );

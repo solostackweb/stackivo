@@ -1,5 +1,6 @@
 import * as React from "react";
 import Link from "next/link";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { AUTH_LOGIN_ROUTE } from "@/features/auth/routes";
@@ -17,7 +18,8 @@ import { logoutAction } from "@/features/auth/actions";
  *
  * Auth: every route under here requires a Supabase session. Unauthed
  * users get redirected to the login page with `?next=` so they bounce
- * back here after signing in.
+ * back here AT THE SAME URL after signing in (so a deep link to a
+ * specific portal or invitation token survives the auth round-trip).
  */
 export default async function PortalLayout({
   children,
@@ -29,33 +31,53 @@ export default async function PortalLayout({
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) {
-    redirect(`${AUTH_LOGIN_ROUTE}?next=${encodeURIComponent("/portal")}`);
+    // Preserve the exact requested URL so the user comes back here after
+    // signing in. Previously we redirected everyone to /portal which
+    // dropped the invitation token + specific portal ID, forcing the
+    // client to find their way again.
+    const reqHeaders = await headers();
+    const fromHeader =
+      reqHeaders.get("next-url") ??
+      reqHeaders.get("x-invoke-path") ??
+      "/portal";
+    redirect(`${AUTH_LOGIN_ROUTE}?next=${encodeURIComponent(fromHeader)}`);
   }
 
   return (
-    <div className="min-h-svh bg-muted/20 text-foreground">
-      <header className="border-b bg-background">
+    <div className="flex min-h-svh flex-col bg-muted/20 text-foreground">
+      <header
+        className="sticky top-0 z-30 border-b bg-background/90 backdrop-blur-md"
+        style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}
+      >
         <div className="mx-auto flex h-14 max-w-5xl items-center justify-between gap-3 px-4 sm:px-6">
           <Link
             href="/portal"
-            className="flex items-center gap-2 text-sm font-semibold tracking-tight"
+            className="flex min-w-0 items-center gap-2 text-sm font-semibold tracking-tight"
           >
-            <Workflow className="h-4 w-4 text-primary" />
-            Client Portal
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+              <Workflow className="h-4 w-4" />
+            </span>
+            <span className="truncate">Client Portal</span>
           </Link>
-          <div className="flex items-center gap-3">
-            <span className="hidden text-xs text-muted-foreground sm:inline">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <span className="hidden max-w-[160px] truncate text-xs text-muted-foreground sm:inline">
               {user.email}
             </span>
             <form action={logoutAction}>
               <Button type="submit" size="sm" variant="ghost">
-                <LogOut /> Sign out
+                <LogOut />
+                <span className="hidden sm:inline">Sign out</span>
               </Button>
             </form>
           </div>
         </div>
       </header>
-      <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-10">
+      <main
+        className="mx-auto w-full max-w-5xl flex-1 px-4 py-6 sm:px-6 sm:py-10"
+        style={{
+          paddingBottom: "max(env(safe-area-inset-bottom, 0px), 2rem)",
+        }}
+      >
         {children}
       </main>
     </div>
