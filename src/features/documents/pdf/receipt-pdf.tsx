@@ -102,8 +102,6 @@ export function ReceiptPdf({ data }: { data: ReceiptPdfData }) {
           eyebrow="Payment received"
           amount={amountFormatted}
           sub={`${methodLabel} · ${formatDateTime(data.paidAt)}`}
-          variant="dark"
-          brandAccent={data.brand.accent}
         />
 
         <MetaGrid

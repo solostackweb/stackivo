@@ -229,8 +229,6 @@ export function InvoicePdf({
           eyebrow={heroEyebrow}
           amount={formatCurrency(totals.paidAmount, data.currency)}
           sub={heroSub}
-          variant={isPaid ? "accent" : "dark"}
-          brandAccent={brand.accent}
         />
 
         <MetaGrid

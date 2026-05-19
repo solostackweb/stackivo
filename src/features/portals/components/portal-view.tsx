@@ -139,58 +139,115 @@ interface ViewProps {
  */
 export function PortalView(props: ViewProps) {
   const isOwner = props.role === "owner";
+
+  // Section order is intentionally different for clients vs owners.
+  //   - Clients open the portal to DO something (pay/sign/acknowledge).
+  //     We surface invoices and contracts first, then files, then the
+  //     conversation. Welcome guides slot above invoices because they
+  //     set context for everything below.
+  //   - Owners use it as an admin/CRM panel. Welcome → Contracts →
+  //     Invoices → Files → Conversation reads better top-to-bottom for
+  //     creation flow.
+  //
+  // Sections take their anchor `id` from `#portal-{kind}` so the hero
+  // pill links above scroll smoothly into the right place on any phone.
+  const mainSections = isOwner ? (
+    <>
+      <WelcomeDocumentsSection
+        documents={props.welcomeDocuments}
+        available={props.availableWelcomeDocuments}
+        isOwner={isOwner}
+        portalId={props.portalId}
+      />
+      <ContractsSection
+        contracts={props.contracts}
+        available={props.availableContracts}
+        isOwner={isOwner}
+        portalId={props.portalId}
+      />
+      <InvoicesSection
+        invoices={props.invoices}
+        available={props.availableInvoices}
+        isOwner={isOwner}
+        portalId={props.portalId}
+      />
+      <FilesSection
+        portalId={props.portalId}
+        files={props.files}
+        isOwner={isOwner}
+        currentUserId={props.currentUserId}
+        r2Enabled={props.r2Enabled}
+        usage={props.storageUsage}
+        cap={props.storageCap}
+      />
+      <MessagesSection
+        portalId={props.portalId}
+        messages={props.messages}
+      />
+    </>
+  ) : (
+    <>
+      <InvoicesSection
+        invoices={props.invoices}
+        available={props.availableInvoices}
+        isOwner={isOwner}
+        portalId={props.portalId}
+      />
+      <ContractsSection
+        contracts={props.contracts}
+        available={props.availableContracts}
+        isOwner={isOwner}
+        portalId={props.portalId}
+      />
+      <WelcomeDocumentsSection
+        documents={props.welcomeDocuments}
+        available={props.availableWelcomeDocuments}
+        isOwner={isOwner}
+        portalId={props.portalId}
+      />
+      <FilesSection
+        portalId={props.portalId}
+        files={props.files}
+        isOwner={isOwner}
+        currentUserId={props.currentUserId}
+        r2Enabled={props.r2Enabled}
+        usage={props.storageUsage}
+        cap={props.storageCap}
+      />
+      <MessagesSection
+        portalId={props.portalId}
+        messages={props.messages}
+      />
+    </>
+  );
+
   return (
     <div className="grid gap-6 lg:grid-cols-3">
-      <div className="space-y-6 lg:col-span-2">
-        <WelcomeDocumentsSection
-          documents={props.welcomeDocuments}
-          available={props.availableWelcomeDocuments}
-          isOwner={isOwner}
-          portalId={props.portalId}
-        />
-        <ContractsSection
-          contracts={props.contracts}
-          available={props.availableContracts}
-          isOwner={isOwner}
-          portalId={props.portalId}
-        />
-        <InvoicesSection
-          invoices={props.invoices}
-          available={props.availableInvoices}
-          isOwner={isOwner}
-          portalId={props.portalId}
-        />
-        <FilesSection
-          portalId={props.portalId}
-          files={props.files}
-          isOwner={isOwner}
-          currentUserId={props.currentUserId}
-          r2Enabled={props.r2Enabled}
-          usage={props.storageUsage}
-          cap={props.storageCap}
-        />
-        <MessagesSection
-          portalId={props.portalId}
-          messages={props.messages}
-        />
+      <div className="space-y-4 sm:space-y-6 lg:col-span-2">
+        {mainSections}
       </div>
-      <div className="space-y-6">
-        <PortalSettingsSection
-          portalId={props.portalId}
-          status={props.portalStatus}
-          portalName={props.portalName}
-          isOwner={isOwner}
-        />
-        <MembersSection
-          portalId={props.portalId}
-          members={props.members}
-          pendingInvitations={props.pendingInvitations}
-          isOwner={isOwner}
-          clientId={props.clientId ?? null}
-          clientEmail={props.clientEmail ?? null}
-        />
-        <ActivitySection activity={props.activity} />
-      </div>
+      {/* Right-rail: owner-only admin chrome. Clients don't see settings,
+          member management, or the raw activity log — those are admin
+          concerns that just add noise to the client view. */}
+      {isOwner && (
+        <div className="space-y-4 sm:space-y-6">
+          <PortalSettingsSection
+            portalId={props.portalId}
+            status={props.portalStatus}
+            portalName={props.portalName}
+            isOwner={isOwner}
+          />
+          <MembersSection
+            portalId={props.portalId}
+            members={props.members}
+            pendingInvitations={props.pendingInvitations}
+            isOwner={isOwner}
+            clientId={props.clientId ?? null}
+            clientEmail={props.clientEmail ?? null}
+          />
+          <ActivitySection activity={props.activity} />
+        </div>
+      )}
     </div>
   );
 }
@@ -211,7 +268,7 @@ function WelcomeDocumentsSection({
   portalId: string;
 }) {
   return (
-    <Card>
+    <Card id="portal-welcome" className="scroll-mt-20">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
         <CardTitle className="flex items-center gap-2 text-base">
           <Sparkles className="h-4 w-4" /> Welcome guides
@@ -233,11 +290,8 @@ function WelcomeDocumentsSection({
             })}
           />
         )}
-        {!isOwner && (
-          <Button size="sm" variant="ghost" disabled>
-            Owner managed
-          </Button>
-        )}
+        {/* "Owner managed" placeholder removed — it added noise to the
+            client view without giving them any way to act. */}
       </CardHeader>
       <CardContent>
         {documents.length === 0 ? (
@@ -248,32 +302,39 @@ function WelcomeDocumentsSection({
           </p>
         ) : (
           <ul className="divide-y rounded-md border">
-            {documents.map((d) => (
-              <li
-                key={d.id}
-                className="flex items-center justify-between gap-3 px-3 py-2.5"
-              >
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium">{d.title}</p>
-                  <p className="text-[11px] capitalize text-muted-foreground">
-                    {d.status.replace(/_/g, " ")}
-                    {d.acknowledgement_required ? " · acknowledgement required" : ""}
-                  </p>
-                </div>
-                {d.public_token && (
-                  <Button
-                    asChild
-                    size="sm"
-                    variant="outline"
-                    className="shrink-0"
-                  >
-                    <Link href={`/w/${d.public_token}`} target="_blank">
-                      Open <ExternalLink />
-                    </Link>
-                  </Button>
-                )}
-              </li>
-            ))}
+            {documents.map((d) => {
+              const needsAck =
+                d.acknowledgement_required && d.status !== "acknowledged";
+              return (
+                <li
+                  key={d.id}
+                  className="flex items-center justify-between gap-3 px-3 py-3"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">{d.title}</p>
+                    <p className="text-[11px] capitalize text-muted-foreground">
+                      {d.status.replace(/_/g, " ")}
+                      {d.acknowledgement_required
+                        ? " · acknowledgement required"
+                        : ""}
+                    </p>
+                  </div>
+                  {d.public_token && (
+                    <Button
+                      asChild
+                      size="sm"
+                      variant={needsAck ? "default" : "outline"}
+                      className="h-9 shrink-0"
+                    >
+                      <Link href={`/w/${d.public_token}`} target="_blank">
+                        {needsAck ? "Read & acknowledge" : "Read guide"}
+                        <ExternalLink className="h-3.5 w-3.5" />
+                      </Link>
+                    </Button>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         )}
       </CardContent>
@@ -293,7 +354,7 @@ function ContractsSection({
   portalId: string;
 }) {
   return (
-    <Card>
+    <Card id="portal-contracts" className="scroll-mt-20">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
         <CardTitle className="flex items-center gap-2 text-base">
           <FileText className="h-4 w-4" /> Contracts
@@ -315,11 +376,6 @@ function ContractsSection({
             })}
           />
         )}
-        {!isOwner && (
-          <Button size="sm" variant="ghost" disabled>
-            Owner managed
-          </Button>
-        )}
       </CardHeader>
       <CardContent>
         {contracts.length === 0 ? (
@@ -328,31 +384,36 @@ function ContractsSection({
           </p>
         ) : (
           <ul className="divide-y rounded-md border">
-            {contracts.map((c) => (
-              <li
-                key={c.id}
-                className="flex items-center justify-between gap-3 px-3 py-2.5"
-              >
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium">{c.title}</p>
-                  <p className="text-[11px] capitalize text-muted-foreground">
-                    {c.status.replace(/_/g, " ")}
-                  </p>
-                </div>
-                {c.public_token && (
-                  <Button
-                    asChild
-                    size="sm"
-                    variant="outline"
-                    className="shrink-0"
-                  >
-                    <Link href={`/c/${c.public_token}`} target="_blank">
-                      Open <ExternalLink />
-                    </Link>
-                  </Button>
-                )}
-              </li>
-            ))}
+            {contracts.map((c) => {
+              const needsSign =
+                c.status !== "signed" && c.status !== "declined";
+              return (
+                <li
+                  key={c.id}
+                  className="flex items-center justify-between gap-3 px-3 py-3"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">{c.title}</p>
+                    <p className="text-[11px] capitalize text-muted-foreground">
+                      {c.status.replace(/_/g, " ")}
+                    </p>
+                  </div>
+                  {c.public_token && (
+                    <Button
+                      asChild
+                      size="sm"
+                      variant={needsSign ? "default" : "outline"}
+                      className="h-9 shrink-0"
+                    >
+                      <Link href={`/c/${c.public_token}`} target="_blank">
+                        {needsSign ? "Review & sign" : "View"}
+                        <ExternalLink className="h-3.5 w-3.5" />
+                      </Link>
+                    </Button>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         )}
       </CardContent>
@@ -372,7 +433,7 @@ function InvoicesSection({
   portalId: string;
 }) {
   return (
-    <Card>
+    <Card id="portal-invoices" className="scroll-mt-20">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
         <CardTitle className="flex items-center gap-2 text-base">
           <Receipt className="h-4 w-4" /> Invoices
@@ -394,11 +455,6 @@ function InvoicesSection({
             })}
           />
         )}
-        {!isOwner && (
-          <Button size="sm" variant="ghost" disabled>
-            Owner managed
-          </Button>
-        )}
       </CardHeader>
       <CardContent>
         {invoices.length === 0 ? (
@@ -407,47 +463,66 @@ function InvoicesSection({
           </p>
         ) : (
           <ul className="divide-y rounded-md border">
-            {invoices.map((i) => (
-              <li
-                key={i.id}
-                className="flex items-center justify-between gap-3 px-3 py-2.5"
-              >
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium">
-                    {i.invoice_number}
-                  </p>
-                  <p className="text-[11px] text-muted-foreground">
-                    {i.currency} {i.total_amount} ·{" "}
-                    <span className="capitalize">{i.status}</span>
-                  </p>
-                </div>
-                {i.public_token && (
-                  <Button
-                    asChild
-                    size="sm"
-                    variant={i.status === "paid" ? "outline" : "default"}
-                    className="shrink-0"
-                  >
-                    <Link href={`/i/${i.public_token}`} target="_blank">
-                      {i.status === "paid" ? (
-                        <>
-                          View <ExternalLink />
-                        </>
-                      ) : (
-                        <>
-                          Pay <ExternalLink />
-                        </>
-                      )}
-                    </Link>
-                  </Button>
-                )}
-              </li>
-            ))}
+            {invoices.map((i) => {
+              const paid = i.status === "paid";
+              const cancelled = i.status === "cancelled";
+              return (
+                <li
+                  key={i.id}
+                  className="flex items-center justify-between gap-3 px-3 py-3"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">
+                      {i.invoice_number}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground">
+                      <span className="font-medium text-foreground tabular-nums">
+                        {formatPortalCurrency(i.currency, i.total_amount)}
+                      </span>{" "}
+                      ·{" "}
+                      <span
+                        className={
+                          paid
+                            ? "font-medium capitalize text-emerald-600 dark:text-emerald-400"
+                            : cancelled
+                              ? "capitalize text-muted-foreground line-through"
+                              : "capitalize"
+                        }
+                      >
+                        {i.status.replace(/_/g, " ")}
+                      </span>
+                    </p>
+                  </div>
+                  {i.public_token && (
+                    <Button
+                      asChild
+                      size="sm"
+                      variant={paid || cancelled ? "outline" : "default"}
+                      className="h-9 shrink-0"
+                    >
+                      <Link href={`/i/${i.public_token}`} target="_blank">
+                        {paid ? "View receipt" : cancelled ? "View" : "Pay invoice"}
+                        <ExternalLink className="h-3.5 w-3.5" />
+                      </Link>
+                    </Button>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         )}
       </CardContent>
     </Card>
   );
+}
+
+function formatPortalCurrency(currency: string, amount: number): string {
+  if (!Number.isFinite(amount)) return `${currency} 0`;
+  // Use locale formatting so big values read naturally on a phone.
+  return `${currency} ${new Intl.NumberFormat("en-IN", {
+    minimumFractionDigits: Number.isInteger(amount) ? 0 : 2,
+    maximumFractionDigits: 2,
+  }).format(amount)}`;
 }
 
 function FilesSection({
