@@ -28,7 +28,7 @@ export function SidebarNav({ items, collapsed, onNavigate }: SidebarNavProps) {
             href={item.href}
             onClick={onNavigate}
             className={cn(
-              "group relative flex h-9 items-center gap-3 rounded-md px-2.5 text-sm font-medium transition-all duration-150",
+              "group relative flex h-10 items-center gap-3 rounded-md px-2.5 text-sm font-medium transition-all duration-150",
               "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground",
               isActive &&
                 "bg-sidebar-accent text-sidebar-foreground shadow-sm",

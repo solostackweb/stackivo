@@ -3,15 +3,17 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 export function ClientsListSkeleton() {
   return (
-    <div className="space-y-8">
-      <div className="flex items-end justify-between">
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="space-y-2">
-          <Skeleton className="h-7 w-32" />
-          <Skeleton className="h-4 w-72" />
+          <Skeleton className="h-7 w-24" />
+          <Skeleton className="hidden h-4 w-64 sm:block" />
         </div>
         <Skeleton className="h-9 w-28" />
       </div>
 
+      {/* Stats */}
       <div className="grid gap-4 sm:grid-cols-3">
         {Array.from({ length: 3 }).map((_, i) => (
           <div key={i} className="rounded-lg border bg-card p-4">
@@ -21,24 +23,32 @@ export function ClientsListSkeleton() {
         ))}
       </div>
 
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex gap-2">
-            <Skeleton className="h-9 w-72" />
-            <Skeleton className="h-9 w-32" />
-            <Skeleton className="h-9 w-32" />
+      {/* Toolbar */}
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <Skeleton className="h-9 w-full sm:max-w-xs" />
+        <Skeleton className="h-9 w-full sm:w-40" />
+      </div>
+
+      {/* Mobile: card skeletons */}
+      <div className="space-y-2 md:hidden">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="flex items-center gap-3 rounded-xl border bg-card p-3">
+            <Skeleton className="h-10 w-10 shrink-0 rounded-full" />
+            <div className="min-w-0 flex-1 space-y-1.5">
+              <Skeleton className="h-4 w-36" />
+              <Skeleton className="h-3 w-48" />
+            </div>
+            <Skeleton className="h-8 w-8 shrink-0 rounded-md" />
           </div>
-          <div className="flex gap-2">
-            <Skeleton className="h-9 w-28" />
-            <Skeleton className="h-9 w-24" />
-          </div>
-        </div>
-        <div className="rounded-md border bg-card">
-          <Skeleton className="h-10 w-full rounded-none" />
-          {Array.from({ length: 8 }).map((_, i) => (
-            <Skeleton key={i} className="h-14 w-full rounded-none border-t" />
-          ))}
-        </div>
+        ))}
+      </div>
+
+      {/* Desktop: table skeleton */}
+      <div className="hidden rounded-md border bg-card md:block">
+        <Skeleton className="h-10 w-full rounded-none" />
+        {Array.from({ length: 8 }).map((_, i) => (
+          <Skeleton key={i} className="h-14 w-full rounded-none border-t" />
+        ))}
       </div>
     </div>
   );

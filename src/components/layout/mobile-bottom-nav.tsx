@@ -63,19 +63,26 @@ export function MobileBottomNav() {
           const content = (
             <span
               className={cn(
-                "relative flex h-14 flex-col items-center justify-center gap-0.5 text-[10.5px] font-medium tracking-tight transition-colors",
+                "relative flex h-14 flex-col items-center justify-center gap-0.5 text-[10.5px] font-medium tracking-tight transition-colors duration-150",
                 active
                   ? "text-primary"
                   : "text-muted-foreground hover:text-foreground",
               )}
             >
-              {active && (
-                <span
-                  aria-hidden
-                  className="absolute -top-px h-[2px] w-8 rounded-b-full bg-primary"
-                />
-              )}
-              <Icon className="h-[18px] w-[18px]" aria-hidden />
+              <span
+                aria-hidden
+                className={cn(
+                  "absolute -top-px h-[2px] rounded-b-full bg-primary transition-all duration-200",
+                  active ? "w-8 opacity-100" : "w-0 opacity-0",
+                )}
+              />
+              <Icon
+                className={cn(
+                  "transition-transform duration-150",
+                  active ? "h-5 w-5" : "h-[18px] w-[18px]",
+                )}
+                aria-hidden
+              />
               <span>{item.title}</span>
             </span>
           );

@@ -61,7 +61,7 @@ export function ContractMobileCard({
     <Link
       href={`/dashboard/contracts/${contract.id}`}
       className={cn(
-        "group relative flex w-full flex-col gap-2 rounded-xl border bg-card p-3.5 text-left shadow-sm transition-colors active:bg-muted/40",
+        "tap-scale group relative flex w-full flex-col gap-2 rounded-xl border bg-card p-3.5 text-left shadow-sm transition-colors active:bg-muted/40",
       )}
     >
       <div className="flex items-start gap-3">
@@ -102,7 +102,7 @@ export function ContractMobileCard({
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-7 w-7 text-muted-foreground"
+                className="h-9 w-9 text-muted-foreground"
                 aria-label="Contract actions"
                 onClick={(e) => {
                   e.preventDefault();

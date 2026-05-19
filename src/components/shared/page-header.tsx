@@ -23,9 +23,7 @@ export function PageHeader({ title, description, actions, className }: PageHeade
           {title}
         </h1>
         {description ? (
-          // Description is supporting text — hide it on phones to cut
-          // visual clutter. Stays visible from sm: upward.
-          <p className="hidden text-sm leading-relaxed text-muted-foreground sm:block">
+          <p className="text-xs leading-relaxed text-muted-foreground xs:text-sm">
             {description}
           </p>
         ) : null}
