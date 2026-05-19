@@ -1,46 +1,43 @@
 import "server-only";
 
 /**
- * Invoice PDF.
+ * Invoice PDF — redesigned to mirror the public invoice web page.
  *
- * Premium, financial-grade layout built on the shared `primitives` +
- * brand resolver. Page composition:
+ * Layout (matches /i/[token] exactly):
+ *   1. Brand accent bar (full-width, top of page)
+ *   2. Header   — logo + business name/email left │ INVOICE eyebrow + number + badge right
+ *   3. Hero row — "Amount Due / INR X" left       │ Issue date / Due date / Type right
+ *   4. Parties  — From left                       │ Billed To right   (vertical divider)
+ *   5. Line items table
+ *   6. Totals (right-aligned)
+ *   7. Notes / Terms (side-by-side if both present)
+ *   8. Signature (left-aligned)
+ *   9. Fixed branded footer
  *
- *   1. Top accent rule (brand colour)
- *   2. Branded header — logo, business name, contact / GSTIN
- *      Right column carries an eyebrow ("TAX INVOICE"), the invoice
- *      number, and a status badge (paid / overdue / sent / etc.).
- *   3. Amount hero — black surface, big total, "Due {date}" or
- *      "Paid {date}" sub-line.
- *   4. Meta grid — issue date, due date, doc type.
- *   5. Party pair — Billed to / From.
- *   6. Line items table — branded header row, zebra rows, right-aligned
- *      numerics.
- *   7. Totals block — subtotal / GST split / GRAND TOTAL (brand colour).
- *   8. Payment confirmation card — when paid: method, reference, paid date.
- *   9. Notes / Terms — left-rule callouts.
- *  10. Signature block — when present.
- *  11. Fixed branded footer with page numbers.
- *
- * All styling decisions live in `theme.ts` + `primitives.tsx`. This file
- * is a layout description, not a CSS dump.
+ * Everything is written inline — no heavy primitives wrappers that fight
+ * with react-pdf's layout model. The helpers (formatDate, formatCurrency,
+ * SignatureBlock, NoteBlock, LineItemsTable, DocumentFooter, Badge) are
+ * still imported from ./primitives.
  */
 
 import * as React from "react";
-import { Document, Text, View, StyleSheet } from "@react-pdf/renderer";
-import { pdfColors, pdfFonts, pdfSizes, pdfSpacing, pdfRadii, pdfTracking, pdfPage } from "./theme";
+import { Document, Image, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
+import {
+  pdfColors,
+  pdfFonts,
+  pdfLineHeights,
+  pdfPage,
+  pdfRadii,
+  pdfSizes,
+  pdfSpacing,
+  pdfTracking,
+} from "./theme";
 import { resolveBrand, type ResolvedBrand } from "./brand";
 import {
-  AmountHero,
   Badge,
   DocumentFooter,
-  DocumentHeader,
-  DocumentPage,
   LineItemsTable,
-  MetaGrid,
   NoteBlock,
-  PartyPair,
-  Section,
   SignatureBlock,
   TableCellText,
   TotalsBlock,
@@ -52,7 +49,9 @@ import {
 } from "./primitives";
 import type { UserProfileRow } from "@/lib/supabase/types";
 
-// --- Data shape (unchanged contract with builders.ts) -----------------------
+// ---------------------------------------------------------------------------
+// Data shapes (unchanged contract with builders.ts)
+// ---------------------------------------------------------------------------
 
 export interface InvoicePdfItem {
   description: string;
@@ -117,24 +116,147 @@ export interface InvoicePdfData {
   client: InvoicePdfClient;
 }
 
-// --- Template ---------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Stylesheet — all values from theme tokens, nothing magic inline
+// ---------------------------------------------------------------------------
 
-const paymentCardStyles = StyleSheet.create({
-  wrap: {
+const PAD = pdfSpacing.pagePadding; // 40
+
+const s = StyleSheet.create({
+  page: {
+    fontFamily: pdfFonts.base,
+    fontSize: pdfSizes.base,
+    color: pdfColors.foreground,
+    backgroundColor: pdfColors.surface,
+    paddingHorizontal: PAD,
+    paddingTop: PAD,
+    paddingBottom: PAD + 28, // room for fixed footer
+    lineHeight: pdfLineHeights.normal,
+  },
+
+  // ── accent bar ──────────────────────────────────────────────────────────
+  accentBar: {
+    height: 4,
+    marginHorizontal: -PAD,
+    marginTop: -PAD,
+    marginBottom: 18,
+  },
+
+  // ── shared row separator ────────────────────────────────────────────────
+  sep: {
+    borderBottomWidth: 0.5,
+    borderBottomColor: pdfColors.border,
+    marginBottom: 14,
+    paddingBottom: 14,
+  },
+
+  // ── header ──────────────────────────────────────────────────────────────
+  header: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: pdfSpacing.sectionGap,
+    alignItems: "flex-start",
   },
-  card: {
-    width: "55%",
-    borderWidth: 0.5,
-    borderColor: pdfColors.border,
-    borderRadius: pdfRadii.md,
-    padding: pdfSpacing.md,
-    backgroundColor: pdfColors.surfaceMuted,
+  headerLeft: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    maxWidth: "58%",
   },
-  cardEmpty: { backgroundColor: pdfColors.surface },
-  label: {
+  logo: {
+    width: 40,
+    height: 40,
+    objectFit: "contain",
+    marginRight: 10,
+    borderRadius: pdfRadii.sm,
+  },
+  businessName: {
+    fontFamily: pdfFonts.bold,
+    fontSize: pdfSizes.md,
+    color: pdfColors.foreground,
+    lineHeight: pdfLineHeights.tight,
+    marginBottom: 3,
+  },
+  headerLine: {
+    fontSize: pdfSizes.xs,
+    color: pdfColors.mutedForeground,
+    marginTop: 2,
+  },
+  headerRight: {
+    alignItems: "flex-end",
+  },
+  docEyebrow: {
+    fontFamily: pdfFonts.bold,
+    fontSize: pdfSizes.eyebrow,
+    textTransform: "uppercase",
+    letterSpacing: pdfTracking.wider,
+    marginBottom: 5,
+  },
+  invoiceNumber: {
+    fontFamily: pdfFonts.bold,
+    fontSize: 22,
+    color: pdfColors.foreground,
+    letterSpacing: pdfTracking.tight,
+    lineHeight: pdfLineHeights.tight,
+    marginBottom: 6,
+  },
+
+  // ── hero row ────────────────────────────────────────────────────────────
+  hero: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+  },
+  amountEyebrow: {
+    fontFamily: pdfFonts.bold,
+    fontSize: pdfSizes.eyebrow,
+    color: pdfColors.mutedForeground,
+    textTransform: "uppercase",
+    letterSpacing: pdfTracking.wider,
+    marginBottom: 5,
+  },
+  amountValue: {
+    fontFamily: pdfFonts.bold,
+    fontSize: 28,
+    color: pdfColors.foreground,
+    letterSpacing: pdfTracking.tight,
+    lineHeight: pdfLineHeights.tight,
+  },
+  amountSub: {
+    fontSize: pdfSizes.sm,
+    marginTop: 5,
+  },
+  dateGrid: {
+    alignItems: "flex-end",
+  },
+  dateLabel: {
+    fontFamily: pdfFonts.bold,
+    fontSize: pdfSizes.eyebrow,
+    color: pdfColors.mutedForeground,
+    textTransform: "uppercase",
+    letterSpacing: pdfTracking.wider,
+    marginBottom: 2,
+  },
+  dateValue: {
+    fontFamily: pdfFonts.bold,
+    fontSize: pdfSizes.sm,
+    color: pdfColors.foreground,
+    marginBottom: 8,
+  },
+
+  // ── parties ─────────────────────────────────────────────────────────────
+  parties: {
+    flexDirection: "row",
+  },
+  partyCol: {
+    flex: 1,
+  },
+  partyColRight: {
+    flex: 1,
+    paddingLeft: 20,
+    borderLeftWidth: 0.5,
+    borderLeftColor: pdfColors.border,
+    marginLeft: 20,
+  },
+  partyEyebrow: {
     fontFamily: pdfFonts.bold,
     fontSize: pdfSizes.eyebrow,
     color: pdfColors.mutedForeground,
@@ -142,20 +264,36 @@ const paymentCardStyles = StyleSheet.create({
     letterSpacing: pdfTracking.wider,
     marginBottom: 6,
   },
-  big: {
+  partyName: {
     fontFamily: pdfFonts.bold,
-    fontSize: pdfSizes.md,
-    color: pdfColors.foreground,
-    marginBottom: 6,
-  },
-  row: { flexDirection: "row", justifyContent: "space-between", marginTop: 3 },
-  rowLabel: { fontSize: pdfSizes.xs, color: pdfColors.mutedForeground },
-  rowValue: {
     fontSize: pdfSizes.sm,
-    fontFamily: pdfFonts.semibold,
     color: pdfColors.foreground,
+    marginBottom: 4,
+  },
+  partyLine: {
+    fontSize: pdfSizes.xs,
+    color: pdfColors.mutedForeground,
+    marginTop: 2,
+    lineHeight: pdfLineHeights.snug,
+  },
+
+  // ── notes / terms side by side ──────────────────────────────────────────
+  notesRow: {
+    flexDirection: "row",
+    marginTop: 6,
+  },
+  notesLeft: {
+    flex: 1,
+    marginRight: 16,
+  },
+  notesRight: {
+    flex: 1,
   },
 });
+
+// ---------------------------------------------------------------------------
+// Template
+// ---------------------------------------------------------------------------
 
 export function InvoicePdf({
   data,
@@ -163,15 +301,10 @@ export function InvoicePdf({
   logoDataUrl,
 }: {
   data: InvoicePdfData;
-  /** Optional fully-typed seller row — preferred. Falls back to data.seller. */
   seller?: UserProfileRow | null;
   logoDataUrl?: string | null;
 }) {
-  // Build the brand snapshot. Prefer a real seller row if provided; otherwise
-  // shim the few fields the brand resolver needs from `data.seller` so this
-  // template still works when called from older code paths.
   const brand = buildBrandFromData(data, seller, logoDataUrl);
-
   const docLabel = data.taxMode === "non_gst" ? "Invoice" : "Tax Invoice";
   const totals = resolveTotals(data);
   const isPaid = data.status === "paid";
@@ -189,12 +322,19 @@ export function InvoicePdf({
       ? "Partially paid"
       : data.status.replace(/_/g, " ");
 
-  const heroEyebrow = isPaid
+  const amountEyebrow = isPaid
     ? "Amount paid"
     : isOverdue
       ? "Amount overdue"
       : "Amount due";
-  const heroSub = isPaid
+
+  const amountSubColor = isPaid
+    ? pdfColors.success
+    : isOverdue
+      ? pdfColors.danger
+      : pdfColors.mutedForeground;
+
+  const amountSubText = isPaid
     ? `Paid on ${formatDate(data.paidAt ?? data.paymentRecordedAt)}`
     : `Due ${formatDate(data.dueDate)}`;
 
@@ -204,198 +344,181 @@ export function InvoicePdf({
       author={brand.businessName}
       subject={`${docLabel} for ${data.client.name}`}
     >
-      <DocumentPage brand={brand}>
-        {/* Accent rule — brand colour, full page width, fixed to top. */}
-        <View
-          fixed
-          style={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            width: pdfPage.width,
-            height: 4,
-            backgroundColor: brand.accent,
-          }}
-        />
-        <DocumentHeader
-          brand={brand}
-          eyebrow={docLabel.toUpperCase()}
-          title={data.invoiceNumber}
-          subtitle={
-            data.classification === "b2b"
-              ? "B2B"
-              : data.classification === "b2c"
-                ? "B2C"
-                : undefined
-          }
-          decoration={
-            <Badge
-              tone={statusTone}
-              brandAccent={brand.accent}
-              label={statusLabel}
-            />
-          }
-        />
+      <Page size="A4" style={s.page}>
 
-        <AmountHero
-          eyebrow={heroEyebrow}
-          amount={formatCurrency(totals.paidAmount, data.currency)}
-          sub={heroSub}
-        />
+        {/* ── 1. ACCENT BAR ─────────────────────────────────── */}
+        <View style={[s.accentBar, { backgroundColor: brand.accent }]} />
 
-        <MetaGrid
-          items={[
-            { label: "Issue date", value: formatDate(data.issueDate) },
-            {
-              label: isPaid ? "Payment date" : "Due date",
-              value: formatDate(
-                isPaid
-                  ? data.paidAt ?? data.paymentRecordedAt ?? data.dueDate
-                  : data.dueDate,
-              ),
-            },
-            {
-              label: "Document",
-              value: docLabel,
-            },
-          ]}
-        />
-
-        <PartyPair
-          left={{
-            label: "Billed to",
-            name: data.client.name,
-            lines: [
-              ...(data.client.companyName ? [data.client.companyName] : []),
-              ...data.client.addressLines.slice(0, 4),
-              ...(data.client.email ? [data.client.email] : []),
-              ...(data.client.phone ? [data.client.phone] : []),
-              ...(data.client.gstin ? [`GSTIN: ${data.client.gstin}`] : []),
-              ...(data.client.stateCode
-                ? [`State code: ${data.client.stateCode}`]
-                : []),
-            ],
-          }}
-          right={{
-            label: "From",
-            name: brand.businessName,
-            lines: [
-              ...(brand.legalName ? [brand.legalName] : []),
-              ...brand.addressLines.slice(0, 4),
-              ...(brand.contact.email ? [brand.contact.email] : []),
-              ...(brand.contact.phone ? [brand.contact.phone] : []),
-              ...(brand.gstin ? [`GSTIN: ${brand.gstin}`] : []),
-              ...(brand.stateCode ? [`State code: ${brand.stateCode}`] : []),
-              data.taxMode === "non_gst"
-                ? "Standard non-GST invoice"
-                : "GST tax invoice",
-            ],
-          }}
-        />
-
-        <Section eyebrow="Line items">
-          <LineItemsTable<InvoicePdfItem>
-            brand={brand}
-            rows={data.items}
-            columns={INVOICE_COLUMNS(data)}
-          />
-        </Section>
-
-        {/* Payment confirmation + totals row */}
-        <View style={paymentCardStyles.wrap} wrap={false}>
-          <View
-            style={[
-              paymentCardStyles.card,
-              ...(isPaid ? [] : [paymentCardStyles.cardEmpty]),
-            ]}
-          >
-            <Text style={paymentCardStyles.label}>
-              {isPaid ? "Payment confirmation" : "Payment instructions"}
-            </Text>
-            {isPaid ? (
-              <>
-                <Text style={paymentCardStyles.big}>
-                  Paid on{" "}
-                  {formatDate(data.paidAt ?? data.paymentRecordedAt)}
-                </Text>
-                {data.paymentMethod ? (
-                  <View style={paymentCardStyles.row}>
-                    <Text style={paymentCardStyles.rowLabel}>Method</Text>
-                    <Text style={paymentCardStyles.rowValue}>
-                      {data.paymentMethod}
-                    </Text>
-                  </View>
-                ) : null}
-                {data.paymentReference ? (
-                  <View style={paymentCardStyles.row}>
-                    <Text style={paymentCardStyles.rowLabel}>Reference</Text>
-                    <Text style={paymentCardStyles.rowValue}>
-                      {data.paymentReference}
-                    </Text>
-                  </View>
-                ) : null}
-              </>
-            ) : (
-              <Text
-                style={{
-                  fontSize: pdfSizes.sm,
-                  color: pdfColors.mutedForeground,
-                }}
-              >
-                {data.publicUrl
-                  ? "Pay online through your secure invoice link, or contact us for bank/UPI details."
-                  : "Please pay using the bank or UPI details shared with this invoice."}
-              </Text>
-            )}
+        {/* ── 2. HEADER ─────────────────────────────────────── */}
+        <View style={[s.header, s.sep]}>
+          {/* Left: brand identity */}
+          <View style={s.headerLeft}>
+            {brand.logoUrl ? (
+              // eslint-disable-next-line jsx-a11y/alt-text
+              <Image src={brand.logoUrl} style={s.logo} />
+            ) : null}
+            <View>
+              <Text style={s.businessName}>{brand.businessName}</Text>
+              {brand.legalName ? (
+                <Text style={s.headerLine}>{brand.legalName}</Text>
+              ) : null}
+              {brand.contact.email ? (
+                <Text style={s.headerLine}>{brand.contact.email}</Text>
+              ) : null}
+              {brand.contact.phone ? (
+                <Text style={s.headerLine}>{brand.contact.phone}</Text>
+              ) : null}
+              {brand.gstin ? (
+                <Text style={s.headerLine}>GSTIN: {brand.gstin}</Text>
+              ) : null}
+            </View>
           </View>
-          <TotalsBlock
-            brandAccent={brand.accent}
-            rows={buildTotalsRows(data, totals)}
-            grand={{
-              label: isPaid ? "Total paid" : "Amount due",
-              value: formatCurrency(totals.total, data.currency),
-            }}
-          />
+
+          {/* Right: document identity */}
+          <View style={s.headerRight}>
+            <Text style={[s.docEyebrow, { color: brand.accent }]}>
+              {docLabel.toUpperCase()}
+            </Text>
+            <Text style={s.invoiceNumber}>{data.invoiceNumber}</Text>
+            <Badge tone={statusTone} brandAccent={brand.accent} label={statusLabel} />
+          </View>
         </View>
 
-        {data.notes ? (
-          <NoteBlock label="Notes" accent={brand.accent}>
-            {data.notes}
-          </NoteBlock>
-        ) : null}
-        {data.terms ? (
-          <NoteBlock label="Terms" accent={brand.accent}>
-            {data.terms}
-          </NoteBlock>
-        ) : null}
+        {/* ── 3. HERO — Amount left, dates right ────────────── */}
+        <View style={[s.hero, s.sep]}>
+          {/* Amount */}
+          <View>
+            <Text style={s.amountEyebrow}>{amountEyebrow}</Text>
+            <Text style={s.amountValue}>
+              {formatCurrency(totals.paidAmount, data.currency)}
+            </Text>
+            <Text style={[s.amountSub, { color: amountSubColor }]}>
+              {amountSubText}
+            </Text>
+          </View>
 
-        {data.seller.signature ? (
-          <View style={{ alignItems: "flex-end" }}>
-            <SignatureBlock
-              label="Authorised signature"
-              signature={data.seller.signature}
-              fallbackName={brand.businessName}
-            />
+          {/* Dates grid */}
+          <View style={s.dateGrid}>
+            <Text style={s.dateLabel}>Issue date</Text>
+            <Text style={s.dateValue}>{formatDate(data.issueDate)}</Text>
+            <Text style={s.dateLabel}>Due date</Text>
+            <Text
+              style={[
+                s.dateValue,
+                { color: isOverdue ? pdfColors.danger : pdfColors.foreground },
+              ]}
+            >
+              {formatDate(data.dueDate)}
+            </Text>
+            <Text style={s.dateLabel}>Type</Text>
+            <Text style={[s.dateValue, { marginBottom: 0 }]}>{docLabel}</Text>
+          </View>
+        </View>
+
+        {/* ── 4. PARTIES ────────────────────────────────────── */}
+        <View style={[s.parties, s.sep]}>
+          {/* From */}
+          <View style={s.partyCol}>
+            <Text style={s.partyEyebrow}>From</Text>
+            <Text style={s.partyName}>{brand.businessName}</Text>
+            {brand.addressLines.slice(0, 2).map((line, i) => (
+              <Text key={i} style={s.partyLine}>{line}</Text>
+            ))}
+            {brand.contact.email ? (
+              <Text style={s.partyLine}>{brand.contact.email}</Text>
+            ) : null}
+            {brand.gstin ? (
+              <Text style={s.partyLine}>GSTIN: {brand.gstin}</Text>
+            ) : null}
+          </View>
+
+          {/* Billed to */}
+          <View style={s.partyColRight}>
+            <Text style={s.partyEyebrow}>Billed To</Text>
+            <Text style={s.partyName}>{data.client.name}</Text>
+            {data.client.companyName ? (
+              <Text style={s.partyLine}>{data.client.companyName}</Text>
+            ) : null}
+            {data.client.email ? (
+              <Text style={s.partyLine}>{data.client.email}</Text>
+            ) : null}
+            {data.client.phone ? (
+              <Text style={s.partyLine}>{data.client.phone}</Text>
+            ) : null}
+            {data.client.gstin ? (
+              <Text style={s.partyLine}>GSTIN: {data.client.gstin}</Text>
+            ) : null}
+            {data.client.addressLines.slice(0, 2).map((line, i) => (
+              <Text key={i} style={s.partyLine}>{line}</Text>
+            ))}
+          </View>
+        </View>
+
+        {/* ── 5. LINE ITEMS ─────────────────────────────────── */}
+        <LineItemsTable<InvoicePdfItem>
+          brand={brand}
+          rows={data.items}
+          columns={INVOICE_COLUMNS(data)}
+        />
+
+        {/* ── 6. TOTALS ─────────────────────────────────────── */}
+        <TotalsBlock
+          brandAccent={brand.accent}
+          rows={buildTotalsRows(data, totals)}
+          grand={{
+            label: isPaid ? "Total paid" : "Amount due",
+            value: formatCurrency(totals.total, data.currency),
+          }}
+        />
+
+        {/* ── 7. NOTES / TERMS ──────────────────────────────── */}
+        {(data.notes || data.terms) ? (
+          <View style={s.notesRow}>
+            {data.notes ? (
+              <View style={data.terms ? s.notesLeft : { flex: 1 }}>
+                <NoteBlock label="Notes" accent={brand.accent}>
+                  {data.notes}
+                </NoteBlock>
+              </View>
+            ) : null}
+            {data.terms ? (
+              <View style={data.notes ? s.notesRight : { flex: 1 }}>
+                <NoteBlock label="Terms" accent={brand.accent}>
+                  {data.terms}
+                </NoteBlock>
+              </View>
+            ) : null}
           </View>
         ) : null}
 
+        {/* ── 8. SIGNATURE ──────────────────────────────────── */}
+        {data.seller.signature ? (
+          <SignatureBlock
+            label="Authorised signature"
+            signature={data.seller.signature}
+            fallbackName={brand.businessName}
+          />
+        ) : null}
+
+        {/* ── 9. FOOTER (fixed on every page) ───────────────── */}
         <DocumentFooter
           brand={brand}
           label={`${docLabel} ${data.invoiceNumber}`}
         />
-      </DocumentPage>
+      </Page>
     </Document>
   );
 }
 
-// --- Helpers ---------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Column definitions
+// ---------------------------------------------------------------------------
 
 function INVOICE_COLUMNS(data: InvoicePdfData): TableColumn<InvoicePdfItem>[] {
   return [
     {
       key: "desc",
       header: "Description",
-      // Narrower description to give number columns more room.
       flex: 3,
       render: (it) => <TableCellText>{it.description}</TableCellText>,
     },
@@ -406,14 +529,15 @@ function INVOICE_COLUMNS(data: InvoicePdfData): TableColumn<InvoicePdfItem>[] {
       align: "right",
       render: (it) => (
         <TableCellText align="right">
-          {Number.isInteger(it.quantity) ? String(it.quantity) : it.quantity.toFixed(2)}
+          {Number.isInteger(it.quantity)
+            ? String(it.quantity)
+            : it.quantity.toFixed(2)}
         </TableCellText>
       ),
     },
     {
       key: "rate",
       header: "Rate",
-      // Wider so ₹1,50,000 style values don't visually bleed.
       flex: 1.5,
       align: "right",
       render: (it) => (
@@ -436,7 +560,6 @@ function INVOICE_COLUMNS(data: InvoicePdfData): TableColumn<InvoicePdfItem>[] {
     {
       key: "amount",
       header: "Amount",
-      // Widest column — always the rightmost and the largest number.
       flex: 1.6,
       align: "right",
       render: (it) => (
@@ -448,35 +571,31 @@ function INVOICE_COLUMNS(data: InvoicePdfData): TableColumn<InvoicePdfItem>[] {
   ];
 }
 
+// ---------------------------------------------------------------------------
+// Totals rows
+// ---------------------------------------------------------------------------
+
 function buildTotalsRows(
   data: InvoicePdfData,
   totals: ReturnType<typeof resolveTotals>,
 ): { label: string; value: string }[] {
   const rows: { label: string; value: string }[] = [
-    {
-      label: "Subtotal",
-      value: formatCurrency(totals.subtotal, data.currency),
-    },
+    { label: "Subtotal", value: formatCurrency(totals.subtotal, data.currency) },
   ];
   if (data.taxMode === "cgst_sgst") {
-    rows.push({
-      label: "CGST",
-      value: formatCurrency(totals.cgstAmount, data.currency),
-    });
-    rows.push({
-      label: "SGST",
-      value: formatCurrency(totals.sgstAmount, data.currency),
-    });
+    rows.push({ label: "CGST", value: formatCurrency(totals.cgstAmount, data.currency) });
+    rows.push({ label: "SGST", value: formatCurrency(totals.sgstAmount, data.currency) });
   } else if (data.taxMode === "igst") {
-    rows.push({
-      label: "IGST",
-      value: formatCurrency(totals.igstAmount, data.currency),
-    });
+    rows.push({ label: "IGST", value: formatCurrency(totals.igstAmount, data.currency) });
   } else {
     rows.push({ label: "GST", value: "Not applicable" });
   }
   return rows;
 }
+
+// ---------------------------------------------------------------------------
+// Brand resolver
+// ---------------------------------------------------------------------------
 
 function buildBrandFromData(
   data: InvoicePdfData,
@@ -486,9 +605,6 @@ function buildBrandFromData(
   if (seller) {
     return resolveBrand(seller, logoDataUrl ?? data.seller.logoDataUrl);
   }
-  // Synthesise a minimal UserProfileRow-shaped object so resolveBrand
-  // produces a clean brand without us duplicating its logic. Falling back
-  // is rare — almost every caller has a real seller row.
   const shim = {
     business_name: data.seller.businessName,
     company_name: null,
@@ -513,6 +629,10 @@ function buildBrandFromData(
   } as unknown as UserProfileRow;
   return resolveBrand(shim, data.seller.logoDataUrl);
 }
+
+// ---------------------------------------------------------------------------
+// Math helpers
+// ---------------------------------------------------------------------------
 
 function resolveTotals(data: InvoicePdfData) {
   const lineSubtotal = round(
@@ -559,3 +679,6 @@ function pos(value: number | null | undefined, fallback: number): number {
   const n = safe(value);
   return n > 0 ? n : fallback;
 }
+
+// Keep pdfPage imported to avoid unused-import lint errors from the barrel.
+void pdfPage;
