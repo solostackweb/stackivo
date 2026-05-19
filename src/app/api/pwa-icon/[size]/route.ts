@@ -27,19 +27,7 @@ export async function GET(
   const scale = maskable ? 0.78 : 1;
   const inner = Math.round(size * scale);
 
-  // Proportions from StackivoMark (stackivo-logo.tsx) viewBox 0 0 512 512:
-  //   bar width   = 280 / 512 ≈ 54.7 %
-  //   bar height  =  76 / 512 ≈ 14.8 %
-  //   bar radius  =  38 / 512 ≈  7.4 %
-  //   h-offset    =  40 / 512 ≈  7.8 %  (bar2 x=136 vs bar1 x=96)
-  //   gap         =  64 / 512 ≈ 12.5 %  (y=288 minus y=148 minus h=76 = 64)
-  //   left pad    =  96 / 512 ≈ 18.75 % (bar1 starts at x=96)
-  const barW = Math.round(inner * 0.547);
-  const barH = Math.round(inner * 0.148);
-  const barR = Math.round(inner * 0.074);
-  const offset = Math.round(inner * 0.078);
-  const gap = Math.round(inner * 0.125);
-  const leftPad = Math.round(inner * 0.1875);
+  // Icon uses the same SVG geometry as StackivoMark (viewBox 0 0 512 512).
 
   const tree = h(
     "div",
@@ -55,32 +43,29 @@ export async function GET(
       },
     },
     h(
-      "div",
+      "svg",
       {
-        style: {
-          display: "flex",
-          flexDirection: "column",
-          gap,
-          width: barW + offset + leftPad,
-        },
+        width: inner,
+        height: inner,
+        viewBox: "0 0 512 512",
+        xmlns: "http://www.w3.org/2000/svg",
+        style: { display: "block" },
       },
-      h("div", {
-        style: {
-          width: barW,
-          height: barH,
-          background: "white",
-          borderRadius: barR,
-          marginLeft: leftPad,
-        },
+      h("rect", {
+        x: 96,
+        y: 148,
+        width: 280,
+        height: 76,
+        rx: 38,
+        fill: "#FFFFFF",
       }),
-      h("div", {
-        style: {
-          width: barW,
-          height: barH,
-          background: "rgba(255,255,255,0.92)",
-          borderRadius: barR,
-          marginLeft: leftPad + offset,
-        },
+      h("rect", {
+        x: 136,
+        y: 288,
+        width: 280,
+        height: 76,
+        rx: 38,
+        fill: "rgba(255,255,255,0.92)",
       }),
     ),
   );

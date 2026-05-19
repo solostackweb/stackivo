@@ -79,7 +79,7 @@ export function InstallPrompt() {
   if (standalone || installed) return null;
   if (shouldHide(pathname)) return null;
 
-  // Android / desktop Chrome path — shown only when the browser hands us
+  // Android / desktop Chrome path — shown when the browser hands us
   // a deferred prompt.
   if (canInstall && !android.dismissed) {
     return (
@@ -105,6 +105,25 @@ export function InstallPrompt() {
             <Download className="h-3.5 w-3.5" />
             Install
           </Button>
+        }
+      />
+    );
+  }
+
+  // Fallback for Android/desktop when the deferred prompt is not available.
+  if (!ios && !android.dismissed) {
+    return (
+      <Banner
+        onDismiss={android.dismiss}
+        title="Install Stackivo"
+        body={
+          <span className="inline-flex flex-wrap items-center gap-1">
+            Open your browser menu and choose
+            <span className="inline-flex items-center gap-1 rounded-md border bg-muted/60 px-1.5 py-0.5 text-[11px] font-medium">
+              <Download className="h-3 w-3" />
+              Install app
+            </span>
+          </span>
         }
       />
     );
