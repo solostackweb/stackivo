@@ -167,7 +167,7 @@ export function WelcomeListView({ documents }: Props) {
     <div className="space-y-6">
       <PageHeader
         title="Welcome documents"
-        description="Onboarding guides for new clients — set expectations before the work starts."
+        description="One personalised guide per client. Duplicate any document to reuse it for the next client."
         actions={
           <Button asChild size="sm">
             <Link href={WELCOME_DOCUMENT_NEW}>
@@ -228,7 +228,7 @@ export function WelcomeListView({ documents }: Props) {
           }
           description={
             documents.length === 0
-              ? "Pick a template — Service Onboarding, Project Kickoff, or Communication Handbook — and customise it in minutes."
+              ? "Pick a template — Freelancer Onboarding, Agency Client Welcome, or Consultant Pack — and customise it in minutes."
               : "Try a different search term or status filter."
           }
           action={
