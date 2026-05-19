@@ -363,7 +363,6 @@ export async function setInvoiceStatusAction(
     patch.payment_status = "paid";
   }
 
-  const userId = await requireUserId();
   const { data: invoiceRow, error } = await supabase
     .from("invoices")
     .update(patch as never)
