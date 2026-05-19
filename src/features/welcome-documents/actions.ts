@@ -525,9 +525,13 @@ export async function acknowledgeWelcomeDocumentAction(
   if (!result.ok) {
     return { ok: false, error: result.error ?? "Could not save." };
   }
-  // No revalidatePath — the public viewer is on the (public) layout
-  // and uses dynamic = "force-dynamic", so the next request will pick
-  // up the new state automatically.
+  // Bust the freelancer's dashboard cache so the acknowledgement count
+  // and "acknowledged" status appear immediately on their detail page.
+  if (result.ack) {
+    const docId = result.ack.document_id;
+    revalidatePath(WELCOME_DOCUMENTS_INDEX);
+    revalidatePath(welcomeDocumentDetail(docId));
+  }
   return {
     ok: true,
     data: { acknowledgedAt: result.ack!.acknowledged_at },

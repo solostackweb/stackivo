@@ -89,7 +89,7 @@ const coverStyles = StyleSheet.create({
   },
   hero: {
     width: pdfPage.width,
-    height: pdfPage.height * 0.6,
+    minHeight: pdfPage.height * 0.52,
     padding: pdfSpacing["3xl"],
     justifyContent: "space-between",
   },
@@ -262,14 +262,16 @@ export function WelcomeDocumentPdf({
                 </Text>
               </View>
             ) : null}
-            <View style={coverStyles.metaCard}>
-              <Text style={[coverStyles.metaLabel, { color: brand.onAccent }]}>
-                Pages
-              </Text>
-              <Text style={[coverStyles.metaValue, { color: brand.onAccent }]}>
-                {1 + Math.max(1, Math.ceil(data.sections.length / 3))}
-              </Text>
-            </View>
+            {data.sections.length > 0 ? (
+              <View style={coverStyles.metaCard}>
+                <Text style={[coverStyles.metaLabel, { color: brand.onAccent }]}>
+                  Sections
+                </Text>
+                <Text style={[coverStyles.metaValue, { color: brand.onAccent }]}>
+                  {data.sections.length}
+                </Text>
+              </View>
+            ) : null}
             <View style={coverStyles.metaCard}>
               <Text style={[coverStyles.metaLabel, { color: brand.onAccent }]}>
                 Read time

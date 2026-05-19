@@ -10,6 +10,7 @@ import {
   ArrowDown,
   Eye,
   EyeOff,
+  UserCheck,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -195,23 +196,46 @@ export function WelcomeEditor(props: Props) {
               maxLength={5000}
             />
           </div>
-          <div className="grid gap-4 sm:grid-cols-3">
-            <div>
-              <Label className="text-xs">Client</Label>
-              <Select value={clientId} onValueChange={setClientId}>
-                <SelectTrigger className="mt-1.5 h-9">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={UNASSIGNED}>Unassigned</SelectItem>
-                  {props.clients.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.name}
+          {/* Client assignment — prominent, with model explanation */}
+          <div className="rounded-md border bg-muted/30 p-4">
+            <div className="flex items-start gap-3">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+                <UserCheck className="h-4 w-4" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <Label className="text-sm font-medium">Assign to a client</Label>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Each welcome document is personalised for one client — names, emails,
+                  and the PDF cover all reflect their details.{" "}
+                  <span className="font-medium text-foreground">
+                    To reuse this for another client, duplicate it from the list.
+                  </span>
+                </p>
+                <Select value={clientId} onValueChange={setClientId}>
+                  <SelectTrigger className="mt-2.5 h-9 w-full sm:w-64">
+                    <SelectValue placeholder="Choose a client…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={UNASSIGNED}>
+                      No client (draft / general)
                     </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                    {props.clients.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.name}
+                        {c.email ? (
+                          <span className="ml-1 text-xs text-muted-foreground">
+                            · {c.email}
+                          </span>
+                        ) : null}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <Label htmlFor="wd-brand" className="text-xs">
                 Brand colour
