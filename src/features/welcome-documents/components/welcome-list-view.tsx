@@ -192,8 +192,8 @@ export function WelcomeListView({ documents }: Props) {
         <Stat label="Views" value={stats.totalViews.toString()} />
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="relative flex-1 min-w-[200px] max-w-md">
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+        <div className="relative w-full sm:flex-1 sm:max-w-md">
           <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="Search documents, clients…"
@@ -206,7 +206,7 @@ export function WelcomeListView({ documents }: Props) {
           value={statusFilter}
           onValueChange={(v) => setStatusFilter(v as StatusFilter)}
         >
-          <SelectTrigger className="h-9 w-[160px]">
+          <SelectTrigger className="h-9 w-full sm:w-[160px]">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>

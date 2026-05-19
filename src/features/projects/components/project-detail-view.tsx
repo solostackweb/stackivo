@@ -131,24 +131,24 @@ export function ProjectDetailView({
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <Button asChild variant="ghost" size="icon" className="h-8 w-8">
+        <div className="flex min-w-0 items-center gap-2">
+          <Button asChild variant="ghost" size="icon" className="h-8 w-8 shrink-0">
             <Link href="/dashboard/projects" aria-label="Back to projects">
               <ArrowLeft />
             </Link>
           </Button>
-          <div className="flex items-center gap-1.5 text-sm">
+          <div className="flex min-w-0 items-center gap-1.5 text-sm">
             <Link
               href="/dashboard/projects"
-              className="text-muted-foreground hover:text-foreground"
+              className="hidden shrink-0 text-muted-foreground hover:text-foreground sm:inline"
             >
               Projects
             </Link>
-            <span className="text-muted-foreground/50">/</span>
-            <span className="font-medium">{project.name}</span>
+            <span className="hidden text-muted-foreground/50 sm:inline">/</span>
+            <span className="truncate font-medium">{project.name}</span>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button size="sm" variant="outline" onClick={() => setEditOpen(true)}>
             <Pencil /> Edit
           </Button>

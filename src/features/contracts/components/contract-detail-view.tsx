@@ -169,24 +169,24 @@ export function ContractDetailView({
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <Button asChild variant="ghost" size="icon" className="h-8 w-8">
+        <div className="flex min-w-0 items-center gap-2">
+          <Button asChild variant="ghost" size="icon" className="h-8 w-8 shrink-0">
             <Link href="/dashboard/contracts" aria-label="Back to contracts">
               <ArrowLeft />
             </Link>
           </Button>
-          <div className="flex items-center gap-1.5 text-sm">
+          <div className="flex min-w-0 items-center gap-1.5 text-sm">
             <Link
               href="/dashboard/contracts"
-              className="text-muted-foreground hover:text-foreground"
+              className="hidden shrink-0 text-muted-foreground hover:text-foreground sm:inline"
             >
               Contracts
             </Link>
-            <span className="text-muted-foreground/50">/</span>
-            <span className="font-medium">{contract.title}</span>
+            <span className="hidden text-muted-foreground/50 sm:inline">/</span>
+            <span className="truncate font-medium">{contract.title}</span>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {isSignable && (
             <Button size="sm" onClick={handleSendForSignature}>
               <Send /> {contract.status === "draft" ? "Send for signature" : "Resend"}
@@ -266,7 +266,7 @@ export function ContractDetailView({
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,320px)]">
         {/* LEFT — content */}
         <Card>
-          <CardContent className="space-y-6 p-8">
+          <CardContent className="space-y-6 p-5 sm:p-8">
             <header className="border-b pb-6">
               <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                 {CONTRACT_KIND_LABEL[contract.kind]}
