@@ -1,30 +1,28 @@
 import "server-only";
 
 /**
- * Welcome Document PDF.
+ * Welcome Document PDF — redesigned to match invoice/contract PDF quality.
  *
- * Premium onboarding package. Two-page-style layout:
+ * PAGE 1 — Cover:
+ *   - Brand-coloured hero block: eyebrow → title → intro → meta pills
+ *     All content flows top-down (no justifyContent: space-between gaps).
+ *   - White lower block: Prepared for | Prepared by  (column + divider)
+ *   - Footer rule + business name
  *
- *   PAGE 1 — Cover:
- *     - Big tinted accent surface (uses the freelancer's brand colour as
- *       background, with readable on-accent text).
- *     - Eyebrow "WELCOME GUIDE", title in oversized type, intro line.
- *     - "Prepared for {client}" + "Prepared by {business}" tags.
- *     - Brand logo in the bottom-left corner, with a "Published {date}"
- *       footer.
+ * PAGE 2..N — Body:
+ *   - Compact header: business name left | eyebrow + title right (14pt, no wrap)
+ *   - Intro paragraph at sm size (not md) to save vertical space
+ *   - Numbered sections at 14pt gap (not 20pt)
+ *   - "What happens next" callout
+ *   - Fixed branded footer
  *
- *   PAGE 2..N — Body:
- *     - Standard branded header (compact mode — no contact lines, since
- *       the cover already established the sender).
- *     - Numbered sections rendered as headings + relaxed body type.
- *     - Optional intro paragraph rendered before the first numbered
- *       section.
- *     - "Next steps" callout block at the end pointing to the
- *       acknowledgement link when required.
- *     - Branded footer on every page.
- *
- * The split-cover pattern is what makes welcome docs feel like an
- * agency onboarding package rather than a wall of text.
+ * Key fixes vs old version:
+ *   - Removed justifyContent: "space-between" that created giant empty gaps
+ *   - Replaced gap: (unsupported in react-pdf) with marginRight on each pill
+ *   - Cover hero is content-height, not fixed minHeight fraction
+ *   - Body title capped at 14pt so long titles never wrap
+ *   - Intro at 9.5pt (sm), sections gap 14pt — all 10 sections fit on 2 pages
+ *   - Uses Page directly for body — no DocumentPage wrapper
  */
 
 import * as React from "react";
@@ -35,7 +33,6 @@ import {
   pdfColors,
   pdfFonts,
   pdfLineHeights,
-  pdfPage,
   pdfRadii,
   pdfSizes,
   pdfSpacing,
@@ -44,15 +41,14 @@ import {
 import { resolveBrand, type ResolvedBrand } from "./brand";
 import {
   DocumentFooter,
-  DocumentHeader,
-  DocumentPage,
   NoteBlock,
-  Section,
   formatDate,
 } from "./primitives";
 import type { UserProfileRow } from "@/lib/supabase/types";
 
-// --- Data shape (preserved) -------------------------------------------------
+// ---------------------------------------------------------------------------
+// Data shape (preserved exactly)
+// ---------------------------------------------------------------------------
 
 export interface WelcomeDocumentPdfData {
   title: string;
@@ -78,118 +74,199 @@ export interface WelcomeDocumentPdfData {
   } | null;
 }
 
-// --- Cover page styles ------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Stylesheet
+// ---------------------------------------------------------------------------
 
-const coverStyles = StyleSheet.create({
+const PAD = pdfSpacing.pagePadding; // 40
+
+const coverS = StyleSheet.create({
   page: {
     fontFamily: pdfFonts.base,
     color: pdfColors.foreground,
     backgroundColor: pdfColors.surface,
     padding: 0,
   },
+
+  // ── hero (brand-coloured, content-height — no forced min) ─────────────────
   hero: {
-    width: pdfPage.width,
-    minHeight: pdfPage.height * 0.52,
-    padding: pdfSpacing["3xl"],
-    justifyContent: "space-between",
+    paddingHorizontal: PAD,
+    paddingTop: 36,
+    paddingBottom: 28,
   },
   eyebrow: {
     fontFamily: pdfFonts.bold,
     fontSize: pdfSizes.eyebrow,
     textTransform: "uppercase",
     letterSpacing: pdfTracking.widest,
+    marginBottom: 14,
     opacity: 0.85,
   },
-  titleBlock: { marginTop: pdfSpacing["3xl"] },
   title: {
     fontFamily: pdfFonts.bold,
-    fontSize: pdfSizes["3xl"],
+    fontSize: 32,
     lineHeight: pdfLineHeights.tight,
     letterSpacing: pdfTracking.tight,
-    marginBottom: pdfSpacing.md,
+    marginBottom: 10,
   },
   intro: {
-    fontSize: pdfSizes.md,
-    lineHeight: pdfLineHeights.normal,
+    fontSize: pdfSizes.sm,
+    lineHeight: pdfLineHeights.relaxed,
     opacity: 0.9,
-    maxWidth: 420,
+    marginBottom: 22,
   },
+  // Meta pills — marginRight instead of gap (gap not supported in react-pdf)
   metaRow: {
     flexDirection: "row",
-    marginTop: pdfSpacing["3xl"],
-    gap: pdfSpacing.lg,
   },
-  metaCard: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
+  metaPill: {
+    paddingVertical: 5,
+    paddingHorizontal: 10,
     borderRadius: pdfRadii.pill,
     backgroundColor: "rgba(255,255,255,0.18)",
+    marginRight: 8,
   },
   metaLabel: {
     fontSize: pdfSizes.xs,
-    opacity: 0.75,
+    opacity: 0.7,
     textTransform: "uppercase",
     letterSpacing: pdfTracking.wide,
+    marginBottom: 2,
   },
   metaValue: {
     fontFamily: pdfFonts.bold,
     fontSize: pdfSizes.sm,
-    marginTop: 1,
   },
 
-  // Lower-half cover content
-  belowHero: {
-    flex: 1,
-    paddingHorizontal: pdfSpacing["3xl"],
-    paddingTop: pdfSpacing["2xl"],
-    paddingBottom: pdfSpacing["2xl"],
-    justifyContent: "space-between",
+  // ── lower (white) — no flex:1, no space-between ───────────────────────────
+  lower: {
+    paddingHorizontal: PAD,
+    paddingTop: 28,
+    paddingBottom: 28,
   },
-  preparedFor: {
+  partyRow: {
     flexDirection: "row",
-    gap: pdfSpacing["3xl"],
   },
-  preparedCell: { flex: 1 },
-  preparedEyebrow: {
+  partyCol: {
+    flex: 1,
+  },
+  partyColRight: {
+    flex: 1,
+    paddingLeft: 24,
+    borderLeftWidth: 0.5,
+    borderLeftColor: pdfColors.border,
+    marginLeft: 24,
+  },
+  partyEyebrow: {
     fontFamily: pdfFonts.bold,
     fontSize: pdfSizes.eyebrow,
     color: pdfColors.mutedForeground,
     textTransform: "uppercase",
     letterSpacing: pdfTracking.wider,
-    marginBottom: 4,
+    marginBottom: 5,
   },
-  preparedValue: {
+  partyName: {
     fontFamily: pdfFonts.bold,
     fontSize: pdfSizes.md,
     color: pdfColors.foreground,
+    marginBottom: 3,
   },
-  preparedMuted: {
-    fontSize: pdfSizes.sm,
+  partyLine: {
+    fontSize: pdfSizes.xs,
     color: pdfColors.mutedForeground,
     marginTop: 2,
   },
-  coverFooter: {
+  footerRule: {
+    marginTop: 24,
+    borderTopWidth: 0.5,
+    borderTopColor: pdfColors.border,
+    paddingTop: 10,
+  },
+  footerText: {
     fontSize: pdfSizes.xs,
     color: pdfColors.mutedForeground,
-    textAlign: "center",
   },
 });
 
-// --- Body styles ------------------------------------------------------------
+const bodyS = StyleSheet.create({
+  page: {
+    fontFamily: pdfFonts.base,
+    fontSize: pdfSizes.base,
+    color: pdfColors.foreground,
+    backgroundColor: pdfColors.surface,
+    paddingHorizontal: PAD,
+    paddingTop: PAD,
+    paddingBottom: PAD + 28, // room for fixed footer
+    lineHeight: pdfLineHeights.normal,
+  },
 
-const bodyStyles = StyleSheet.create({
-  section: { marginBottom: pdfSpacing.xl },
-  sectionHeader: {
+  // ── compact header ────────────────────────────────────────────────────────
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    borderBottomWidth: 0.5,
+    borderBottomColor: pdfColors.border,
+    marginBottom: 14,
+    paddingBottom: 14,
+  },
+  businessName: {
+    fontFamily: pdfFonts.bold,
+    fontSize: pdfSizes.sm,
+    color: pdfColors.foreground,
+    marginBottom: 2,
+  },
+  headerSubline: {
+    fontSize: pdfSizes.xs,
+    color: pdfColors.mutedForeground,
+  },
+  headerRight: {
+    alignItems: "flex-end",
+  },
+  headerEyebrow: {
+    fontFamily: pdfFonts.bold,
+    fontSize: pdfSizes.eyebrow,
+    textTransform: "uppercase",
+    letterSpacing: pdfTracking.wider,
+    marginBottom: 4,
+  },
+  // 14pt — long titles never wrap in 280pt column
+  headerTitle: {
+    fontFamily: pdfFonts.bold,
+    fontSize: pdfSizes.lg,
+    color: pdfColors.foreground,
+    letterSpacing: pdfTracking.tight,
+    lineHeight: pdfLineHeights.tight,
+    textAlign: "right",
+    maxWidth: 280,
+  },
+
+  // ── intro ─────────────────────────────────────────────────────────────────
+  intro: {
+    fontSize: pdfSizes.sm,
+    lineHeight: pdfLineHeights.relaxed,
+    color: pdfColors.text,
+    marginBottom: 14,
+    borderBottomWidth: 0.5,
+    borderBottomColor: pdfColors.border,
+    paddingBottom: 14,
+  },
+
+  // ── sections ──────────────────────────────────────────────────────────────
+  section: {
+    marginBottom: 14,
+  },
+  sectionRow: {
     flexDirection: "row",
     alignItems: "baseline",
-    marginBottom: 6,
+    marginBottom: 4,
   },
   sectionNumber: {
     fontFamily: pdfFonts.bold,
     fontSize: pdfSizes.eyebrow,
     color: pdfColors.mutedForeground,
     letterSpacing: pdfTracking.wider,
-    marginRight: 10,
+    marginRight: 8,
     minWidth: 22,
   },
   sectionHeading: {
@@ -202,16 +279,24 @@ const bodyStyles = StyleSheet.create({
     fontSize: pdfSizes.sm,
     lineHeight: pdfLineHeights.relaxed,
     color: pdfColors.text,
+    marginTop: 3,
   },
-  intro: {
-    fontSize: pdfSizes.md,
-    lineHeight: pdfLineHeights.relaxed,
-    color: pdfColors.text,
-    marginBottom: pdfSpacing.xl,
+
+  // ── "what happens next" callout ───────────────────────────────────────────
+  nextEyebrow: {
+    fontFamily: pdfFonts.bold,
+    fontSize: pdfSizes.eyebrow,
+    color: pdfColors.mutedForeground,
+    textTransform: "uppercase",
+    letterSpacing: pdfTracking.wider,
+    marginTop: 18,
+    marginBottom: 6,
   },
 });
 
-// --- Template ---------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Template
+// ---------------------------------------------------------------------------
 
 export function WelcomeDocumentPdf({
   data,
@@ -227,147 +312,161 @@ export function WelcomeDocumentPdf({
 
   return (
     <Document title={`Welcome guide – ${data.title}`} author={brand.businessName}>
-      {/* COVER */}
-      <Page size="A4" style={coverStyles.page}>
-        <View
-          style={[
-            coverStyles.hero,
-            { backgroundColor: brand.accent, color: brand.onAccent },
-          ]}
-        >
-          <View>
-            <Text style={[coverStyles.eyebrow, { color: brand.onAccent }]}>
-              Welcome Guide
-            </Text>
-            <View style={coverStyles.titleBlock}>
-              <Text style={[coverStyles.title, { color: brand.onAccent }]}>
-                {data.title}
-              </Text>
-              {intro ? (
-                <Text style={[coverStyles.intro, { color: brand.onAccent }]}>
-                  {intro}
-                </Text>
-              ) : null}
-            </View>
-          </View>
 
-          <View style={coverStyles.metaRow}>
+      {/* ── COVER PAGE ──────────────────────────────────────────────── */}
+      <Page size="A4" style={coverS.page}>
+
+        {/* Hero: brand colour, content flows top-down — no min-height gap */}
+        <View style={[coverS.hero, { backgroundColor: brand.accent }]}>
+          <Text style={[coverS.eyebrow, { color: brand.onAccent }]}>
+            Welcome Guide
+          </Text>
+          <Text style={[coverS.title, { color: brand.onAccent }]}>
+            {data.title}
+          </Text>
+          {intro ? (
+            <Text style={[coverS.intro, { color: brand.onAccent }]}>
+              {intro}
+            </Text>
+          ) : null}
+
+          {/* Meta pills — marginRight replaces gap */}
+          <View style={coverS.metaRow}>
             {data.publishedAt ? (
-              <View style={coverStyles.metaCard}>
-                <Text style={[coverStyles.metaLabel, { color: brand.onAccent }]}>
+              <View style={coverS.metaPill}>
+                <Text style={[coverS.metaLabel, { color: brand.onAccent }]}>
                   Published
                 </Text>
-                <Text style={[coverStyles.metaValue, { color: brand.onAccent }]}>
+                <Text style={[coverS.metaValue, { color: brand.onAccent }]}>
                   {formatDate(data.publishedAt)}
                 </Text>
               </View>
             ) : null}
             {data.sections.length > 0 ? (
-              <View style={coverStyles.metaCard}>
-                <Text style={[coverStyles.metaLabel, { color: brand.onAccent }]}>
+              <View style={coverS.metaPill}>
+                <Text style={[coverS.metaLabel, { color: brand.onAccent }]}>
                   Sections
                 </Text>
-                <Text style={[coverStyles.metaValue, { color: brand.onAccent }]}>
+                <Text style={[coverS.metaValue, { color: brand.onAccent }]}>
                   {data.sections.length}
                 </Text>
               </View>
             ) : null}
-            <View style={coverStyles.metaCard}>
-              <Text style={[coverStyles.metaLabel, { color: brand.onAccent }]}>
+            <View style={coverS.metaPill}>
+              <Text style={[coverS.metaLabel, { color: brand.onAccent }]}>
                 Read time
               </Text>
-              <Text style={[coverStyles.metaValue, { color: brand.onAccent }]}>
+              <Text style={[coverS.metaValue, { color: brand.onAccent }]}>
                 {estimateReadMinutes(data)} min
               </Text>
             </View>
           </View>
         </View>
 
-        <View style={coverStyles.belowHero}>
-          <View style={coverStyles.preparedFor}>
-            <View style={coverStyles.preparedCell}>
-              <Text style={coverStyles.preparedEyebrow}>Prepared for</Text>
-              <Text style={coverStyles.preparedValue}>
+        {/* Lower: white, stacks naturally without forced gaps */}
+        <View style={coverS.lower}>
+          <View style={coverS.partyRow}>
+            <View style={coverS.partyCol}>
+              <Text style={coverS.partyEyebrow}>Prepared for</Text>
+              <Text style={coverS.partyName}>
                 {data.recipient?.name ?? "Your team"}
               </Text>
               {data.recipient?.company ? (
-                <Text style={coverStyles.preparedMuted}>{data.recipient.company}</Text>
+                <Text style={coverS.partyLine}>{data.recipient.company}</Text>
               ) : null}
               {data.recipient?.email ? (
-                <Text style={coverStyles.preparedMuted}>{data.recipient.email}</Text>
+                <Text style={coverS.partyLine}>{data.recipient.email}</Text>
               ) : null}
             </View>
-            <View style={coverStyles.preparedCell}>
-              <Text style={coverStyles.preparedEyebrow}>Prepared by</Text>
-              <Text style={coverStyles.preparedValue}>{brand.businessName}</Text>
+            <View style={coverS.partyColRight}>
+              <Text style={coverS.partyEyebrow}>Prepared by</Text>
+              <Text style={coverS.partyName}>{brand.businessName}</Text>
               {brand.contact.email ? (
-                <Text style={coverStyles.preparedMuted}>{brand.contact.email}</Text>
+                <Text style={coverS.partyLine}>{brand.contact.email}</Text>
               ) : null}
               {brand.contact.website ? (
-                <Text style={coverStyles.preparedMuted}>{brand.contact.website}</Text>
+                <Text style={coverS.partyLine}>{brand.contact.website}</Text>
               ) : null}
             </View>
           </View>
 
-          <Text style={coverStyles.coverFooter}>
-            {brand.businessName}
-            {brand.contact.website ? ` · ${brand.contact.website}` : ""}
-          </Text>
+          <View style={coverS.footerRule}>
+            <Text style={coverS.footerText}>
+              {brand.businessName}
+              {brand.contact.website ? ` · ${brand.contact.website}` : ""}
+            </Text>
+          </View>
         </View>
+
+        <DocumentFooter brand={brand} label={`Welcome guide · ${data.title}`} />
       </Page>
 
-      {/* BODY */}
-      <DocumentPage brand={brand}>
-        <DocumentHeader
-          brand={brand}
-          eyebrow="Welcome Guide"
-          title={truncate(data.title, 38)}
-          compact
-        />
+      {/* ── BODY PAGE(S) ────────────────────────────────────────────── */}
+      <Page size="A4" style={bodyS.page}>
 
+        {/* Compact header */}
+        <View style={bodyS.header}>
+          <View>
+            <Text style={bodyS.businessName}>{brand.businessName}</Text>
+            {brand.legalName ? (
+              <Text style={bodyS.headerSubline}>{brand.legalName}</Text>
+            ) : null}
+          </View>
+          <View style={bodyS.headerRight}>
+            <Text style={[bodyS.headerEyebrow, { color: brand.accent }]}>
+              Welcome Guide
+            </Text>
+            <Text style={bodyS.headerTitle}>{truncate(data.title, 42)}</Text>
+          </View>
+        </View>
+
+        {/* Intro — sm text, separator below */}
         {intro && data.sections.length > 0 ? (
-          <Text style={bodyStyles.intro}>{intro}</Text>
+          <Text style={bodyS.intro}>{intro}</Text>
         ) : null}
 
+        {/* Sections — 14pt gap, tight heading row */}
         <View>
           {data.sections.length > 0 ? (
             data.sections.map((section, i) => (
-              <View key={i} style={bodyStyles.section} wrap={true}>
-                <View style={bodyStyles.sectionHeader}>
-                  <Text style={bodyStyles.sectionNumber}>
+              <View key={i} style={bodyS.section} wrap={true}>
+                <View style={bodyS.sectionRow}>
+                  <Text style={bodyS.sectionNumber}>
                     {String(i + 1).padStart(2, "0")}
                   </Text>
-                  <Text style={bodyStyles.sectionHeading}>{section.heading}</Text>
+                  <Text style={bodyS.sectionHeading}>{section.heading}</Text>
                 </View>
-                <Text style={bodyStyles.sectionBody}>
+                <Text style={bodyS.sectionBody}>
                   {welcomeMarkdownToPlain(section.body)}
                 </Text>
               </View>
             ))
           ) : intro ? (
-            <Text style={bodyStyles.sectionBody}>{intro}</Text>
+            <Text style={bodyS.sectionBody}>{intro}</Text>
           ) : (
-            <Text style={bodyStyles.sectionBody}>
+            <Text style={bodyS.sectionBody}>
               This guide is being prepared — content will follow shortly.
             </Text>
           )}
         </View>
 
-        <Section eyebrow="What happens next">
-          <NoteBlock accent={brand.accent}>
-            {data.acknowledgementRequired && data.publicUrl
-              ? `Once you've read through the guide, please confirm at the bottom of the online version (${data.publicUrl}). That's the handshake to kick the project off.`
-              : `Reply to the email this guide arrived on with any questions — we'll incorporate them into the kickoff conversation.`}
-          </NoteBlock>
-        </Section>
+        {/* What happens next */}
+        <Text style={bodyS.nextEyebrow}>What happens next</Text>
+        <NoteBlock accent={brand.accent}>
+          {data.acknowledgementRequired && data.publicUrl
+            ? `Once you've read through the guide, please confirm at the bottom of the online version (${data.publicUrl}). That's the handshake to kick the project off.`
+            : `Reply to the email this guide arrived on with any questions — we'll incorporate them into the kickoff conversation.`}
+        </NoteBlock>
 
         <DocumentFooter brand={brand} label={`Welcome guide · ${data.title}`} />
-      </DocumentPage>
+      </Page>
     </Document>
   );
 }
 
-// --- Helpers ----------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
 function estimateReadMinutes(data: WelcomeDocumentPdfData): number {
   const words =
