@@ -64,6 +64,31 @@ export async function sendWelcomeDocumentAction(
   const doc = await getWelcomeDocument(parsed.data.documentId);
   if (!doc) return { ok: false, error: "Document not found." };
 
+  // ---- One-per-client guard -----------------------------------------------
+  // A freelancer should only have one active sent welcome document per
+  // client. If another non-deleted, non-archived document was already sent
+  // to the same client, block this send and ask the user to delete it first.
+  if (doc.clientId) {
+    const { data: conflict } = await supabase
+      .from("welcome_documents")
+      .select("id, title")
+      .eq("user_id", user.id)
+      .eq("client_id", doc.clientId)
+      .is("deleted_at", null)
+      .neq("status", "archived")
+      .not("sent_at", "is", null)
+      .neq("id", doc.id)
+      .maybeSingle();
+
+    if (conflict) {
+      const c = conflict as { id: string; title: string };
+      return {
+        ok: false,
+        error: `This client already has an active welcome document: "${c.title}". Delete or archive it first before sending a new one.`,
+      };
+    }
+  }
+
   // ---- Recipient resolution -----------------------------------------------
   let toEmail = parsed.data.toEmail ?? null;
   let toName = parsed.data.toName ?? null;

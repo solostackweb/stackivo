@@ -237,6 +237,7 @@ export async function archiveWelcomeDocumentAction(input: {
     .eq("user_id", userId);
   if (error) return { ok: false, error: error.message };
   revalidatePath(WELCOME_DOCUMENTS_INDEX);
+  revalidatePath(welcomeDocumentDetail(input.id));
   return { ok: true, message: "Archived." };
 }
 
@@ -254,6 +255,7 @@ export async function deleteWelcomeDocumentAction(input: {
     .eq("user_id", userId);
   if (error) return { ok: false, error: error.message };
   revalidatePath(WELCOME_DOCUMENTS_INDEX);
+  revalidatePath(welcomeDocumentDetail(input.id));
   return { ok: true, message: "Deleted." };
 }
 

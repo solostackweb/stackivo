@@ -22,11 +22,27 @@ interface Props {
  * we never reload the page, so any partial form state stays put if
  * the action returns a validation error.
  */
+const ACK_KEY = (t: string) => `wd_ack_${t}`;
+
 export function WelcomePublicAck({ token, brandColor, defaultEmail }: Props) {
   const [name, setName] = React.useState("");
   const [email, setEmail] = React.useState(defaultEmail ?? "");
   const [done, setDone] = React.useState<{ at: string } | null>(null);
   const [pending, startTransition] = React.useTransition();
+
+  // Restore acknowledgement state from localStorage so a page refresh
+  // doesn't reset the confirmation panel back to the form.
+  React.useEffect(() => {
+    try {
+      const stored = localStorage.getItem(ACK_KEY(token));
+      if (stored) {
+        const parsed = JSON.parse(stored) as { at?: string };
+        if (parsed?.at) setDone({ at: parsed.at });
+      }
+    } catch {
+      // localStorage unavailable or corrupted — ignore silently.
+    }
+  }, [token]);
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,9 +60,14 @@ export function WelcomePublicAck({ token, brandColor, defaultEmail }: Props) {
         toast.error(res.error);
         return;
       }
-      setDone({
-        at: res.data?.acknowledgedAt ?? new Date().toISOString(),
-      });
+      const at = res.data?.acknowledgedAt ?? new Date().toISOString();
+      // Persist so the confirmation panel survives a page refresh.
+      try {
+        localStorage.setItem(ACK_KEY(token), JSON.stringify({ at }));
+      } catch {
+        // Storage quota exceeded or private-mode restriction — not fatal.
+      }
+      setDone({ at });
     });
   };
 
