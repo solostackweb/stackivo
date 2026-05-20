@@ -10,6 +10,7 @@ import { getClient } from "@/features/clients/server";
 import { getClientDisplayName } from "@/features/clients/utils";
 import { InvoiceStatusBadge } from "@/features/invoices/components/invoice-status-badge";
 import { MarkPaidManuallyDialog } from "@/features/invoices/components/mark-paid-manually-dialog";
+import { InvoiceShareButtons } from "@/features/invoices/components/invoice-share-buttons";
 
 export const dynamic = "force-dynamic";
 
@@ -69,7 +70,15 @@ export default async function InvoiceDetailPage({
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2 sm:ml-auto">
+        <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
+          <InvoiceShareButtons
+            invoiceId={invoice.id}
+            invoiceNumber={invoice.invoiceNumber}
+            totalAmount={invoice.totalAmount}
+            clientName={client ? getClientDisplayName(client) : null}
+            clientPhone={client?.phone ?? null}
+            publicToken={invoice.publicToken}
+          />
           <Button asChild variant="outline" size="sm" className="flex-1 sm:flex-none">
             <a
               href={`/api/invoices/${invoice.id}/pdf`}
