@@ -82,8 +82,13 @@ function normalizeAuthError(message: string): string {
 async function getOrigin(): Promise<string> {
   // Prefer the runtime origin so preview deploys work without config changes.
   const h = await headers();
-  const host = h.get("x-forwarded-host") ?? h.get("host");
-  const proto = h.get("x-forwarded-proto") ?? "https";
+  // On multi-hop proxies (Vercel, Cloudflare, AWS ALB) these headers can be
+  // comma-separated lists of values ordered outermost→innermost.
+  // Always take the FIRST (outermost / public-facing) value only.
+  const rawHost = h.get("x-forwarded-host") ?? h.get("host");
+  const host = rawHost?.split(",")[0].trim();
+  const rawProto = h.get("x-forwarded-proto") ?? "https";
+  const proto = rawProto.split(",")[0].trim();
   if (host) return `${proto}://${host}`;
   return env.appUrl;
 }
