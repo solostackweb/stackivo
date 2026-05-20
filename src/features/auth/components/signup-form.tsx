@@ -15,7 +15,7 @@ import {
 import { FieldError } from "./field-error";
 import { GoogleOAuthButton } from "./google-oauth-button";
 
-export function SignupForm() {
+export function SignupForm({ oauthError }: { oauthError?: string | null }) {
   const [state, formAction] = useActionState<ActionResult | undefined, FormData>(
     signupAction,
     undefined,
@@ -23,9 +23,17 @@ export function SignupForm() {
 
   const succeeded = state?.ok === true;
 
+  // Resolve OAuth error code to a user-friendly message.
+  const oauthErrorMessage = oauthError
+    ? resolveOAuthError(oauthError)
+    : null;
+
   return (
     <div className="space-y-5">
-      <GoogleOAuthButton />
+      {oauthErrorMessage && !state ? (
+        <AuthFormError message={oauthErrorMessage} />
+      ) : null}
+      <GoogleOAuthButton from="signup" />
       <AuthOrSeparator />
 
       <form action={formAction} className="space-y-4">
@@ -102,4 +110,23 @@ function SubmitButton({ disabled }: { disabled?: boolean }) {
       {pending ? "Creating account…" : "Create account"}
     </Button>
   );
+}
+
+function resolveOAuthError(code: string): string {
+  switch (code) {
+    case "oauth_unavailable":
+      return "Google sign-in isn't configured yet. Use email + password below.";
+    case "missing_code":
+      return "Google sign-in was cancelled or timed out. Please try again.";
+    default: {
+      const decoded = decodeURIComponent(code);
+      if (decoded.toLowerCase().includes("redirect_uri_mismatch")) {
+        return "Google sign-in is misconfigured — the redirect URI is not authorised. Contact support.";
+      }
+      if (decoded.toLowerCase().includes("access_denied")) {
+        return "Google sign-in was denied. Please try again or use email + password.";
+      }
+      return "Google sign-in failed. Please try again or use email + password below.";
+    }
+  }
 }

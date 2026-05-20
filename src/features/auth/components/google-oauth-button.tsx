@@ -16,14 +16,18 @@ import { googleOAuthAction } from "../actions";
  */
 export function GoogleOAuthButton({
   next,
+  from = "login",
   label = "Continue with Google",
 }: {
   next?: string;
+  /** Which auth page is rendering this button. Used to redirect errors back correctly. */
+  from?: "login" | "signup";
   label?: string;
 }) {
   return (
     <form action={googleOAuthAction} className="w-full">
       {next && <input type="hidden" name="next" value={next} />}
+      <input type="hidden" name="from" value={from} />
       <SubmitButton label={label} />
     </form>
   );

@@ -39,8 +39,8 @@ export function LoginForm({
           message={
             state && !state.ok
               ? state.error
-              : oauthError === "oauth_unavailable"
-                ? "Google sign-in isn't configured yet. Use email + password below."
+              : oauthError
+                ? resolveOAuthError(oauthError)
                 : null
           }
         />
@@ -104,4 +104,30 @@ function SubmitButton() {
       {pending ? "Logging in…" : "Log in"}
     </Button>
   );
+}
+
+/**
+ * Map `?error=` values that the callback / OAuth action append to the URL
+ * into user-readable messages.  Falls back to a generic "try again" note
+ * so any future error code is visible rather than silently swallowed.
+ */
+function resolveOAuthError(code: string): string {
+  switch (code) {
+    case "oauth_unavailable":
+      return "Google sign-in isn't configured yet. Use email + password below.";
+    case "missing_code":
+      return "Google sign-in was cancelled or timed out. Please try again.";
+    default: {
+      // The callback sometimes passes the raw GoTrue error message as the
+      // code (URL-encoded).  Decode and show it so ops can see what's wrong.
+      const decoded = decodeURIComponent(code);
+      if (decoded.toLowerCase().includes("redirect_uri_mismatch")) {
+        return "Google sign-in is misconfigured — the redirect URI is not authorised. Contact support.";
+      }
+      if (decoded.toLowerCase().includes("access_denied")) {
+        return "Google sign-in was denied. Please try again or use email + password.";
+      }
+      return "Google sign-in failed. Please try again or use email + password below.";
+    }
+  }
 }

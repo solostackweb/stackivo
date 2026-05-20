@@ -36,6 +36,49 @@ export type ActionResult<T = undefined> =
 
 // --- helpers ----------------------------------------------------------------
 
+/**
+ * Map raw Supabase / GoTrue error messages to user-safe strings.
+ *
+ * GoTrue's internal messages (e.g. "Database error saving new user",
+ * "unexpected_failure") are confusing to end users and may change between
+ * GoTrue releases.  We normalise them here so the UI always shows something
+ * actionable.
+ */
+function normalizeAuthError(message: string): string {
+  const m = message.toLowerCase();
+  // Database / trigger failure — the most common root cause on signup.
+  if (
+    m.includes("database error") ||
+    m.includes("unexpected_failure") ||
+    m.includes("unexpected failure") ||
+    m.includes("saving new user")
+  ) {
+    return "We couldn't create your account right now. Please wait a moment and try again. If the problem persists, contact support.";
+  }
+  // Supabase email-send rate limits (built-in SMTP: 3/hr).
+  if (
+    m.includes("email rate limit") ||
+    m.includes("only request this") ||
+    m.includes("rate limit exceeded")
+  ) {
+    return "Too many requests. Please wait 60 seconds and try again.";
+  }
+  // Signups globally disabled on the project.
+  if (m.includes("signups not allowed") || m.includes("signup disabled")) {
+    return "Account registration is currently unavailable. Please try again later.";
+  }
+  // Invalid email format from Supabase validation.
+  if (m.includes("unable to validate email") || m.includes("invalid email")) {
+    return "Please enter a valid email address.";
+  }
+  // Password too short / weak.
+  if (m.includes("password") && (m.includes("short") || m.includes("weak") || m.includes("length"))) {
+    return "Password must be at least 8 characters.";
+  }
+  // Fallback — return the raw message as-is.
+  return message;
+}
+
 async function getOrigin(): Promise<string> {
   // Prefer the runtime origin so preview deploys work without config changes.
   const h = await headers();
@@ -64,22 +107,22 @@ function userSafeErrorMessage(err: unknown): string {
   const fallback = "We couldn't create your account. Please try again in a moment.";
   if (err instanceof Error) {
     const message = err.message.trim();
-    if (message && message !== "{}" && message !== "[]") return message;
+    if (message && message !== "{}" && message !== "[]") return normalizeAuthError(message);
   }
   if (typeof err === "string") {
     const message = err.trim();
-    if (message && message !== "{}" && message !== "[]") return message;
+    if (message && message !== "{}" && message !== "[]") return normalizeAuthError(message);
   }
   if (err && typeof err === "object") {
     const maybeMessage = (err as { message?: unknown; error?: unknown }).message;
     if (typeof maybeMessage === "string") {
       const message = maybeMessage.trim();
-      if (message && message !== "{}" && message !== "[]") return message;
+      if (message && message !== "{}" && message !== "[]") return normalizeAuthError(message);
     }
     const maybeError = (err as { error?: unknown }).error;
     if (typeof maybeError === "string") {
       const message = maybeError.trim();
-      if (message && message !== "{}" && message !== "[]") return message;
+      if (message && message !== "{}" && message !== "[]") return normalizeAuthError(message);
     }
   }
   return fallback;
@@ -186,7 +229,7 @@ export async function signupAction(
     }
 
     // Identify the (unverified) user in PostHog so the funnel from
-    // signup -> email verified -> onboarding completed is joinable.
+    // signup → email verified → onboarding completed is joinable.
     if (signUpData.user) {
       await identifyServer(signUpData.user.id, {
         email: signUpData.user.email,
@@ -198,7 +241,7 @@ export async function signupAction(
     return {
       ok: true,
       message:
-        "Check your inbox to verify your email - clicking the link signs you in and drops you into onboarding.",
+        "Check your inbox to verify your email — clicking the link signs you in and drops you into onboarding.",
     };
   } catch (err) {
     const message = userSafeErrorMessage(err);
@@ -214,7 +257,7 @@ export async function signupAction(
       ok: false,
       error: isExistingAccountError(message)
         ? "An account with that email already exists. Try logging in instead, or reset your password."
-        : "We couldn't create your account. Please try again in a moment.",
+        : message,
     };
   }
 }
@@ -416,24 +459,31 @@ export async function resetPasswordAction(
   };
 }
 
-// --- Google OAuth (placeholder) --------------------------------------------
-// Returns the URL the browser should redirect to. The auth/callback route
-// handler finalises the session on return.
+// --- Google OAuth ------------------------------------------------------------
+// Initiates the OAuth flow. The browser is redirected to Google, which then
+// redirects back to /auth/callback where the session is finalised.
 export async function googleOAuthAction(formData: FormData): Promise<void> {
   const supabase = await getServerSupabase();
   const origin = await getOrigin();
   const next = sanitiseNext(formData.get("next")?.toString() ?? null);
+  // Which auth page launched this action (login | signup). Used to redirect
+  // errors back to the originating page so the user sees the error in context.
+  const from = formData.get("from")?.toString() === "signup" ? "/signup" : AUTH_LOGIN_ROUTE;
 
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "google",
     options: {
       redirectTo: `${origin}/auth/callback?next=${encodeURIComponent(next)}`,
+      queryParams: {
+        // Request a refresh token so long-lived sessions work.
+        access_type: "offline",
+        prompt: "select_account",
+      },
     },
   });
 
   if (error || !data?.url) {
-    // Fall through to login with an error marker — OAuth is optional for MVP.
-    redirect(`${AUTH_LOGIN_ROUTE}?error=oauth_unavailable`);
+    redirect(`${from}?error=oauth_unavailable`);
   }
   redirect(data.url);
 }

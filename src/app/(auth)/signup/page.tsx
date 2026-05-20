@@ -9,9 +9,15 @@ import { AUTH_DEFAULT_REDIRECT } from "@/features/auth/routes";
 
 export const metadata = { title: "Sign up" };
 
-export default async function SignupPage() {
+interface PageProps {
+  searchParams: Promise<{ error?: string }>;
+}
+
+export default async function SignupPage({ searchParams }: PageProps) {
   const user = await getCurrentUser();
   if (user) redirect(AUTH_DEFAULT_REDIRECT);
+
+  const { error: oauthError } = await searchParams;
 
   return (
     <AuthFormShell
@@ -25,7 +31,7 @@ export default async function SignupPage() {
         />
       }
     >
-      <SignupForm />
+      <SignupForm oauthError={oauthError ?? null} />
     </AuthFormShell>
   );
 }
