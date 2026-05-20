@@ -21,6 +21,7 @@ import {
 } from "@/lib/rate-limit";
 import { recordSecurityEvent } from "@/lib/security-events/server";
 import { hashedEmail } from "@/lib/logger/redact";
+import { log } from "@/lib/logger";
 import { identifyServer, trackServerEvent } from "@/lib/analytics/server";
 import {
   loginSchema,
@@ -184,14 +185,20 @@ export async function signupAction(
       password,
       options: {
         data: { full_name: fullName },
-        emailRedirectTo: `${origin}/auth/callback?next=${encodeURIComponent(
-          AUTH_DEFAULT_REDIRECT,
-        )}`,
+        emailRedirectTo: `${origin}/auth/callback`,
       },
     });
 
     if (error) {
       const message = userSafeErrorMessage(error);
+      log.warn("auth.signup.supabase_failed", {
+        error_code: (error as { code?: unknown }).code,
+        error_status: (error as { status?: unknown }).status,
+        error_name: error.name,
+        error_message: error.message,
+        user_message: message,
+        email_hash: await safeHashedEmail(email),
+      });
       await recordSecurityEvent({
         kind: "auth_signup_failed",
         severity: "info",
@@ -250,6 +257,11 @@ export async function signupAction(
     };
   } catch (err) {
     const message = userSafeErrorMessage(err);
+    log.warn("auth.signup.unexpected_failed", {
+      error: err instanceof Error ? err.message : String(err),
+      user_message: message,
+      email_hash: await safeHashedEmail(email),
+    });
     await recordSecurityEvent({
       kind: "auth_signup_failed",
       severity: "info",
