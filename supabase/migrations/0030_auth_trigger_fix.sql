@@ -32,28 +32,29 @@ begin
 
   return new;
 
-exception when unique_violation then
-  -- The email column has a separate UNIQUE constraint.
-  -- An orphaned user_profiles row (different id, same email) is the culprit.
-  -- Re-link it to the new auth user so onboarding proceeds normally.
-  update public.user_profiles
-    set
-      id        = new.id,
-      full_name = coalesce(
-        new.raw_user_meta_data->>'full_name',
-        full_name,
-        split_part(new.email, '@', 1)
-      )
-  where email = new.email;
+exception
+  when unique_violation then
+    -- The email column has a separate UNIQUE constraint.
+    -- An orphaned user_profiles row (different id, same email) is the culprit.
+    -- Re-link it to the new auth user so onboarding proceeds normally.
+    update public.user_profiles
+      set
+        id        = new.id,
+        full_name = coalesce(
+          new.raw_user_meta_data->>'full_name',
+          full_name,
+          split_part(new.email, '@', 1)
+        )
+    where email = new.email;
 
-  return new;
+    return new;
 
-exception when others then
-  -- Safety net: log the failure but NEVER block auth user creation.
-  -- A missing profile row is recoverable; a blocked signup is not.
-  raise warning 'handle_new_auth_user: could not create profile for user % (%): %',
-    new.id, new.email, sqlerrm;
-  return new;
+  when others then
+    -- Safety net: log the failure but NEVER block auth user creation.
+    -- A missing profile row is recoverable; a blocked signup is not.
+    raise warning 'handle_new_auth_user: could not create profile for user % (%): %',
+      new.id, new.email, sqlerrm;
+    return new;
 end $$;
 
 -- Re-create the trigger (idempotent — drop first, then create).
