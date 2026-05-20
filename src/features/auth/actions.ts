@@ -272,7 +272,7 @@ export async function signupAction(
     return {
       ok: true,
       message:
-        "Check your inbox to verify your email — clicking the link signs you in and drops you into onboarding.",
+        "Check your inbox to verify your email. If it is not there, check Spam or Promotions too. Clicking the link signs you in and drops you into onboarding.",
     };
   } catch (err) {
     const message = userSafeErrorMessage(err);
