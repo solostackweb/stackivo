@@ -88,8 +88,9 @@ const coverS = StyleSheet.create({
     padding: 0,
   },
 
-  // ── hero (brand-coloured, content-height — no forced min) ─────────────────
+  // ── hero (flex:1 fills remaining page height — blue covers ~75% of cover) ──
   hero: {
+    flex: 1,
     paddingHorizontal: PAD,
     paddingTop: 36,
     paddingBottom: 28,
@@ -246,15 +247,15 @@ const bodyS = StyleSheet.create({
     fontSize: pdfSizes.sm,
     lineHeight: pdfLineHeights.relaxed,
     color: pdfColors.text,
-    marginBottom: 14,
+    marginBottom: 10,
     borderBottomWidth: 0.5,
     borderBottomColor: pdfColors.border,
-    paddingBottom: 14,
+    paddingBottom: 10,
   },
 
   // ── sections ──────────────────────────────────────────────────────────────
   section: {
-    marginBottom: 14,
+    marginBottom: 10,
   },
   sectionRow: {
     flexDirection: "row",
@@ -289,7 +290,7 @@ const bodyS = StyleSheet.create({
     color: pdfColors.mutedForeground,
     textTransform: "uppercase",
     letterSpacing: pdfTracking.wider,
-    marginTop: 18,
+    marginTop: 12,
     marginBottom: 6,
   },
 });
@@ -429,7 +430,7 @@ export function WelcomeDocumentPdf({
         <View>
           {data.sections.length > 0 ? (
             data.sections.map((section, i) => (
-              <View key={i} style={bodyS.section} wrap={true}>
+              <View key={i} style={bodyS.section} wrap={false}>
                 <View style={bodyS.sectionRow}>
                   <Text style={bodyS.sectionNumber}>
                     {String(i + 1).padStart(2, "0")}
