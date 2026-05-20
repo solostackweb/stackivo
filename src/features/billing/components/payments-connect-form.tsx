@@ -4,6 +4,7 @@ import * as React from "react";
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
 import { Button } from "@/components/ui/button";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -163,14 +164,19 @@ function ReverifyButton() {
 
 function DisconnectButton() {
   const [pending, start] = React.useTransition();
+  const confirm = useConfirm();
   return (
     <Button
       variant="outline"
       size="sm"
-      onClick={() => {
-        if (!confirm("Disconnect Razorpay? Clients won't be able to pay until you reconnect.")) {
-          return;
-        }
+      onClick={async () => {
+        const ok = await confirm({
+          title: "Disconnect Razorpay?",
+          description: "Clients won't be able to pay until you reconnect.",
+          confirmLabel: "Disconnect",
+          variant: "destructive",
+        });
+        if (!ok) return;
         start(async () => {
           await disconnectRazorpayPaymentsAction();
         });

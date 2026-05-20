@@ -20,6 +20,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -544,10 +545,16 @@ function FilesSection({
   cap: number;
 }) {
   const router = useRouter();
+  const confirm = useConfirm();
   const usagePct = Number.isFinite(cap) ? Math.min(100, (usage.totalBytes / cap) * 100) : 0;
 
   async function onDelete(fileId: string) {
-    if (!confirm("Delete this file?")) return;
+    const ok = await confirm({
+      title: "Delete this file?",
+      confirmLabel: "Delete",
+      variant: "destructive",
+    });
+    if (!ok) return;
     await deletePortalFileAction({ portalId, fileId });
     router.refresh();
   }
@@ -1240,6 +1247,7 @@ function MembersSection({
   clientEmail: string | null;
 }) {
   const router = useRouter();
+  const confirm = useConfirm();
   const [open, setOpen] = React.useState(false);
   const [email, setEmail] = React.useState("");
   const [name, setName] = React.useState("");
@@ -1272,7 +1280,13 @@ function MembersSection({
   }
 
   async function onRevoke(userId: string) {
-    if (!confirm("Revoke this member's access?")) return;
+    const ok = await confirm({
+      title: "Revoke access?",
+      description: "This member will immediately lose access to the portal.",
+      confirmLabel: "Revoke",
+      variant: "destructive",
+    });
+    if (!ok) return;
     await revokePortalMemberAction({ portalId, userId });
     router.refresh();
   }

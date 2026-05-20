@@ -20,6 +20,7 @@ import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import {
   Select,
   SelectContent,
@@ -150,8 +151,16 @@ export function WelcomeListView({ documents }: Props) {
     });
   };
 
-  const handleDelete = (doc: WelcomeDocumentRecord) => {
-    if (!confirm(`Delete "${doc.title}"? This cannot be undone.`)) return;
+  const confirm = useConfirm();
+
+  const handleDelete = async (doc: WelcomeDocumentRecord) => {
+    const ok = await confirm({
+      title: `Delete "${doc.title}"?`,
+      description: "This cannot be undone.",
+      confirmLabel: "Delete",
+      variant: "destructive",
+    });
+    if (!ok) return;
     startTransition(async () => {
       const res = await deleteWelcomeDocumentAction({ id: doc.id });
       if (!res.ok) {
