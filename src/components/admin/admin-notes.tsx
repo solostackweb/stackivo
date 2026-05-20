@@ -13,6 +13,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { toast } from "sonner";
 import { Pin, PinOff, Trash2, Plus, Save, X } from "lucide-react";
 
@@ -173,6 +174,7 @@ function NoteCard({
 }) {
   const [editing, setEditing] = React.useState(false);
   const [draft, setDraft] = React.useState(note.body);
+  const confirm = useConfirm();
 
   return (
     <li
@@ -270,7 +272,12 @@ function NoteCard({
               </button>
               <form
                 action={async () => {
-                  if (!window.confirm("Delete this note?")) return;
+                  const ok = await confirm({
+                    title: "Delete this note?",
+                    confirmLabel: "Delete",
+                    variant: "destructive",
+                  });
+                  if (!ok) return;
                   const res = await adminDeleteNoteAction({
                     id: note.id,
                     targetType,

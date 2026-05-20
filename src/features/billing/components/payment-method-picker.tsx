@@ -19,6 +19,7 @@ import * as React from "react";
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
 import { Button } from "@/components/ui/button";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -117,20 +118,22 @@ function StatusStrip({ summary }: { summary: PaymentMethodSummary }) {
 
 function ClearMethodButton() {
   const [pending, start] = React.useTransition();
+  const confirm = useConfirm();
   return (
     <Button
       type="button"
       variant="ghost"
       size="sm"
       disabled={pending}
-      onClick={() => {
-        if (
-          !confirm(
-            "Turn off online payments? Clients won't be able to pay invoices through Stackivo until you re-enable a method.",
-          )
-        ) {
-          return;
-        }
+      onClick={async () => {
+        const ok = await confirm({
+          title: "Turn off online payments?",
+          description:
+            "Clients won't be able to pay invoices through Stackivo until you re-enable a method.",
+          confirmLabel: "Turn off",
+          variant: "destructive",
+        });
+        if (!ok) return;
         start(async () => {
           await clearPaymentMethodAction();
         });

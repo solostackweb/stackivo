@@ -14,6 +14,7 @@
  */
 
 import * as React from "react";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Loader2, ShieldCheck, ShieldAlert, Trash2 } from "lucide-react";
@@ -295,6 +296,7 @@ function FactorList({
   factors: MfaStatus["factors"];
   onChange: () => void;
 }) {
+  const confirm = useConfirm();
   if (factors.length === 0) return null;
   return (
     <ul className="overflow-hidden rounded-md border bg-card text-xs">
@@ -323,12 +325,14 @@ function FactorList({
                 );
                 return;
               }
-              if (
-                !window.confirm(
-                  "Remove this factor? You'll need another verified factor to keep admin access.",
-                )
-              )
-                return;
+              const ok = await confirm({
+                title: "Remove this factor?",
+                description:
+                  "You'll need another verified factor to keep admin access.",
+                confirmLabel: "Remove",
+                variant: "destructive",
+              });
+              if (!ok) return;
               const res = await unenrollFactorAction(f.id);
               if (res.ok) {
                 toast.success("Factor removed");

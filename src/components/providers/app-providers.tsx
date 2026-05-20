@@ -10,6 +10,7 @@ import { InstallPrompt } from "@/features/pwa/install-prompt";
 import { UpdatePrompt } from "@/features/pwa/update-prompt";
 import { PostHogProvider } from "@/lib/analytics/posthog-provider";
 import { ClarityProvider } from "@/lib/analytics/clarity-provider";
+import { ConfirmDialogProvider } from "@/components/ui/confirm-dialog";
 
 export function AppProviders({ children }: { children: React.ReactNode }) {
   return (
@@ -21,15 +22,17 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
     >
       <PostHogProvider>
         <TooltipProvider delayDuration={200}>
-          {children}
-          <Toaster />
-          <OfflineIndicator />
-          <InstallPrompt />
-          <UpdatePrompt />
-          <ServiceWorkerRegister />
-          {/* Microsoft Clarity heatmaps + replay. No-ops when the env var
-              isn't set, so safe to leave mounted globally. */}
-          <ClarityProvider />
+          <ConfirmDialogProvider>
+            {children}
+            <Toaster />
+            <OfflineIndicator />
+            <InstallPrompt />
+            <UpdatePrompt />
+            <ServiceWorkerRegister />
+            {/* Microsoft Clarity heatmaps + replay. No-ops when the env var
+                isn't set, so safe to leave mounted globally. */}
+            <ClarityProvider />
+          </ConfirmDialogProvider>
         </TooltipProvider>
       </PostHogProvider>
     </ThemeProvider>

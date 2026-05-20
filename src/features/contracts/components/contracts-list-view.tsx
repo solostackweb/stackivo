@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import {
   Select,
   SelectContent,
@@ -99,8 +100,16 @@ export function ContractsListView({
     return { total, signed, awaiting, value };
   }, [contracts]);
 
-  const handleDelete = (contract: ContractRecord) => {
-    if (!confirm(`Delete "${contract.title}"? This cannot be undone.`)) return;
+  const confirm = useConfirm();
+
+  const handleDelete = async (contract: ContractRecord) => {
+    const ok = await confirm({
+      title: `Delete "${contract.title}"?`,
+      description: "This cannot be undone.",
+      confirmLabel: "Delete",
+      variant: "destructive",
+    });
+    if (!ok) return;
     const fd = new FormData();
     fd.set("id", contract.id);
     startTransition(async () => {

@@ -1,41 +1,29 @@
 import "server-only";
 
 /**
- * Welcome Document PDF.
+ * Welcome Document PDF — single-document layout matching invoice/contract quality.
  *
- * Premium onboarding package. Two-page-style layout:
+ * No separate cover page. Everything flows on one document:
+ *   1. Brand accent bar   (full-bleed, 4px)
+ *   2. Header             — logo + business name left │ "WELCOME GUIDE" + title right
+ *   3. Meta row           — Published │ Sections │ Read time
+ *   4. Parties            — Prepared for left │ Prepared by right (vertical divider)
+ *   5. Intro              — if present, with bottom separator
+ *   6. Sections           — numbered 01, 02 … wrap={false} keeps heading+body together
+ *   7. "What happens next" callout
+ *   8. Fixed branded footer
  *
- *   PAGE 1 — Cover:
- *     - Big tinted accent surface (uses the freelancer's brand colour as
- *       background, with readable on-accent text).
- *     - Eyebrow "WELCOME GUIDE", title in oversized type, intro line.
- *     - "Prepared for {client}" + "Prepared by {business}" tags.
- *     - Brand logo in the bottom-left corner, with a "Published {date}"
- *       footer.
- *
- *   PAGE 2..N — Body:
- *     - Standard branded header (compact mode — no contact lines, since
- *       the cover already established the sender).
- *     - Numbered sections rendered as headings + relaxed body type.
- *     - Optional intro paragraph rendered before the first numbered
- *       section.
- *     - "Next steps" callout block at the end pointing to the
- *       acknowledgement link when required.
- *     - Branded footer on every page.
- *
- * The split-cover pattern is what makes welcome docs feel like an
- * agency onboarding package rather than a wall of text.
+ * Same discipline as invoice-pdf.tsx and contract-pdf.tsx.
  */
 
 import * as React from "react";
-import { Document, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
+import { Document, Image, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
 import type { WelcomeDocumentSection } from "@/features/welcome-documents/types";
 import { welcomeMarkdownToPlain } from "@/features/welcome-documents/markdown";
 import {
   pdfColors,
   pdfFonts,
   pdfLineHeights,
-  pdfPage,
   pdfRadii,
   pdfSizes,
   pdfSpacing,
@@ -44,15 +32,14 @@ import {
 import { resolveBrand, type ResolvedBrand } from "./brand";
 import {
   DocumentFooter,
-  DocumentHeader,
-  DocumentPage,
   NoteBlock,
-  Section,
   formatDate,
 } from "./primitives";
 import type { UserProfileRow } from "@/lib/supabase/types";
 
-// --- Data shape (preserved) -------------------------------------------------
+// ---------------------------------------------------------------------------
+// Data shape (preserved exactly)
+// ---------------------------------------------------------------------------
 
 export interface WelcomeDocumentPdfData {
   title: string;
@@ -78,118 +65,171 @@ export interface WelcomeDocumentPdfData {
   } | null;
 }
 
-// --- Cover page styles ------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Stylesheet — mirrors invoice-pdf.tsx conventions exactly
+// ---------------------------------------------------------------------------
 
-const coverStyles = StyleSheet.create({
+const PAD = pdfSpacing.pagePadding; // 40
+
+const s = StyleSheet.create({
   page: {
     fontFamily: pdfFonts.base,
+    fontSize: pdfSizes.base,
     color: pdfColors.foreground,
     backgroundColor: pdfColors.surface,
-    padding: 0,
+    paddingHorizontal: PAD,
+    paddingTop: PAD,
+    paddingBottom: PAD + 28,
+    lineHeight: pdfLineHeights.normal,
   },
-  hero: {
-    width: pdfPage.width,
-    minHeight: pdfPage.height * 0.52,
-    padding: pdfSpacing["3xl"],
+
+  // ── accent bar ──────────────────────────────────────────────────────────
+  accentBar: {
+    height: 4,
+    marginHorizontal: -PAD,
+    marginTop: -PAD,
+    marginBottom: 18,
+  },
+
+  // ── shared separator ────────────────────────────────────────────────────
+  sep: {
+    borderBottomWidth: 0.5,
+    borderBottomColor: pdfColors.border,
+    marginBottom: 14,
+    paddingBottom: 14,
+  },
+
+  // ── header ──────────────────────────────────────────────────────────────
+  header: {
+    flexDirection: "row",
     justifyContent: "space-between",
+    alignItems: "flex-start",
   },
-  eyebrow: {
+  headerLeft: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    maxWidth: "55%",
+  },
+  logo: {
+    width: 40,
+    height: 40,
+    objectFit: "contain",
+    marginRight: 10,
+    borderRadius: pdfRadii.sm,
+  },
+  businessName: {
+    fontFamily: pdfFonts.bold,
+    fontSize: pdfSizes.md,
+    color: pdfColors.foreground,
+    lineHeight: pdfLineHeights.tight,
+    marginBottom: 3,
+  },
+  headerLine: {
+    fontSize: pdfSizes.xs,
+    color: pdfColors.mutedForeground,
+    marginTop: 2,
+  },
+  headerRight: {
+    alignItems: "flex-end",
+  },
+  docEyebrow: {
     fontFamily: pdfFonts.bold,
     fontSize: pdfSizes.eyebrow,
     textTransform: "uppercase",
-    letterSpacing: pdfTracking.widest,
-    opacity: 0.85,
+    letterSpacing: pdfTracking.wider,
+    marginBottom: 5,
   },
-  titleBlock: { marginTop: pdfSpacing["3xl"] },
-  title: {
+  docTitle: {
     fontFamily: pdfFonts.bold,
-    fontSize: pdfSizes["3xl"],
-    lineHeight: pdfLineHeights.tight,
+    fontSize: pdfSizes.xl,
+    color: pdfColors.foreground,
     letterSpacing: pdfTracking.tight,
-    marginBottom: pdfSpacing.md,
-  },
-  intro: {
-    fontSize: pdfSizes.md,
-    lineHeight: pdfLineHeights.normal,
-    opacity: 0.9,
-    maxWidth: 420,
-  },
-  metaRow: {
-    flexDirection: "row",
-    marginTop: pdfSpacing["3xl"],
-    gap: pdfSpacing.lg,
-  },
-  metaCard: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: pdfRadii.pill,
-    backgroundColor: "rgba(255,255,255,0.18)",
-  },
-  metaLabel: {
-    fontSize: pdfSizes.xs,
-    opacity: 0.75,
-    textTransform: "uppercase",
-    letterSpacing: pdfTracking.wide,
-  },
-  metaValue: {
-    fontFamily: pdfFonts.bold,
-    fontSize: pdfSizes.sm,
-    marginTop: 1,
+    lineHeight: pdfLineHeights.tight,
+    textAlign: "right",
   },
 
-  // Lower-half cover content
-  belowHero: {
-    flex: 1,
-    paddingHorizontal: pdfSpacing["3xl"],
-    paddingTop: pdfSpacing["2xl"],
-    paddingBottom: pdfSpacing["2xl"],
-    justifyContent: "space-between",
-  },
-  preparedFor: {
+  // ── meta row (Published | Sections | Read time) ──────────────────────────
+  metaRow: {
     flexDirection: "row",
-    gap: pdfSpacing["3xl"],
   },
-  preparedCell: { flex: 1 },
-  preparedEyebrow: {
+  metaCell: {
+    flex: 1,
+  },
+  metaLabel: {
     fontFamily: pdfFonts.bold,
     fontSize: pdfSizes.eyebrow,
     color: pdfColors.mutedForeground,
     textTransform: "uppercase",
     letterSpacing: pdfTracking.wider,
-    marginBottom: 4,
+    marginBottom: 3,
   },
-  preparedValue: {
+  metaValue: {
     fontFamily: pdfFonts.bold,
-    fontSize: pdfSizes.md,
+    fontSize: pdfSizes.sm,
     color: pdfColors.foreground,
   },
-  preparedMuted: {
-    fontSize: pdfSizes.sm,
-    color: pdfColors.mutedForeground,
-    marginTop: 2,
+
+  // ── parties (Prepared for | Prepared by) ─────────────────────────────────
+  parties: {
+    flexDirection: "row",
   },
-  coverFooter: {
+  partyCol: {
+    flex: 1,
+  },
+  partyColRight: {
+    flex: 1,
+    paddingLeft: 20,
+    borderLeftWidth: 0.5,
+    borderLeftColor: pdfColors.border,
+    marginLeft: 20,
+  },
+  partyEyebrow: {
+    fontFamily: pdfFonts.bold,
+    fontSize: pdfSizes.eyebrow,
+    color: pdfColors.mutedForeground,
+    textTransform: "uppercase",
+    letterSpacing: pdfTracking.wider,
+    marginBottom: 6,
+  },
+  partyName: {
+    fontFamily: pdfFonts.bold,
+    fontSize: pdfSizes.sm,
+    color: pdfColors.foreground,
+    marginBottom: 4,
+  },
+  partyLine: {
     fontSize: pdfSizes.xs,
     color: pdfColors.mutedForeground,
-    textAlign: "center",
+    marginTop: 2,
+    lineHeight: pdfLineHeights.snug,
   },
-});
 
-// --- Body styles ------------------------------------------------------------
+  // ── intro ────────────────────────────────────────────────────────────────
+  intro: {
+    fontSize: pdfSizes.sm,
+    lineHeight: pdfLineHeights.relaxed,
+    color: pdfColors.text,
+    marginBottom: 10,
+    borderBottomWidth: 0.5,
+    borderBottomColor: pdfColors.border,
+    paddingBottom: 10,
+  },
 
-const bodyStyles = StyleSheet.create({
-  section: { marginBottom: pdfSpacing.xl },
-  sectionHeader: {
+  // ── sections ─────────────────────────────────────────────────────────────
+  section: {
+    marginBottom: 10,
+  },
+  sectionRow: {
     flexDirection: "row",
     alignItems: "baseline",
-    marginBottom: 6,
+    marginBottom: 4,
   },
   sectionNumber: {
     fontFamily: pdfFonts.bold,
     fontSize: pdfSizes.eyebrow,
     color: pdfColors.mutedForeground,
     letterSpacing: pdfTracking.wider,
-    marginRight: 10,
+    marginRight: 8,
     minWidth: 22,
   },
   sectionHeading: {
@@ -202,16 +242,24 @@ const bodyStyles = StyleSheet.create({
     fontSize: pdfSizes.sm,
     lineHeight: pdfLineHeights.relaxed,
     color: pdfColors.text,
+    marginTop: 3,
   },
-  intro: {
-    fontSize: pdfSizes.md,
-    lineHeight: pdfLineHeights.relaxed,
-    color: pdfColors.text,
-    marginBottom: pdfSpacing.xl,
+
+  // ── "what happens next" ───────────────────────────────────────────────────
+  nextEyebrow: {
+    fontFamily: pdfFonts.bold,
+    fontSize: pdfSizes.eyebrow,
+    color: pdfColors.mutedForeground,
+    textTransform: "uppercase",
+    letterSpacing: pdfTracking.wider,
+    marginTop: 12,
+    marginBottom: 6,
   },
 });
 
-// --- Template ---------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Template
+// ---------------------------------------------------------------------------
 
 export function WelcomeDocumentPdf({
   data,
@@ -227,147 +275,131 @@ export function WelcomeDocumentPdf({
 
   return (
     <Document title={`Welcome guide – ${data.title}`} author={brand.businessName}>
-      {/* COVER */}
-      <Page size="A4" style={coverStyles.page}>
-        <View
-          style={[
-            coverStyles.hero,
-            { backgroundColor: brand.accent, color: brand.onAccent },
-          ]}
-        >
-          <View>
-            <Text style={[coverStyles.eyebrow, { color: brand.onAccent }]}>
+      <Page size="A4" style={s.page}>
+
+        {/* ── 1. ACCENT BAR ─────────────────────────────────── */}
+        <View style={[s.accentBar, { backgroundColor: brand.accent }]} />
+
+        {/* ── 2. HEADER ─────────────────────────────────────── */}
+        <View style={[s.header, s.sep]}>
+          <View style={s.headerLeft}>
+            {brand.logoUrl ? (
+              // eslint-disable-next-line jsx-a11y/alt-text
+              <Image src={brand.logoUrl} style={s.logo} />
+            ) : null}
+            <View>
+              <Text style={s.businessName}>{brand.businessName}</Text>
+              {brand.legalName ? (
+                <Text style={s.headerLine}>{brand.legalName}</Text>
+              ) : null}
+              {brand.contact.email ? (
+                <Text style={s.headerLine}>{brand.contact.email}</Text>
+              ) : null}
+              {brand.contact.phone ? (
+                <Text style={s.headerLine}>{brand.contact.phone}</Text>
+              ) : null}
+            </View>
+          </View>
+          <View style={s.headerRight}>
+            <Text style={[s.docEyebrow, { color: brand.accent }]}>
               Welcome Guide
             </Text>
-            <View style={coverStyles.titleBlock}>
-              <Text style={[coverStyles.title, { color: brand.onAccent }]}>
-                {data.title}
-              </Text>
-              {intro ? (
-                <Text style={[coverStyles.intro, { color: brand.onAccent }]}>
-                  {intro}
-                </Text>
-              ) : null}
-            </View>
-          </View>
-
-          <View style={coverStyles.metaRow}>
-            {data.publishedAt ? (
-              <View style={coverStyles.metaCard}>
-                <Text style={[coverStyles.metaLabel, { color: brand.onAccent }]}>
-                  Published
-                </Text>
-                <Text style={[coverStyles.metaValue, { color: brand.onAccent }]}>
-                  {formatDate(data.publishedAt)}
-                </Text>
-              </View>
-            ) : null}
-            {data.sections.length > 0 ? (
-              <View style={coverStyles.metaCard}>
-                <Text style={[coverStyles.metaLabel, { color: brand.onAccent }]}>
-                  Sections
-                </Text>
-                <Text style={[coverStyles.metaValue, { color: brand.onAccent }]}>
-                  {data.sections.length}
-                </Text>
-              </View>
-            ) : null}
-            <View style={coverStyles.metaCard}>
-              <Text style={[coverStyles.metaLabel, { color: brand.onAccent }]}>
-                Read time
-              </Text>
-              <Text style={[coverStyles.metaValue, { color: brand.onAccent }]}>
-                {estimateReadMinutes(data)} min
-              </Text>
-            </View>
+            <Text style={s.docTitle}>{data.title}</Text>
           </View>
         </View>
 
-        <View style={coverStyles.belowHero}>
-          <View style={coverStyles.preparedFor}>
-            <View style={coverStyles.preparedCell}>
-              <Text style={coverStyles.preparedEyebrow}>Prepared for</Text>
-              <Text style={coverStyles.preparedValue}>
-                {data.recipient?.name ?? "Your team"}
-              </Text>
-              {data.recipient?.company ? (
-                <Text style={coverStyles.preparedMuted}>{data.recipient.company}</Text>
-              ) : null}
-              {data.recipient?.email ? (
-                <Text style={coverStyles.preparedMuted}>{data.recipient.email}</Text>
-              ) : null}
+        {/* ── 3. META ROW ───────────────────────────────────── */}
+        <View style={[s.metaRow, s.sep]}>
+          {data.publishedAt ? (
+            <View style={s.metaCell}>
+              <Text style={s.metaLabel}>Published</Text>
+              <Text style={s.metaValue}>{formatDate(data.publishedAt)}</Text>
             </View>
-            <View style={coverStyles.preparedCell}>
-              <Text style={coverStyles.preparedEyebrow}>Prepared by</Text>
-              <Text style={coverStyles.preparedValue}>{brand.businessName}</Text>
-              {brand.contact.email ? (
-                <Text style={coverStyles.preparedMuted}>{brand.contact.email}</Text>
-              ) : null}
-              {brand.contact.website ? (
-                <Text style={coverStyles.preparedMuted}>{brand.contact.website}</Text>
-              ) : null}
-            </View>
+          ) : null}
+          <View style={s.metaCell}>
+            <Text style={s.metaLabel}>Sections</Text>
+            <Text style={s.metaValue}>{data.sections.length}</Text>
           </View>
-
-          <Text style={coverStyles.coverFooter}>
-            {brand.businessName}
-            {brand.contact.website ? ` · ${brand.contact.website}` : ""}
-          </Text>
+          <View style={s.metaCell}>
+            <Text style={s.metaLabel}>Read time</Text>
+            <Text style={s.metaValue}>{estimateReadMinutes(data)} min</Text>
+          </View>
         </View>
-      </Page>
 
-      {/* BODY */}
-      <DocumentPage brand={brand}>
-        <DocumentHeader
-          brand={brand}
-          eyebrow="Welcome Guide"
-          title={truncate(data.title, 38)}
-          compact
-        />
+        {/* ── 4. PARTIES ────────────────────────────────────── */}
+        <View style={[s.parties, s.sep]}>
+          <View style={s.partyCol}>
+            <Text style={s.partyEyebrow}>Prepared for</Text>
+            <Text style={s.partyName}>
+              {data.recipient?.name ?? "Your team"}
+            </Text>
+            {data.recipient?.company ? (
+              <Text style={s.partyLine}>{data.recipient.company}</Text>
+            ) : null}
+            {data.recipient?.email ? (
+              <Text style={s.partyLine}>{data.recipient.email}</Text>
+            ) : null}
+          </View>
+          <View style={s.partyColRight}>
+            <Text style={s.partyEyebrow}>Prepared by</Text>
+            <Text style={s.partyName}>{brand.businessName}</Text>
+            {brand.contact.email ? (
+              <Text style={s.partyLine}>{brand.contact.email}</Text>
+            ) : null}
+            {brand.contact.phone ? (
+              <Text style={s.partyLine}>{brand.contact.phone}</Text>
+            ) : null}
+          </View>
+        </View>
 
+        {/* ── 5. INTRO ──────────────────────────────────────── */}
         {intro && data.sections.length > 0 ? (
-          <Text style={bodyStyles.intro}>{intro}</Text>
+          <Text style={s.intro}>{intro}</Text>
         ) : null}
 
+        {/* ── 6. SECTIONS ───────────────────────────────────── */}
         <View>
           {data.sections.length > 0 ? (
             data.sections.map((section, i) => (
-              <View key={i} style={bodyStyles.section} wrap={true}>
-                <View style={bodyStyles.sectionHeader}>
-                  <Text style={bodyStyles.sectionNumber}>
+              <View key={i} style={s.section} wrap={false}>
+                <View style={s.sectionRow}>
+                  <Text style={s.sectionNumber}>
                     {String(i + 1).padStart(2, "0")}
                   </Text>
-                  <Text style={bodyStyles.sectionHeading}>{section.heading}</Text>
+                  <Text style={s.sectionHeading}>{section.heading}</Text>
                 </View>
-                <Text style={bodyStyles.sectionBody}>
+                <Text style={s.sectionBody}>
                   {welcomeMarkdownToPlain(section.body)}
                 </Text>
               </View>
             ))
           ) : intro ? (
-            <Text style={bodyStyles.sectionBody}>{intro}</Text>
+            <Text style={s.sectionBody}>{intro}</Text>
           ) : (
-            <Text style={bodyStyles.sectionBody}>
+            <Text style={s.sectionBody}>
               This guide is being prepared — content will follow shortly.
             </Text>
           )}
         </View>
 
-        <Section eyebrow="What happens next">
-          <NoteBlock accent={brand.accent}>
-            {data.acknowledgementRequired && data.publicUrl
-              ? `Once you've read through the guide, please confirm at the bottom of the online version (${data.publicUrl}). That's the handshake to kick the project off.`
-              : `Reply to the email this guide arrived on with any questions — we'll incorporate them into the kickoff conversation.`}
-          </NoteBlock>
-        </Section>
+        {/* ── 7. WHAT HAPPENS NEXT ──────────────────────────── */}
+        <Text style={s.nextEyebrow}>What happens next</Text>
+        <NoteBlock accent={brand.accent}>
+          {data.acknowledgementRequired && data.publicUrl
+            ? `Once you've read through the guide, please confirm at the bottom of the online version (${data.publicUrl}). That's the handshake to kick the project off.`
+            : `Reply to the email this guide arrived on with any questions — we'll incorporate them into the kickoff conversation.`}
+        </NoteBlock>
 
+        {/* ── 8. FOOTER ─────────────────────────────────────── */}
         <DocumentFooter brand={brand} label={`Welcome guide · ${data.title}`} />
-      </DocumentPage>
+      </Page>
     </Document>
   );
 }
 
-// --- Helpers ----------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
 function estimateReadMinutes(data: WelcomeDocumentPdfData): number {
   const words =
@@ -377,10 +409,6 @@ function estimateReadMinutes(data: WelcomeDocumentPdfData): number {
       0,
     );
   return Math.max(1, Math.round(words / 220));
-}
-
-function truncate(s: string, max: number): string {
-  return s.length > max ? `${s.slice(0, max - 1)}…` : s;
 }
 
 function buildBrandFromData(

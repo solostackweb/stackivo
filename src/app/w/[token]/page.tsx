@@ -1,3 +1,4 @@
+import * as React from "react";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { Sparkles, Download } from "lucide-react";
@@ -82,8 +83,35 @@ function WelcomeViewer({
   const sections = parseWelcomeContent(doc.content);
   const brand = doc.brand_color ?? "#2563EB";
 
+  // Force light-mode CSS variable values on this public page.
+  // The root layout wraps AppProviders (next-themes), which injects
+  // class="dark" on <html> for users whose system is in dark mode.
+  // That makes text-foreground/80 render as near-white — invisible on
+  // the white article card. Overriding the variables here at the page
+  // root means every Tailwind CSS-variable class (text-foreground,
+  // text-muted-foreground, bg-muted, etc.) always resolves to the
+  // correct light-mode value regardless of system preference.
+  const lightVars = {
+    "--background":        "0 0% 100%",
+    "--foreground":        "222 47% 11%",
+    "--card":              "0 0% 100%",
+    "--card-foreground":   "222 47% 11%",
+    "--muted":             "210 40% 96%",
+    "--muted-foreground":  "215 16% 47%",
+    "--primary":           "224 76% 40%",
+    "--primary-foreground":"0 0% 100%",
+    "--accent":            "210 40% 96%",
+    "--accent-foreground": "222 47% 11%",
+    "--border":            "214 32% 91%",
+    "--input":             "214 32% 91%",
+    "--ring":              "224 76% 40%",
+    "--success":           "142 72% 36%",
+    "--destructive":       "0 84% 60%",
+    colorScheme:           "light",
+  } as React.CSSProperties;
+
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900">
+    <div className="min-h-screen bg-slate-50 text-slate-900" style={lightVars}>
       {/* Hero */}
       <header
         className="px-5 pb-12 pt-12 text-white sm:px-10 sm:pt-16"

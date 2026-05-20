@@ -128,7 +128,7 @@ const headerStyles = StyleSheet.create({
   },
   title: {
     fontFamily: pdfFonts.bold,
-    fontSize: pdfSizes["2xl"],
+    fontSize: pdfSizes.xl,
     color: pdfColors.foreground,
     lineHeight: pdfLineHeights.tight,
     textAlign: "right",
@@ -492,7 +492,7 @@ const amountStyles = StyleSheet.create({
   },
   value: {
     fontFamily: pdfFonts.bold,
-    fontSize: pdfSizes["2xl"],
+    fontSize: pdfSizes.xl,
     color: pdfColors.foreground,
     letterSpacing: pdfTracking.tight,
   },
@@ -541,15 +541,19 @@ const partyStyles = StyleSheet.create({
   pair: {
     flexDirection: "row",
     marginBottom: pdfSpacing.sectionGap,
+    borderTopWidth: 0.5,
+    borderTopColor: pdfColors.border,
+    paddingTop: pdfSpacing.md,
   },
-  spacer: { width: pdfSpacing.md },
-  card: {
+  colLeft: {
     flex: 1,
-    borderWidth: 0.5,
-    borderColor: pdfColors.border,
-    borderRadius: pdfRadii.md,
-    padding: pdfSpacing.md,
-    minHeight: 96,
+    paddingRight: pdfSpacing.lg,
+  },
+  colRight: {
+    flex: 1,
+    paddingLeft: pdfSpacing.lg,
+    borderLeftWidth: 0.5,
+    borderLeftColor: pdfColors.border,
   },
   label: {
     fontFamily: pdfFonts.bold,
@@ -561,12 +565,12 @@ const partyStyles = StyleSheet.create({
   },
   name: {
     fontFamily: pdfFonts.bold,
-    fontSize: pdfSizes.md,
+    fontSize: pdfSizes.sm,
     color: pdfColors.foreground,
     marginBottom: 4,
   },
   line: {
-    fontSize: pdfSizes.sm,
+    fontSize: pdfSizes.xs,
     color: pdfColors.mutedForeground,
     marginTop: 2,
     lineHeight: pdfLineHeights.snug,
@@ -589,16 +593,19 @@ export function PartyPair({
 }) {
   return (
     <View style={partyStyles.pair}>
-      <PartyCard data={left} />
-      <View style={partyStyles.spacer} />
-      <PartyCard data={right} />
+      <View style={partyStyles.colLeft}>
+        <PartyCard data={left} />
+      </View>
+      <View style={partyStyles.colRight}>
+        <PartyCard data={right} />
+      </View>
     </View>
   );
 }
 
 export function PartyCard({ data }: { data: PartyCardData }) {
   return (
-    <View style={partyStyles.card}>
+    <View>
       <Text style={partyStyles.label}>{data.label}</Text>
       <Text style={partyStyles.name}>{data.name}</Text>
       {data.lines.map((line, i) => (
@@ -974,6 +981,7 @@ export function formatDateTime(iso: string | null | undefined): string {
   const time = d.toLocaleTimeString("en-IN", {
     hour: "2-digit",
     minute: "2-digit",
+    hour12: false,
   });
   return `${date} · ${time}`;
 }

@@ -390,16 +390,31 @@ export async function recordWelcomeAcknowledgement(input: {
     .update(`${input.ip ?? "no-ip"}|${input.userAgent ?? "no-ua"}`)
     .digest("hex");
 
-  // Idempotent — if this fingerprint already acked, return the
-  // existing row instead of erroring.
-  const { data: existing } = await admin
+  // Idempotent — if the same fingerprint (IP + UA) already acknowledged,
+  // return the existing row so the client shows the confirmation panel.
+  const { data: existingByIp } = await admin
     .from("welcome_document_acknowledgements")
     .select("*")
     .eq("document_id", doc.id)
     .eq("ip_hash", fingerprint)
     .maybeSingle();
-  if (existing) {
-    return { ok: true, ack: existing as WelcomeDocumentAcknowledgementRow };
+  if (existingByIp) {
+    return { ok: true, ack: existingByIp as WelcomeDocumentAcknowledgementRow };
+  }
+
+  // Also guard by viewer_user_id when the requester is authenticated.
+  // This prevents a DB unique-constraint error (and a confusing "Could not
+  // save" message) when a logged-in user acknowledges from a second device.
+  if (input.viewerUserId) {
+    const { data: existingByUser } = await admin
+      .from("welcome_document_acknowledgements")
+      .select("*")
+      .eq("document_id", doc.id)
+      .eq("viewer_user_id", input.viewerUserId)
+      .maybeSingle();
+    if (existingByUser) {
+      return { ok: true, ack: existingByUser as WelcomeDocumentAcknowledgementRow };
+    }
   }
 
   const { data: inserted, error } = await admin
