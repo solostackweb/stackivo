@@ -61,9 +61,28 @@ async function safeHashedEmail(email: string): Promise<string | undefined> {
 }
 
 function userSafeErrorMessage(err: unknown): string {
-  if (err instanceof Error && err.message.trim()) return err.message;
-  if (typeof err === "string" && err.trim()) return err;
-  return "We couldn't create your account. Please try again in a moment.";
+  const fallback = "We couldn't create your account. Please try again in a moment.";
+  if (err instanceof Error) {
+    const message = err.message.trim();
+    if (message && message !== "{}" && message !== "[]") return message;
+  }
+  if (typeof err === "string") {
+    const message = err.trim();
+    if (message && message !== "{}" && message !== "[]") return message;
+  }
+  if (err && typeof err === "object") {
+    const maybeMessage = (err as { message?: unknown; error?: unknown }).message;
+    if (typeof maybeMessage === "string") {
+      const message = maybeMessage.trim();
+      if (message && message !== "{}" && message !== "[]") return message;
+    }
+    const maybeError = (err as { error?: unknown }).error;
+    if (typeof maybeError === "string") {
+      const message = maybeError.trim();
+      if (message && message !== "{}" && message !== "[]") return message;
+    }
+  }
+  return fallback;
 }
 
 function isExistingAccountError(message: string): boolean {
