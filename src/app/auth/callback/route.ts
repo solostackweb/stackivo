@@ -7,7 +7,8 @@
  *      (also `?code=...`).
  *
  * We exchange the one-time code for a session, which sets the auth cookies
- * via our server Supabase client, then redirect to `?next=` (sanitised).
+ * via our server Supabase client, then redirect to the short-lived
+ * `stackivo_oauth_next` cookie or `?next=` fallback (sanitised).
  *
  * Error handling:
  *   - Missing code     → redirect to login with ?error=missing_code
@@ -16,6 +17,7 @@
  */
 
 import { NextResponse, type NextRequest } from "next/server";
+import { cookies } from "next/headers";
 import { getServerSupabase } from "@/lib/supabase/server";
 import {
   AUTH_DEFAULT_REDIRECT,
@@ -33,15 +35,28 @@ function sanitiseNext(raw: string | null): string {
   return raw;
 }
 
+function sanitiseErrorRedirect(raw: string | null): typeof AUTH_LOGIN_ROUTE | "/signup" {
+  return raw === "/signup" ? "/signup" : AUTH_LOGIN_ROUTE;
+}
+
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
-  const next = sanitiseNext(searchParams.get("next"));
+  const cookieStore = await cookies();
+  const next = sanitiseNext(
+    cookieStore.get("stackivo_oauth_next")?.value ?? searchParams.get("next"),
+  );
+  const errorRedirect = sanitiseErrorRedirect(
+    cookieStore.get("stackivo_oauth_from")?.value ?? AUTH_LOGIN_ROUTE,
+  );
 
   if (!code) {
-    return NextResponse.redirect(
-      `${origin}${AUTH_LOGIN_ROUTE}?error=missing_code`,
+    const response = NextResponse.redirect(
+      `${origin}${errorRedirect}?error=missing_code`,
     );
+    response.cookies.delete("stackivo_oauth_next");
+    response.cookies.delete("stackivo_oauth_from");
+    return response;
   }
 
   const supabase = await getServerSupabase();
@@ -50,11 +65,17 @@ export async function GET(request: NextRequest) {
   if (error) {
     // Surface the raw error code so login/signup can show something helpful.
     const errorCode = encodeURIComponent(error.message);
-    return NextResponse.redirect(
-      `${origin}${AUTH_LOGIN_ROUTE}?error=${errorCode}`,
+    const response = NextResponse.redirect(
+      `${origin}${errorRedirect}?error=${errorCode}`,
     );
+    response.cookies.delete("stackivo_oauth_next");
+    response.cookies.delete("stackivo_oauth_from");
+    return response;
   }
 
   // Session established — send the user to their destination.
-  return NextResponse.redirect(`${origin}${next}`);
+  const response = NextResponse.redirect(`${origin}${next}`);
+  response.cookies.delete("stackivo_oauth_next");
+  response.cookies.delete("stackivo_oauth_from");
+  return response;
 }

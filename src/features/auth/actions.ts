@@ -10,7 +10,7 @@
  */
 
 import { redirect } from "next/navigation";
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { env } from "@/config/env";
 import { getServerSupabase } from "@/lib/supabase/server";
 import {
@@ -474,11 +474,27 @@ export async function googleOAuthAction(formData: FormData): Promise<void> {
   // Which auth page launched this action (login | signup). Used to redirect
   // errors back to the originating page so the user sees the error in context.
   const from = formData.get("from")?.toString() === "signup" ? "/signup" : AUTH_LOGIN_ROUTE;
+  const cookieStore = await cookies();
+
+  cookieStore.set("stackivo_oauth_next", next, {
+    httpOnly: true,
+    maxAge: 5 * 60,
+    path: "/",
+    sameSite: "lax",
+    secure: origin.startsWith("https://"),
+  });
+  cookieStore.set("stackivo_oauth_from", from, {
+    httpOnly: true,
+    maxAge: 5 * 60,
+    path: "/",
+    sameSite: "lax",
+    secure: origin.startsWith("https://"),
+  });
 
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "google",
     options: {
-      redirectTo: `${origin}/auth/callback?next=${encodeURIComponent(next)}`,
+      redirectTo: `${origin}/auth/callback`,
       queryParams: {
         // Request a refresh token so long-lived sessions work.
         access_type: "offline",
