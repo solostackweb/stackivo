@@ -1,32 +1,23 @@
 import "server-only";
 
 /**
- * Welcome Document PDF — redesigned to match invoice/contract PDF quality.
+ * Welcome Document PDF — single-document layout matching invoice/contract quality.
  *
- * PAGE 1 — Cover:
- *   - Brand-coloured hero block: eyebrow → title → intro → meta pills
- *     All content flows top-down (no justifyContent: space-between gaps).
- *   - White lower block: Prepared for | Prepared by  (column + divider)
- *   - Footer rule + business name
+ * No separate cover page. Everything flows on one document:
+ *   1. Brand accent bar   (full-bleed, 4px)
+ *   2. Header             — logo + business name left │ "WELCOME GUIDE" + title right
+ *   3. Meta row           — Published │ Sections │ Read time
+ *   4. Parties            — Prepared for left │ Prepared by right (vertical divider)
+ *   5. Intro              — if present, with bottom separator
+ *   6. Sections           — numbered 01, 02 … wrap={false} keeps heading+body together
+ *   7. "What happens next" callout
+ *   8. Fixed branded footer
  *
- * PAGE 2..N — Body:
- *   - Compact header: business name left | eyebrow + title right (14pt, no wrap)
- *   - Intro paragraph at sm size (not md) to save vertical space
- *   - Numbered sections at 14pt gap (not 20pt)
- *   - "What happens next" callout
- *   - Fixed branded footer
- *
- * Key fixes vs old version:
- *   - Removed justifyContent: "space-between" that created giant empty gaps
- *   - Replaced gap: (unsupported in react-pdf) with marginRight on each pill
- *   - Cover hero is content-height, not fixed minHeight fraction
- *   - Body title capped at 14pt so long titles never wrap
- *   - Intro at 9.5pt (sm), sections gap 14pt — all 10 sections fit on 2 pages
- *   - Uses Page directly for body — no DocumentPage wrapper
+ * Same discipline as invoice-pdf.tsx and contract-pdf.tsx.
  */
 
 import * as React from "react";
-import { Document, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
+import { Document, Image, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
 import type { WelcomeDocumentSection } from "@/features/welcome-documents/types";
 import { welcomeMarkdownToPlain } from "@/features/welcome-documents/markdown";
 import {
@@ -75,121 +66,12 @@ export interface WelcomeDocumentPdfData {
 }
 
 // ---------------------------------------------------------------------------
-// Stylesheet
+// Stylesheet — mirrors invoice-pdf.tsx conventions exactly
 // ---------------------------------------------------------------------------
 
 const PAD = pdfSpacing.pagePadding; // 40
 
-const coverS = StyleSheet.create({
-  page: {
-    fontFamily: pdfFonts.base,
-    color: pdfColors.foreground,
-    backgroundColor: pdfColors.surface,
-    padding: 0,
-  },
-
-  // ── hero (flex:1 fills remaining page height — blue covers ~75% of cover) ──
-  hero: {
-    flex: 1,
-    paddingHorizontal: PAD,
-    paddingTop: 36,
-    paddingBottom: 28,
-  },
-  eyebrow: {
-    fontFamily: pdfFonts.bold,
-    fontSize: pdfSizes.eyebrow,
-    textTransform: "uppercase",
-    letterSpacing: pdfTracking.widest,
-    marginBottom: 14,
-    opacity: 0.85,
-  },
-  title: {
-    fontFamily: pdfFonts.bold,
-    fontSize: 32,
-    lineHeight: pdfLineHeights.tight,
-    letterSpacing: pdfTracking.tight,
-    marginBottom: 10,
-  },
-  intro: {
-    fontSize: pdfSizes.sm,
-    lineHeight: pdfLineHeights.relaxed,
-    opacity: 0.9,
-    marginBottom: 22,
-  },
-  // Meta pills — marginRight instead of gap (gap not supported in react-pdf)
-  metaRow: {
-    flexDirection: "row",
-  },
-  metaPill: {
-    paddingVertical: 5,
-    paddingHorizontal: 10,
-    borderRadius: pdfRadii.pill,
-    backgroundColor: "rgba(255,255,255,0.18)",
-    marginRight: 8,
-  },
-  metaLabel: {
-    fontSize: pdfSizes.xs,
-    opacity: 0.7,
-    textTransform: "uppercase",
-    letterSpacing: pdfTracking.wide,
-    marginBottom: 2,
-  },
-  metaValue: {
-    fontFamily: pdfFonts.bold,
-    fontSize: pdfSizes.sm,
-  },
-
-  // ── lower (white) — no flex:1, no space-between ───────────────────────────
-  lower: {
-    paddingHorizontal: PAD,
-    paddingTop: 28,
-    paddingBottom: 28,
-  },
-  partyRow: {
-    flexDirection: "row",
-  },
-  partyCol: {
-    flex: 1,
-  },
-  partyColRight: {
-    flex: 1,
-    paddingLeft: 24,
-    borderLeftWidth: 0.5,
-    borderLeftColor: pdfColors.border,
-    marginLeft: 24,
-  },
-  partyEyebrow: {
-    fontFamily: pdfFonts.bold,
-    fontSize: pdfSizes.eyebrow,
-    color: pdfColors.mutedForeground,
-    textTransform: "uppercase",
-    letterSpacing: pdfTracking.wider,
-    marginBottom: 5,
-  },
-  partyName: {
-    fontFamily: pdfFonts.bold,
-    fontSize: pdfSizes.md,
-    color: pdfColors.foreground,
-    marginBottom: 3,
-  },
-  partyLine: {
-    fontSize: pdfSizes.xs,
-    color: pdfColors.mutedForeground,
-    marginTop: 2,
-  },
-  footerRule: {
-    marginTop: 24,
-    borderTopWidth: 0.5,
-    borderTopColor: pdfColors.border,
-    paddingTop: 10,
-  },
-  footerText: {
-    fontSize: pdfSizes.xs,
-    color: pdfColors.mutedForeground,
-  },
-});
-
-const bodyS = StyleSheet.create({
+const s = StyleSheet.create({
   page: {
     fontFamily: pdfFonts.base,
     fontSize: pdfSizes.base,
@@ -197,52 +79,132 @@ const bodyS = StyleSheet.create({
     backgroundColor: pdfColors.surface,
     paddingHorizontal: PAD,
     paddingTop: PAD,
-    paddingBottom: PAD + 28, // room for fixed footer
+    paddingBottom: PAD + 28,
     lineHeight: pdfLineHeights.normal,
   },
 
-  // ── compact header ────────────────────────────────────────────────────────
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
+  // ── accent bar ──────────────────────────────────────────────────────────
+  accentBar: {
+    height: 4,
+    marginHorizontal: -PAD,
+    marginTop: -PAD,
+    marginBottom: 18,
+  },
+
+  // ── shared separator ────────────────────────────────────────────────────
+  sep: {
     borderBottomWidth: 0.5,
     borderBottomColor: pdfColors.border,
     marginBottom: 14,
     paddingBottom: 14,
   },
+
+  // ── header ──────────────────────────────────────────────────────────────
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+  },
+  headerLeft: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    maxWidth: "55%",
+  },
+  logo: {
+    width: 40,
+    height: 40,
+    objectFit: "contain",
+    marginRight: 10,
+    borderRadius: pdfRadii.sm,
+  },
   businessName: {
     fontFamily: pdfFonts.bold,
-    fontSize: pdfSizes.sm,
+    fontSize: pdfSizes.md,
     color: pdfColors.foreground,
-    marginBottom: 2,
+    lineHeight: pdfLineHeights.tight,
+    marginBottom: 3,
   },
-  headerSubline: {
+  headerLine: {
     fontSize: pdfSizes.xs,
     color: pdfColors.mutedForeground,
+    marginTop: 2,
   },
   headerRight: {
     alignItems: "flex-end",
   },
-  headerEyebrow: {
+  docEyebrow: {
     fontFamily: pdfFonts.bold,
     fontSize: pdfSizes.eyebrow,
     textTransform: "uppercase",
     letterSpacing: pdfTracking.wider,
-    marginBottom: 4,
+    marginBottom: 5,
   },
-  // 14pt — long titles never wrap in 280pt column
-  headerTitle: {
+  docTitle: {
     fontFamily: pdfFonts.bold,
-    fontSize: pdfSizes.lg,
+    fontSize: pdfSizes.xl,
     color: pdfColors.foreground,
     letterSpacing: pdfTracking.tight,
     lineHeight: pdfLineHeights.tight,
     textAlign: "right",
-    maxWidth: 280,
   },
 
-  // ── intro ─────────────────────────────────────────────────────────────────
+  // ── meta row (Published | Sections | Read time) ──────────────────────────
+  metaRow: {
+    flexDirection: "row",
+  },
+  metaCell: {
+    flex: 1,
+  },
+  metaLabel: {
+    fontFamily: pdfFonts.bold,
+    fontSize: pdfSizes.eyebrow,
+    color: pdfColors.mutedForeground,
+    textTransform: "uppercase",
+    letterSpacing: pdfTracking.wider,
+    marginBottom: 3,
+  },
+  metaValue: {
+    fontFamily: pdfFonts.bold,
+    fontSize: pdfSizes.sm,
+    color: pdfColors.foreground,
+  },
+
+  // ── parties (Prepared for | Prepared by) ─────────────────────────────────
+  parties: {
+    flexDirection: "row",
+  },
+  partyCol: {
+    flex: 1,
+  },
+  partyColRight: {
+    flex: 1,
+    paddingLeft: 20,
+    borderLeftWidth: 0.5,
+    borderLeftColor: pdfColors.border,
+    marginLeft: 20,
+  },
+  partyEyebrow: {
+    fontFamily: pdfFonts.bold,
+    fontSize: pdfSizes.eyebrow,
+    color: pdfColors.mutedForeground,
+    textTransform: "uppercase",
+    letterSpacing: pdfTracking.wider,
+    marginBottom: 6,
+  },
+  partyName: {
+    fontFamily: pdfFonts.bold,
+    fontSize: pdfSizes.sm,
+    color: pdfColors.foreground,
+    marginBottom: 4,
+  },
+  partyLine: {
+    fontSize: pdfSizes.xs,
+    color: pdfColors.mutedForeground,
+    marginTop: 2,
+    lineHeight: pdfLineHeights.snug,
+  },
+
+  // ── intro ────────────────────────────────────────────────────────────────
   intro: {
     fontSize: pdfSizes.sm,
     lineHeight: pdfLineHeights.relaxed,
@@ -253,7 +215,7 @@ const bodyS = StyleSheet.create({
     paddingBottom: 10,
   },
 
-  // ── sections ──────────────────────────────────────────────────────────────
+  // ── sections ─────────────────────────────────────────────────────────────
   section: {
     marginBottom: 10,
   },
@@ -283,7 +245,7 @@ const bodyS = StyleSheet.create({
     marginTop: 3,
   },
 
-  // ── "what happens next" callout ───────────────────────────────────────────
+  // ── "what happens next" ───────────────────────────────────────────────────
   nextEyebrow: {
     fontFamily: pdfFonts.bold,
     fontSize: pdfSizes.eyebrow,
@@ -313,152 +275,122 @@ export function WelcomeDocumentPdf({
 
   return (
     <Document title={`Welcome guide – ${data.title}`} author={brand.businessName}>
+      <Page size="A4" style={s.page}>
 
-      {/* ── COVER PAGE ──────────────────────────────────────────────── */}
-      <Page size="A4" style={coverS.page}>
+        {/* ── 1. ACCENT BAR ─────────────────────────────────── */}
+        <View style={[s.accentBar, { backgroundColor: brand.accent }]} />
 
-        {/* Hero: brand colour, content flows top-down — no min-height gap */}
-        <View style={[coverS.hero, { backgroundColor: brand.accent }]}>
-          <Text style={[coverS.eyebrow, { color: brand.onAccent }]}>
-            Welcome Guide
-          </Text>
-          <Text style={[coverS.title, { color: brand.onAccent }]}>
-            {data.title}
-          </Text>
-          {intro ? (
-            <Text style={[coverS.intro, { color: brand.onAccent }]}>
-              {intro}
-            </Text>
-          ) : null}
-
-          {/* Meta pills — marginRight replaces gap */}
-          <View style={coverS.metaRow}>
-            {data.publishedAt ? (
-              <View style={coverS.metaPill}>
-                <Text style={[coverS.metaLabel, { color: brand.onAccent }]}>
-                  Published
-                </Text>
-                <Text style={[coverS.metaValue, { color: brand.onAccent }]}>
-                  {formatDate(data.publishedAt)}
-                </Text>
-              </View>
+        {/* ── 2. HEADER ─────────────────────────────────────── */}
+        <View style={[s.header, s.sep]}>
+          <View style={s.headerLeft}>
+            {brand.logoUrl ? (
+              // eslint-disable-next-line jsx-a11y/alt-text
+              <Image src={brand.logoUrl} style={s.logo} />
             ) : null}
-            {data.sections.length > 0 ? (
-              <View style={coverS.metaPill}>
-                <Text style={[coverS.metaLabel, { color: brand.onAccent }]}>
-                  Sections
-                </Text>
-                <Text style={[coverS.metaValue, { color: brand.onAccent }]}>
-                  {data.sections.length}
-                </Text>
-              </View>
-            ) : null}
-            <View style={coverS.metaPill}>
-              <Text style={[coverS.metaLabel, { color: brand.onAccent }]}>
-                Read time
-              </Text>
-              <Text style={[coverS.metaValue, { color: brand.onAccent }]}>
-                {estimateReadMinutes(data)} min
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Lower: white, stacks naturally without forced gaps */}
-        <View style={coverS.lower}>
-          <View style={coverS.partyRow}>
-            <View style={coverS.partyCol}>
-              <Text style={coverS.partyEyebrow}>Prepared for</Text>
-              <Text style={coverS.partyName}>
-                {data.recipient?.name ?? "Your team"}
-              </Text>
-              {data.recipient?.company ? (
-                <Text style={coverS.partyLine}>{data.recipient.company}</Text>
+            <View>
+              <Text style={s.businessName}>{brand.businessName}</Text>
+              {brand.legalName ? (
+                <Text style={s.headerLine}>{brand.legalName}</Text>
               ) : null}
-              {data.recipient?.email ? (
-                <Text style={coverS.partyLine}>{data.recipient.email}</Text>
-              ) : null}
-            </View>
-            <View style={coverS.partyColRight}>
-              <Text style={coverS.partyEyebrow}>Prepared by</Text>
-              <Text style={coverS.partyName}>{brand.businessName}</Text>
               {brand.contact.email ? (
-                <Text style={coverS.partyLine}>{brand.contact.email}</Text>
+                <Text style={s.headerLine}>{brand.contact.email}</Text>
               ) : null}
-              {brand.contact.website ? (
-                <Text style={coverS.partyLine}>{brand.contact.website}</Text>
+              {brand.contact.phone ? (
+                <Text style={s.headerLine}>{brand.contact.phone}</Text>
               ) : null}
             </View>
           </View>
-
-          <View style={coverS.footerRule}>
-            <Text style={coverS.footerText}>
-              {brand.businessName}
-              {brand.contact.website ? ` · ${brand.contact.website}` : ""}
-            </Text>
-          </View>
-        </View>
-
-        <DocumentFooter brand={brand} label={`Welcome guide · ${data.title}`} />
-      </Page>
-
-      {/* ── BODY PAGE(S) ────────────────────────────────────────────── */}
-      <Page size="A4" style={bodyS.page}>
-
-        {/* Compact header */}
-        <View style={bodyS.header}>
-          <View>
-            <Text style={bodyS.businessName}>{brand.businessName}</Text>
-            {brand.legalName ? (
-              <Text style={bodyS.headerSubline}>{brand.legalName}</Text>
-            ) : null}
-          </View>
-          <View style={bodyS.headerRight}>
-            <Text style={[bodyS.headerEyebrow, { color: brand.accent }]}>
+          <View style={s.headerRight}>
+            <Text style={[s.docEyebrow, { color: brand.accent }]}>
               Welcome Guide
             </Text>
-            <Text style={bodyS.headerTitle}>{truncate(data.title, 42)}</Text>
+            <Text style={s.docTitle}>{data.title}</Text>
           </View>
         </View>
 
-        {/* Intro — sm text, separator below */}
+        {/* ── 3. META ROW ───────────────────────────────────── */}
+        <View style={[s.metaRow, s.sep]}>
+          {data.publishedAt ? (
+            <View style={s.metaCell}>
+              <Text style={s.metaLabel}>Published</Text>
+              <Text style={s.metaValue}>{formatDate(data.publishedAt)}</Text>
+            </View>
+          ) : null}
+          <View style={s.metaCell}>
+            <Text style={s.metaLabel}>Sections</Text>
+            <Text style={s.metaValue}>{data.sections.length}</Text>
+          </View>
+          <View style={s.metaCell}>
+            <Text style={s.metaLabel}>Read time</Text>
+            <Text style={s.metaValue}>{estimateReadMinutes(data)} min</Text>
+          </View>
+        </View>
+
+        {/* ── 4. PARTIES ────────────────────────────────────── */}
+        <View style={[s.parties, s.sep]}>
+          <View style={s.partyCol}>
+            <Text style={s.partyEyebrow}>Prepared for</Text>
+            <Text style={s.partyName}>
+              {data.recipient?.name ?? "Your team"}
+            </Text>
+            {data.recipient?.company ? (
+              <Text style={s.partyLine}>{data.recipient.company}</Text>
+            ) : null}
+            {data.recipient?.email ? (
+              <Text style={s.partyLine}>{data.recipient.email}</Text>
+            ) : null}
+          </View>
+          <View style={s.partyColRight}>
+            <Text style={s.partyEyebrow}>Prepared by</Text>
+            <Text style={s.partyName}>{brand.businessName}</Text>
+            {brand.contact.email ? (
+              <Text style={s.partyLine}>{brand.contact.email}</Text>
+            ) : null}
+            {brand.contact.phone ? (
+              <Text style={s.partyLine}>{brand.contact.phone}</Text>
+            ) : null}
+          </View>
+        </View>
+
+        {/* ── 5. INTRO ──────────────────────────────────────── */}
         {intro && data.sections.length > 0 ? (
-          <Text style={bodyS.intro}>{intro}</Text>
+          <Text style={s.intro}>{intro}</Text>
         ) : null}
 
-        {/* Sections — 14pt gap, tight heading row */}
+        {/* ── 6. SECTIONS ───────────────────────────────────── */}
         <View>
           {data.sections.length > 0 ? (
             data.sections.map((section, i) => (
-              <View key={i} style={bodyS.section} wrap={false}>
-                <View style={bodyS.sectionRow}>
-                  <Text style={bodyS.sectionNumber}>
+              <View key={i} style={s.section} wrap={false}>
+                <View style={s.sectionRow}>
+                  <Text style={s.sectionNumber}>
                     {String(i + 1).padStart(2, "0")}
                   </Text>
-                  <Text style={bodyS.sectionHeading}>{section.heading}</Text>
+                  <Text style={s.sectionHeading}>{section.heading}</Text>
                 </View>
-                <Text style={bodyS.sectionBody}>
+                <Text style={s.sectionBody}>
                   {welcomeMarkdownToPlain(section.body)}
                 </Text>
               </View>
             ))
           ) : intro ? (
-            <Text style={bodyS.sectionBody}>{intro}</Text>
+            <Text style={s.sectionBody}>{intro}</Text>
           ) : (
-            <Text style={bodyS.sectionBody}>
+            <Text style={s.sectionBody}>
               This guide is being prepared — content will follow shortly.
             </Text>
           )}
         </View>
 
-        {/* What happens next */}
-        <Text style={bodyS.nextEyebrow}>What happens next</Text>
+        {/* ── 7. WHAT HAPPENS NEXT ──────────────────────────── */}
+        <Text style={s.nextEyebrow}>What happens next</Text>
         <NoteBlock accent={brand.accent}>
           {data.acknowledgementRequired && data.publicUrl
             ? `Once you've read through the guide, please confirm at the bottom of the online version (${data.publicUrl}). That's the handshake to kick the project off.`
             : `Reply to the email this guide arrived on with any questions — we'll incorporate them into the kickoff conversation.`}
         </NoteBlock>
 
+        {/* ── 8. FOOTER ─────────────────────────────────────── */}
         <DocumentFooter brand={brand} label={`Welcome guide · ${data.title}`} />
       </Page>
     </Document>
@@ -477,10 +409,6 @@ function estimateReadMinutes(data: WelcomeDocumentPdfData): number {
       0,
     );
   return Math.max(1, Math.round(words / 220));
-}
-
-function truncate(s: string, max: number): string {
-  return s.length > max ? `${s.slice(0, max - 1)}…` : s;
 }
 
 function buildBrandFromData(
