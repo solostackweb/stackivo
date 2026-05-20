@@ -18,6 +18,7 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 import { cookies } from "next/headers";
+import type { EmailOtpType } from "@supabase/supabase-js";
 import { getServerSupabase } from "@/lib/supabase/server";
 import {
   AUTH_DEFAULT_REDIRECT,
@@ -39,9 +40,18 @@ function sanitiseErrorRedirect(raw: string | null): typeof AUTH_LOGIN_ROUTE | "/
   return raw === "/signup" ? "/signup" : AUTH_LOGIN_ROUTE;
 }
 
+function redirectAndClearOauthCookies(url: string): NextResponse {
+  const response = NextResponse.redirect(url);
+  response.cookies.delete("stackivo_oauth_next");
+  response.cookies.delete("stackivo_oauth_from");
+  return response;
+}
+
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
+  const tokenHash = searchParams.get("token_hash");
+  const type = searchParams.get("type") as EmailOtpType | null;
   const cookieStore = await cookies();
   const next = sanitiseNext(
     cookieStore.get("stackivo_oauth_next")?.value ?? searchParams.get("next"),
@@ -50,32 +60,39 @@ export async function GET(request: NextRequest) {
     cookieStore.get("stackivo_oauth_from")?.value ?? AUTH_LOGIN_ROUTE,
   );
 
-  if (!code) {
-    const response = NextResponse.redirect(
+  if (searchParams.get("error")) {
+    const errorCode = encodeURIComponent(
+      searchParams.get("error_description") ??
+        searchParams.get("error") ??
+        "auth_callback_error",
+    );
+    return redirectAndClearOauthCookies(
+      `${origin}${errorRedirect}?error=${errorCode}`,
+    );
+  }
+
+  if (!code && (!tokenHash || !type)) {
+    return redirectAndClearOauthCookies(
       `${origin}${errorRedirect}?error=missing_code`,
     );
-    response.cookies.delete("stackivo_oauth_next");
-    response.cookies.delete("stackivo_oauth_from");
-    return response;
   }
 
   const supabase = await getServerSupabase();
-  const { error } = await supabase.auth.exchangeCodeForSession(code);
+  const { error } = code
+    ? await supabase.auth.exchangeCodeForSession(code)
+    : await supabase.auth.verifyOtp({
+        token_hash: tokenHash!,
+        type: type!,
+      });
 
   if (error) {
     // Surface the raw error code so login/signup can show something helpful.
     const errorCode = encodeURIComponent(error.message);
-    const response = NextResponse.redirect(
+    return redirectAndClearOauthCookies(
       `${origin}${errorRedirect}?error=${errorCode}`,
     );
-    response.cookies.delete("stackivo_oauth_next");
-    response.cookies.delete("stackivo_oauth_from");
-    return response;
   }
 
   // Session established — send the user to their destination.
-  const response = NextResponse.redirect(`${origin}${next}`);
-  response.cookies.delete("stackivo_oauth_next");
-  response.cookies.delete("stackivo_oauth_from");
-  return response;
+  return redirectAndClearOauthCookies(`${origin}${next}`);
 }

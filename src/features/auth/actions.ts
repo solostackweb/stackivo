@@ -80,6 +80,18 @@ function normalizeAuthError(message: string): string {
   return message;
 }
 
+function getAuthErrorStatus(err: unknown): number | undefined {
+  if (!err || typeof err !== "object") return undefined;
+  const status = (err as { status?: unknown }).status;
+  return typeof status === "number" ? status : undefined;
+}
+
+function getAuthErrorName(err: unknown): string | undefined {
+  if (!err || typeof err !== "object") return undefined;
+  const name = (err as { name?: unknown }).name;
+  return typeof name === "string" ? name : undefined;
+}
+
 async function getOrigin(): Promise<string> {
   // Prefer the runtime origin so preview deploys work without config changes.
   const h = await headers();
@@ -111,6 +123,11 @@ async function safeHashedEmail(email: string): Promise<string | undefined> {
 
 function userSafeErrorMessage(err: unknown): string {
   const fallback = "We couldn't create your account. Please try again in a moment.";
+  const status = getAuthErrorStatus(err);
+  const name = getAuthErrorName(err)?.toLowerCase() ?? "";
+  if (status === 504 || name.includes("retryablefetch")) {
+    return "Signup is taking longer than expected. Please check your inbox first; if no verification email arrives in a minute, try again.";
+  }
   if (err instanceof Error) {
     const message = err.message.trim();
     if (message && message !== "{}" && message !== "[]") return normalizeAuthError(message);
@@ -197,6 +214,8 @@ export async function signupAction(
         error_name: error.name,
         error_message: error.message,
         user_message: message,
+        email_redirect_to: `${origin}/auth/callback`,
+        origin,
         email_hash: await safeHashedEmail(email),
       });
       await recordSecurityEvent({
