@@ -52,6 +52,29 @@ function sanitiseNext(next: string | null | undefined): string {
   return next;
 }
 
+async function safeHashedEmail(email: string): Promise<string | undefined> {
+  try {
+    return await hashedEmail(email);
+  } catch {
+    return undefined;
+  }
+}
+
+function userSafeErrorMessage(err: unknown): string {
+  if (err instanceof Error && err.message.trim()) return err.message;
+  if (typeof err === "string" && err.trim()) return err;
+  return "We couldn't create your account. Please try again in a moment.";
+}
+
+function isExistingAccountError(message: string): boolean {
+  const normalized = message.toLowerCase();
+  return (
+    normalized.includes("already registered") ||
+    normalized.includes("already exists") ||
+    normalized.includes("user already")
+  );
+}
+
 // --- signup -----------------------------------------------------------------
 
 export async function signupAction(
@@ -72,81 +95,109 @@ export async function signupAction(
     };
   }
 
-  // Per-IP rate-limit so a single network can't spam-create accounts.
-  const ip = await getClientIp();
-  const gate = await signupLimit(`signup:${ip}`);
-  if (!gate.ok) {
-    await recordSecurityEvent({
-      kind: "auth_ratelimit_tripped",
-      severity: "warn",
-      metadata: { flow: "signup", ip },
-    });
-    return { ok: false, error: gate.message };
-  }
-
   const { fullName, email, password } = parsed.data;
-  const supabase = await getServerSupabase();
-  const origin = await getOrigin();
+  try {
+    // Per-IP rate-limit so a single network can't spam-create accounts.
+    const ip = await getClientIp();
+    const gate = await signupLimit(`signup:${ip}`);
+    if (!gate.ok) {
+      await recordSecurityEvent({
+        kind: "auth_ratelimit_tripped",
+        severity: "warn",
+        metadata: { flow: "signup", ip },
+      });
+      return { ok: false, error: gate.message };
+    }
 
-  const { data: signUpData, error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: {
-      data: { full_name: fullName },
-      emailRedirectTo: `${origin}/auth/callback?next=${encodeURIComponent(
-        AUTH_DEFAULT_REDIRECT,
-      )}`,
-    },
-  });
+    const supabase = await getServerSupabase();
+    const origin = await getOrigin();
 
-  if (error) {
+    const { data: signUpData, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: { full_name: fullName },
+        emailRedirectTo: `${origin}/auth/callback?next=${encodeURIComponent(
+          AUTH_DEFAULT_REDIRECT,
+        )}`,
+      },
+    });
+
+    if (error) {
+      const message = userSafeErrorMessage(error);
+      await recordSecurityEvent({
+        kind: "auth_signup_failed",
+        severity: "info",
+        metadata: {
+          email_hash: await safeHashedEmail(email),
+          reason: message,
+        },
+      });
+
+      if (isExistingAccountError(message)) {
+        return {
+          ok: false,
+          error:
+            "An account with that email already exists. Try logging in instead, or reset your password.",
+        };
+      }
+
+      return { ok: false, error: message };
+    }
+
+    // Supabase default behaviour for an already-registered email: returns a
+    // placeholder user row with `identities: []` and NO error. Without this
+    // check the UI would falsely confirm signup. We surface a generic
+    // "already registered" message that nudges the user to the login page
+    // without leaking which email exists.
+    const identities = (signUpData.user?.identities ?? []) as unknown[];
+    const looksLikeExistingAccount =
+      !!signUpData.user && identities.length === 0;
+    if (looksLikeExistingAccount) {
+      await recordSecurityEvent({
+        kind: "auth_signup_duplicate",
+        severity: "info",
+        metadata: { email_hash: await safeHashedEmail(email) },
+      });
+      return {
+        ok: false,
+        error:
+          "An account with that email already exists. Try logging in instead, or reset your password.",
+      };
+    }
+
+    // Identify the (unverified) user in PostHog so the funnel from
+    // signup -> email verified -> onboarding completed is joinable.
+    if (signUpData.user) {
+      await identifyServer(signUpData.user.id, {
+        email: signUpData.user.email,
+        createdAt: signUpData.user.created_at,
+      });
+      await trackServerEvent(signUpData.user.id, "auth.user.signed_up");
+    }
+
+    return {
+      ok: true,
+      message:
+        "Check your inbox to verify your email - clicking the link signs you in and drops you into onboarding.",
+    };
+  } catch (err) {
+    const message = userSafeErrorMessage(err);
     await recordSecurityEvent({
       kind: "auth_signup_failed",
       severity: "info",
       metadata: {
-        email_hash: await hashedEmail(email),
-        reason: error.message,
+        email_hash: await safeHashedEmail(email),
+        reason: message,
       },
-    });
-    return { ok: false, error: error.message };
-  }
-
-  // Supabase default behaviour for an already-registered email: returns a
-  // placeholder user row with `identities: []` and NO error. Without this
-  // check the UI would falsely confirm signup. We surface a generic
-  // "already registered" message that nudges the user to the login page
-  // without leaking which email exists.
-  const identities = (signUpData.user?.identities ?? []) as unknown[];
-  const looksLikeExistingAccount =
-    !!signUpData.user && identities.length === 0;
-  if (looksLikeExistingAccount) {
-    await recordSecurityEvent({
-      kind: "auth_signup_duplicate",
-      severity: "info",
-      metadata: { email_hash: await hashedEmail(email) },
     });
     return {
       ok: false,
-      error:
-        "An account with that email already exists. Try logging in instead, or reset your password.",
+      error: isExistingAccountError(message)
+        ? "An account with that email already exists. Try logging in instead, or reset your password."
+        : "We couldn't create your account. Please try again in a moment.",
     };
   }
-
-  // Identify the (unverified) user in PostHog so the funnel from
-  // signup → email verified → onboarding completed is joinable.
-  if (signUpData.user) {
-    await identifyServer(signUpData.user.id, {
-      email: signUpData.user.email,
-      createdAt: signUpData.user.created_at,
-    });
-    await trackServerEvent(signUpData.user.id, "auth.user.signed_up");
-  }
-
-  return {
-    ok: true,
-    message:
-      "Check your inbox to verify your email — clicking the link signs you in and drops you into onboarding.",
-  };
 }
 
 // --- login ------------------------------------------------------------------
