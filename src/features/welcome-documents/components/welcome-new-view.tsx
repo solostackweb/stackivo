@@ -26,6 +26,7 @@ interface Props {
   templates: WelcomeDocumentTemplate[];
   preset: WelcomeDocumentTemplate | null;
   clients: ClientOption[];
+  defaultBrandColor: string | null;
 }
 
 const BLANK_SECTIONS: WelcomeDocumentSection[] = [
@@ -141,7 +142,12 @@ const BUILTIN_TEMPLATES: WelcomeDocumentTemplate[] = [
  * The router URL itself does the routing — `?template=<id>` becomes
  * the seed; otherwise we render the template grid.
  */
-export function WelcomeNewView({ templates, preset, clients }: Props) {
+export function WelcomeNewView({
+  templates,
+  preset,
+  clients,
+  defaultBrandColor,
+}: Props) {
   // Hook must come before any conditional return.
   const [showBlankEditor, setShowBlankEditor] = React.useState(false);
 
@@ -170,7 +176,7 @@ export function WelcomeNewView({ templates, preset, clients }: Props) {
             intro: preset.intro ?? "",
             sections: preset.sections,
             clientId: null,
-            brandColor: "#2563EB",
+            brandColor: defaultBrandColor ?? "#2563EB",
             acknowledgementRequired: false,
           }}
         />
@@ -203,7 +209,7 @@ export function WelcomeNewView({ templates, preset, clients }: Props) {
             intro: "",
             sections: BLANK_SECTIONS,
             clientId: null,
-            brandColor: "#2563EB",
+            brandColor: defaultBrandColor ?? "#2563EB",
             acknowledgementRequired: false,
           }}
         />

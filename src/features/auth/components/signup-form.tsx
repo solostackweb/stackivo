@@ -15,7 +15,13 @@ import {
 import { FieldError } from "./field-error";
 import { GoogleOAuthButton } from "./google-oauth-button";
 
-export function SignupForm({ oauthError }: { oauthError?: string | null }) {
+export function SignupForm({
+  oauthError,
+  next,
+}: {
+  oauthError?: string | null;
+  next?: string;
+}) {
   const [state, formAction] = useActionState<ActionResult | undefined, FormData>(
     signupAction,
     undefined,
@@ -33,10 +39,11 @@ export function SignupForm({ oauthError }: { oauthError?: string | null }) {
       {oauthErrorMessage && !state ? (
         <AuthFormError message={oauthErrorMessage} />
       ) : null}
-      <GoogleOAuthButton from="signup" />
+      <GoogleOAuthButton from="signup" next={next} />
       <AuthOrSeparator />
 
       <form action={formAction} className="space-y-4">
+        {next && <input type="hidden" name="next" value={next} />}
         <AuthFormError message={state && !state.ok ? state.error : null} />
         <AuthFormSuccess message={succeeded ? state?.message ?? null : null} />
 

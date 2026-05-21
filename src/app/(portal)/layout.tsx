@@ -1,4 +1,5 @@
 import * as React from "react";
+import type { Metadata, Viewport } from "next";
 import Link from "next/link";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
@@ -7,6 +8,29 @@ import { AUTH_LOGIN_ROUTE } from "@/features/auth/routes";
 import { LogOut, Workflow } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { logoutAction } from "@/features/auth/actions";
+
+export const metadata: Metadata = {
+  applicationName: "Stackivo Portal",
+  manifest: "/portal.webmanifest",
+  appleWebApp: {
+    capable: true,
+    title: "Portal",
+    statusBarStyle: "black-translucent",
+  },
+  other: {
+    "apple-mobile-web-app-title": "Portal",
+    "mobile-web-app-capable": "yes",
+    "apple-mobile-web-app-capable": "yes",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#0f172a",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+  viewportFit: "cover",
+};
 
 /**
  * Layout for the client-facing Client Portal area at `/portal/*`.
@@ -30,16 +54,30 @@ export default async function PortalLayout({
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  const reqHeaders = await headers();
+  const fromHeader =
+    reqHeaders.get("next-url") ??
+    reqHeaders.get("x-invoke-path") ??
+    "/portal";
   if (!user) {
+    if (fromHeader === "/portal/accept" || fromHeader.startsWith("/portal/accept?")) {
+      return (
+        <div className="flex min-h-svh flex-col bg-muted/20 text-foreground">
+          <main
+            className="mx-auto flex w-full max-w-5xl flex-1 items-center px-4 py-6 sm:px-6 sm:py-10"
+            style={{
+              paddingBottom: "max(env(safe-area-inset-bottom, 0px), 2rem)",
+            }}
+          >
+            {children}
+          </main>
+        </div>
+      );
+    }
     // Preserve the exact requested URL so the user comes back here after
     // signing in. Previously we redirected everyone to /portal which
     // dropped the invitation token + specific portal ID, forcing the
     // client to find their way again.
-    const reqHeaders = await headers();
-    const fromHeader =
-      reqHeaders.get("next-url") ??
-      reqHeaders.get("x-invoke-path") ??
-      "/portal";
     redirect(`${AUTH_LOGIN_ROUTE}?next=${encodeURIComponent(fromHeader)}`);
   }
 

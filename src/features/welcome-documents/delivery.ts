@@ -147,7 +147,7 @@ export async function sendWelcomeDocumentAction(
     businessName: p?.business_name ?? null,
     legalName: p?.legal_name ?? null,
     fullName: p?.full_name ?? null,
-    brandColor: p?.brand_color ?? null,
+    brandColor: doc.brandColor ?? p?.brand_color ?? null,
     logoUrl: pdfData.seller.logoDataUrl,
     businessEmail: p?.business_email ?? null,
     businessPhone: p?.business_phone ?? null,

@@ -21,6 +21,7 @@ const OFFLINE_URL = "/offline.html";
 const PRECACHE_URLS = [
   OFFLINE_URL,
   "/manifest.webmanifest",
+  "/portal.webmanifest",
   "/icon.svg",
   "/icon-maskable.svg",
   "/apple-touch-icon.svg",

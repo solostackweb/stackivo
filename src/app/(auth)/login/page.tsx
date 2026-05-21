@@ -39,7 +39,7 @@ export default async function LoginPage({ searchParams }: PageProps) {
       footer={
         <AuthFormFooterLink
           prefix="Don't have an account?"
-          href="/signup"
+          href={next ? `/signup?next=${encodeURIComponent(next)}` : "/signup"}
           label="Sign up"
         />
       }

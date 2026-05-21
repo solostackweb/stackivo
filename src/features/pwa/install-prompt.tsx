@@ -53,6 +53,8 @@ function shouldHide(pathname: string | null): boolean {
 
 const DISMISS_KEY_ANDROID = "stackivo:pwa:install-banner:dismissed";
 const DISMISS_KEY_IOS = "stackivo:pwa:install-banner:ios:dismissed";
+const PORTAL_DISMISS_KEY_ANDROID = "stackivo:portal-pwa:install-banner:dismissed";
+const PORTAL_DISMISS_KEY_IOS = "stackivo:portal-pwa:install-banner:ios:dismissed";
 // Re-show after 30 days if dismissed.
 const DISMISS_TTL = 30 * 24 * 60 * 60 * 1000;
 
@@ -72,9 +74,23 @@ export function InstallPrompt() {
   const standalone = useIsStandalone();
   const ios = useIsIos();
   const { canInstall, installed, promptInstall } = useInstallPrompt();
-  const android = useDismissible(DISMISS_KEY_ANDROID, DISMISS_TTL);
-  const iosBanner = useDismissible(DISMISS_KEY_IOS, DISMISS_TTL);
+  const isPortal = pathname === "/portal" || pathname?.startsWith("/portal/");
+  const android = useDismissible(
+    isPortal ? PORTAL_DISMISS_KEY_ANDROID : DISMISS_KEY_ANDROID,
+    DISMISS_TTL,
+  );
+  const iosBanner = useDismissible(
+    isPortal ? PORTAL_DISMISS_KEY_IOS : DISMISS_KEY_IOS,
+    DISMISS_TTL,
+  );
   const [pending, setPending] = React.useState(false);
+  const title = isPortal ? "Install Stackivo Portal" : "Install Stackivo";
+  const installBody = isPortal
+    ? "Open this client workspace from your home screen without hunting for the invite link."
+    : "Get the full-screen, app-like experience on your home screen.";
+  const iosTitle = isPortal
+    ? "Add this portal to your home screen"
+    : "Add Stackivo to your home screen";
 
   if (standalone || installed) return null;
   if (shouldHide(pathname)) return null;
@@ -85,8 +101,8 @@ export function InstallPrompt() {
     return (
       <Banner
         onDismiss={android.dismiss}
-        title="Install Stackivo"
-        body="Get the full-screen, app-like experience on your home screen."
+        title={title}
+        body={installBody}
         action={
           <Button
             size="sm"
@@ -115,7 +131,7 @@ export function InstallPrompt() {
     return (
       <Banner
         onDismiss={android.dismiss}
-        title="Install Stackivo"
+        title={title}
         body={
           <span className="inline-flex flex-wrap items-center gap-1">
             Open your browser menu and choose
@@ -134,7 +150,7 @@ export function InstallPrompt() {
     return (
       <Banner
         onDismiss={iosBanner.dismiss}
-        title="Add Stackivo to your home screen"
+        title={iosTitle}
         body={
           <span className="inline-flex flex-wrap items-center gap-1">
             Tap

@@ -44,6 +44,7 @@ function redirectAndClearOauthCookies(url: string): NextResponse {
   const response = NextResponse.redirect(url);
   response.cookies.delete("stackivo_oauth_next");
   response.cookies.delete("stackivo_oauth_from");
+  response.cookies.delete("stackivo_signup_next");
   return response;
 }
 
@@ -54,7 +55,9 @@ export async function GET(request: NextRequest) {
   const type = searchParams.get("type") as EmailOtpType | null;
   const cookieStore = await cookies();
   const next = sanitiseNext(
-    cookieStore.get("stackivo_oauth_next")?.value ?? searchParams.get("next"),
+    cookieStore.get("stackivo_oauth_next")?.value ??
+      cookieStore.get("stackivo_signup_next")?.value ??
+      searchParams.get("next"),
   );
   const errorRedirect = sanitiseErrorRedirect(
     cookieStore.get("stackivo_oauth_from")?.value ?? AUTH_LOGIN_ROUTE,

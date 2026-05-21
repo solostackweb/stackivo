@@ -2,8 +2,10 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { AlertTriangle, MailQuestion } from "lucide-react";
+import { AlertTriangle, MailQuestion, ShieldCheck, Workflow } from "lucide-react";
+import { getServerSupabase } from "@/lib/supabase/server";
 import { acceptPortalInvitationAction } from "@/features/portals/actions";
+import { AUTH_LOGIN_ROUTE } from "@/features/auth/routes";
 import { portalClientHome } from "@/features/portals/routes";
 
 export const metadata = { title: "Accept invitation" };
@@ -28,6 +30,15 @@ export default async function AcceptInvitationPage({
         message="The invitation token is missing from the URL. Open the original email link again — make sure your inbox didn't trim the link."
       />
     );
+  }
+
+  const supabase = await getServerSupabase();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const next = `/portal/accept?token=${encodeURIComponent(token)}`;
+  if (!user) {
+    return <InviteAccessBox next={next} />;
   }
 
   const res = await acceptPortalInvitationAction({ token });
@@ -58,6 +69,56 @@ export default async function AcceptInvitationPage({
       : raw;
 
   return <ErrorBox title={title} message={message} />;
+}
+
+function InviteAccessBox({ next }: { next: string }) {
+  return (
+    <Card className="mx-auto w-full max-w-md">
+      <CardContent className="space-y-5 p-5 sm:p-6">
+        <div className="flex items-start gap-3">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <Workflow className="h-5 w-5" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+              Stackivo Portal
+            </p>
+            <h1 className="mt-1 text-lg font-semibold tracking-tight">
+              Your client portal is ready
+            </h1>
+            <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
+              Continue with the email address this invitation was sent to. Once
+              accepted, you can add the portal to your home screen for quick
+              access.
+            </p>
+          </div>
+        </div>
+
+        <div className="rounded-lg border bg-muted/35 p-3">
+          <div className="flex gap-2.5">
+            <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              This invite is private and time-limited. The portal opens only
+              after the invited email is signed in.
+            </p>
+          </div>
+        </div>
+
+        <div className="grid gap-2">
+          <Button asChild className="w-full">
+            <Link href={`${AUTH_LOGIN_ROUTE}?next=${encodeURIComponent(next)}`}>
+              Continue to portal
+            </Link>
+          </Button>
+          <Button asChild variant="outline" className="w-full">
+            <Link href={`/signup?next=${encodeURIComponent(next)}`}>
+              Create account
+            </Link>
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
 }
 
 function ErrorBox({ title, message }: { title: string; message: string }) {

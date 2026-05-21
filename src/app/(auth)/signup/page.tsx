@@ -10,14 +10,18 @@ import { AUTH_DEFAULT_REDIRECT } from "@/features/auth/routes";
 export const metadata = { title: "Sign up" };
 
 interface PageProps {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; next?: string }>;
 }
 
 export default async function SignupPage({ searchParams }: PageProps) {
   const user = await getCurrentUser();
   if (user) redirect(AUTH_DEFAULT_REDIRECT);
 
-  const { error: oauthError } = await searchParams;
+  const sp = await searchParams;
+  const next =
+    sp.next && sp.next.startsWith("/") && !sp.next.startsWith("//")
+      ? sp.next
+      : undefined;
 
   return (
     <AuthFormShell
@@ -26,12 +30,12 @@ export default async function SignupPage({ searchParams }: PageProps) {
       footer={
         <AuthFormFooterLink
           prefix="Already have an account?"
-          href="/login"
+          href={next ? `/login?next=${encodeURIComponent(next)}` : "/login"}
           label="Log in"
         />
       }
     >
-      <SignupForm oauthError={oauthError ?? null} />
+      <SignupForm oauthError={sp.error ?? null} next={next} />
     </AuthFormShell>
   );
 }

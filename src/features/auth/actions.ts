@@ -196,6 +196,16 @@ export async function signupAction(
 
     const supabase = await getServerSupabase();
     const origin = await getOrigin();
+    const next = sanitiseNext(formData.get("next")?.toString() ?? null);
+    const cookieStore = await cookies();
+
+    cookieStore.set("stackivo_signup_next", next, {
+      httpOnly: true,
+      maxAge: 15 * 60,
+      path: "/",
+      sameSite: "lax",
+      secure: origin.startsWith("https://"),
+    });
 
     const { data: signUpData, error } = await supabase.auth.signUp({
       email,
