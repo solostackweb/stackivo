@@ -199,6 +199,21 @@ export async function getPortalEmailAccessContext(email: string): Promise<{
     if (context) return context;
   }
 
+  const { data: acceptedInvites } = await admin
+    .from("portal_invitations")
+    .select("portal_id")
+    .eq("email", normalised)
+    .not("accepted_at", "is", null)
+    .order("accepted_at", { ascending: false })
+    .limit(1);
+  const acceptedPortalId =
+    (acceptedInvites?.[0] as { portal_id?: string } | undefined)?.portal_id ??
+    null;
+  if (acceptedPortalId) {
+    const context = await getPortalContextById(acceptedPortalId);
+    if (context) return context;
+  }
+
   const { data: profiles } = await admin
     .from("user_profiles")
     .select("id")
@@ -216,7 +231,36 @@ export async function getPortalEmailAccessContext(email: string): Promise<{
   const memberPortalId =
     (memberships?.[0] as { portal_id?: string } | undefined)?.portal_id ??
     null;
-  return memberPortalId ? getPortalContextById(memberPortalId) : null;
+  if (memberPortalId) return getPortalContextById(memberPortalId);
+
+  const { data: clientRows } = await admin
+    .from("clients")
+    .select("id")
+    .ilike("email", normalised)
+    .limit(20);
+  const clientIds = ((clientRows ?? []) as Array<{ id: string }>).map(
+    (client) => client.id,
+  );
+  if (clientIds.length === 0) return null;
+
+  const { data: portalRows } = await admin
+    .from("portals")
+    .select("id, owner_user_id, name")
+    .in("client_id", clientIds)
+    .eq("status", "active")
+    .is("deleted_at", null)
+    .order("created_at", { ascending: false })
+    .limit(1);
+  const portal = (portalRows?.[0] ?? null) as
+    | { id: string; owner_user_id: string; name: string }
+    | null;
+  return portal
+    ? {
+        ownerUserId: portal.owner_user_id,
+        portalId: portal.id,
+        portalName: portal.name,
+      }
+    : null;
 }
 
 export async function activatePendingPortalInvitesForCurrentUser(
@@ -300,6 +344,50 @@ export async function activatePendingPortalInvitesForCurrentUser(
     });
 
     portalIds.add(inv.portal_id);
+  }
+
+  const { data: clientRows } = await admin
+    .from("clients")
+    .select("id")
+    .ilike("email", normalised)
+    .limit(20);
+  const clientIds = ((clientRows ?? []) as Array<{ id: string }>).map(
+    (client) => client.id,
+  );
+  if (clientIds.length > 0) {
+    const { data: linkedPortalRows } = await admin
+      .from("portals")
+      .select("id")
+      .in("client_id", clientIds)
+      .eq("status", "active")
+      .is("deleted_at", null)
+      .limit(20);
+
+    for (const portal of (linkedPortalRows ?? []) as Array<{ id: string }>) {
+      const { data: existingMemberRows } = (await admin
+        .from("portal_members")
+        .select("user_id")
+        .eq("portal_id", portal.id)
+        .is("revoked_at", null)) as {
+        data: Array<{ user_id: string }> | null;
+      };
+      const hasDifferentClient =
+        existingMemberRows?.some((member) => member.user_id !== user.id) ??
+        false;
+      if (hasDifferentClient) continue;
+
+      await admin.from("portal_members").upsert(
+        {
+          portal_id: portal.id,
+          user_id: user.id,
+          role: "client",
+          joined_at: new Date().toISOString(),
+          revoked_at: null,
+        } as never,
+        { onConflict: "portal_id,user_id" },
+      );
+      portalIds.add(portal.id);
+    }
   }
 
   if (portalIds.size === 0) {
