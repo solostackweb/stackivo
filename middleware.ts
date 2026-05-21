@@ -50,6 +50,17 @@ export async function middleware(request: NextRequest) {
   response.headers.set("x-request-id", requestId);
 
   const pathname = request.nextUrl.pathname;
+  const isClientPortalUser =
+    user?.user_metadata &&
+    (user.user_metadata as { auth_context?: unknown }).auth_context ===
+      "client_portal";
+
+  if (user && isClientPortalUser && isProtectedPath(pathname)) {
+    const portalUrl = request.nextUrl.clone();
+    portalUrl.pathname = "/portal";
+    portalUrl.search = "";
+    return NextResponse.redirect(portalUrl);
+  }
 
   // 0. /admin/* requires an authenticated admin. Authenticated non-admins
   //    are rewritten to /404 to make the surface indistinguishable from
@@ -123,14 +134,20 @@ export async function middleware(request: NextRequest) {
     const dashUrl = request.nextUrl.clone();
     const next = request.nextUrl.searchParams.get("next");
     const role = (user.app_metadata as { role?: unknown } | null)?.role;
-    const defaultFor = role === "admin" ? "/admin" : AUTH_DEFAULT_REDIRECT;
-    dashUrl.pathname =
+    const defaultFor =
+      isClientPortalUser
+        ? "/portal"
+        : role === "admin"
+          ? "/admin"
+          : AUTH_DEFAULT_REDIRECT;
+    const safeNext =
       next &&
       next.startsWith("/") &&
       !next.startsWith("//") &&
       !isAuthOnlyPath(next.split("?")[0] ?? "")
         ? next
-        : defaultFor;
+        : null;
+    dashUrl.pathname = isClientPortalUser ? "/portal" : safeNext ?? defaultFor;
     dashUrl.search = "";
     return NextResponse.redirect(dashUrl);
   }

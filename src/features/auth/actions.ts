@@ -13,6 +13,7 @@ import { redirect } from "next/navigation";
 import { cookies, headers } from "next/headers";
 import { env } from "@/config/env";
 import { getServerSupabase } from "@/lib/supabase/server";
+import { getAdminSupabase } from "@/lib/supabase/admin";
 import {
   authLimit,
   getClientIp,
@@ -27,6 +28,8 @@ import {
   loginSchema,
   signupSchema,
   forgotPasswordSchema,
+  portalCodeRequestSchema,
+  portalCodeVerifySchema,
   resetPasswordSchema,
 } from "./schemas";
 import {
@@ -34,6 +37,13 @@ import {
   AUTH_LOGIN_ROUTE,
   isClientPortalPath,
 } from "./routes";
+import {
+  activatePendingPortalInvitesForCurrentUser,
+  getPortalEmailAccessContext,
+} from "@/features/portals/invitations";
+import { portalClientHome } from "@/features/portals/routes";
+import { dispatchDelivery } from "@/features/email/send";
+import { renderPortalAccessCodeEmail } from "@/features/email/templates";
 
 export type ActionResult<T = undefined> =
   | { ok: true; data?: T; message?: string }
@@ -400,6 +410,149 @@ export async function loginAction(
 
   const next = sanitiseNext(rawNext);
   redirect(next);
+}
+
+// --- client portal code login ----------------------------------------------
+
+export async function requestPortalCodeAction(
+  _prev: ActionResult<{ email: string }> | undefined,
+  formData: FormData,
+): Promise<ActionResult<{ email: string }>> {
+  const parsed = portalCodeRequestSchema.safeParse({
+    email: formData.get("portalEmail"),
+  });
+
+  if (!parsed.success) {
+    return {
+      ok: false,
+      error: "Enter the client email used for the portal invite.",
+      fieldErrors: parsed.error.flatten().fieldErrors,
+    };
+  }
+
+  const email = parsed.data.email.toLowerCase();
+  const ip = await getClientIp();
+  const gate = await authLimit(`portal-code:${ip}:${email}`);
+  if (!gate.ok) return { ok: false, error: gate.message };
+
+  const genericMessage =
+    "If this email has portal access, we've sent a 6-digit code.";
+
+  const accessContext = await getPortalEmailAccessContext(email);
+  if (!accessContext) {
+    return { ok: true, data: { email }, message: genericMessage };
+  }
+
+  const admin = getAdminSupabase();
+  const origin = await getOrigin();
+  const { data, error } = await admin.auth.admin.generateLink({
+    type: "magiclink",
+    email,
+    options: {
+      redirectTo: `${origin}/auth/callback?next=${encodeURIComponent("/portal")}`,
+      data: { full_name: email.split("@")[0], auth_context: "client_portal" },
+    },
+  });
+
+  const code = data.properties?.email_otp ?? null;
+  if (error || !code) {
+    log.warn("auth.portal_code.request_failed", {
+      error: error?.message ?? "missing_email_otp",
+      email_hash: await safeHashedEmail(email),
+    });
+    return {
+      ok: false,
+      error: "We couldn't send the code right now. Please try again.",
+    };
+  }
+
+  const rendered = renderPortalAccessCodeEmail({
+    code,
+    portalName: accessContext.portalName,
+    expiresMinutes: 10,
+  });
+  const delivery = await dispatchDelivery({
+    userId: accessContext.ownerUserId,
+    kind: "portal_invite",
+    entityType: "system",
+    entityId: accessContext.portalId,
+    senderType: "connect",
+    to: { email },
+    subject: rendered.subject,
+    html: rendered.html,
+    text: rendered.text,
+    metadata: {
+      flow: "portal_code",
+      portalId: accessContext.portalId,
+    },
+    tags: ["portal", "code"],
+    idempotencyKey: `portal-code:${email}:${code}`,
+  });
+
+  if (!delivery.ok) {
+    return {
+      ok: false,
+      error: "We couldn't send the code right now. Please try again.",
+    };
+  }
+
+  return { ok: true, data: { email }, message: genericMessage };
+}
+
+export async function verifyPortalCodeAction(
+  _prev: ActionResult | undefined,
+  formData: FormData,
+): Promise<ActionResult> {
+  const parsed = portalCodeVerifySchema.safeParse({
+    email: formData.get("portalEmail"),
+    code: formData.get("portalCode"),
+  });
+
+  if (!parsed.success) {
+    return {
+      ok: false,
+      error: "Enter the 6-digit code from your email.",
+      fieldErrors: parsed.error.flatten().fieldErrors,
+    };
+  }
+
+  const email = parsed.data.email.toLowerCase();
+  const ip = await getClientIp();
+  const gate = await authLimit(`portal-code-verify:${ip}:${email}`);
+  if (!gate.ok) return { ok: false, error: gate.message };
+
+  const supabase = await getServerSupabase();
+  const { error } = await supabase.auth.verifyOtp({
+    email,
+    token: parsed.data.code,
+    type: "email",
+  });
+
+  if (error) {
+    await recordSecurityEvent({
+      kind: "auth_login_failed",
+      severity: "info",
+      metadata: {
+        flow: "portal_code",
+        email_hash: await safeHashedEmail(email),
+      },
+    });
+    return { ok: false, error: "Invalid or expired code." };
+  }
+
+  const activated = await activatePendingPortalInvitesForCurrentUser(email);
+  if (!activated.ok) {
+    await supabase.auth.signOut();
+    return {
+      ok: false,
+      error:
+        activated.error ??
+        "No active client portal was found for this email.",
+    };
+  }
+
+  const portalIds = activated.data?.portalIds ?? [];
+  redirect(portalIds.length === 1 ? portalClientHome(portalIds[0]!) : "/portal");
 }
 
 // --- logout -----------------------------------------------------------------

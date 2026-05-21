@@ -614,7 +614,7 @@ export function renderPortalInviteEmail(input: PortalInviteInput): EmailRender {
       paragraphs,
       cta: { label: "Open portal", href: input.acceptUrl },
       secondaryParagraphs: [
-        "If you do not have a Stackivo account yet, you will be prompted to create one.",
+        "You will verify the invited email with a one-time code before the portal opens.",
       ],
       signature: formatSenderSignature(input.senderName, input.senderEmail),
       brand: input.brand,
@@ -624,6 +624,41 @@ export function renderPortalInviteEmail(input: PortalInviteInput): EmailRender {
       { label: "Open portal", href: input.acceptUrl },
       formatSenderSignature(input.senderName, input.senderEmail),
     ),
+  };
+}
+
+// --- Portal access code --------------------------------------------------
+
+export interface PortalAccessCodeInput {
+  code: string;
+  portalName?: string | null;
+  expiresMinutes: number;
+}
+
+export function renderPortalAccessCodeEmail(
+  input: PortalAccessCodeInput,
+): EmailRender {
+  const portalLabel = input.portalName ?? "your client portal";
+  const paragraphs = [
+    `Use this code to open ${portalLabel}:`,
+    input.code,
+    `This code expires in ${input.expiresMinutes} minutes. If you did not request it, you can ignore this email.`,
+  ];
+
+  return {
+    subject: `Your Stackivo portal code is ${input.code}`,
+    html: envelope({
+      preheader: `Your portal code is ${input.code}`,
+      eyebrow: "Client Portal",
+      heading: input.code,
+      subheading: `Your one-time code for ${portalLabel}`,
+      paragraphs: [
+        `Use this one-time code to open ${portalLabel}.`,
+        `It expires in ${input.expiresMinutes} minutes. If you did not request it, you can ignore this email.`,
+      ],
+      signature: "Stackivo <connect@stackivo.me>",
+    }),
+    text: plain(paragraphs, undefined, "Stackivo <connect@stackivo.me>"),
   };
 }
 

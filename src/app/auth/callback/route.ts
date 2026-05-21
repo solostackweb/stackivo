@@ -25,6 +25,8 @@ import {
   AUTH_LOGIN_ROUTE,
   isClientPortalPath,
 } from "@/features/auth/routes";
+import { activatePendingPortalInvitesForCurrentUser } from "@/features/portals/invitations";
+import { portalClientHome } from "@/features/portals/routes";
 
 function sanitiseNext(raw: string | null): string {
   if (!raw) return AUTH_DEFAULT_REDIRECT;
@@ -107,5 +109,25 @@ export async function GET(request: NextRequest) {
   }
 
   // Session established — send the user to their destination.
+  if (isClientPortalPath(next)) {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (user?.email) {
+      const activated = await activatePendingPortalInvitesForCurrentUser(
+        user.email,
+      );
+      if (activated.ok && next === "/portal") {
+        const portalIds = activated.data?.portalIds ?? [];
+        if (portalIds.length === 1) {
+          return redirectAndClearOauthCookies(
+            `${origin}${portalClientHome(portalIds[0]!)}`,
+            next,
+          );
+        }
+      }
+    }
+  }
+
   return redirectAndClearOauthCookies(`${origin}${next}`, next);
 }

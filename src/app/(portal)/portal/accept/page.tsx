@@ -4,9 +4,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { AlertTriangle, MailQuestion, ShieldCheck, Workflow } from "lucide-react";
 import { getServerSupabase } from "@/lib/supabase/server";
-import { acceptPortalInvitation } from "@/features/portals/invitations";
-import { AUTH_LOGIN_ROUTE } from "@/features/auth/routes";
+import {
+  acceptPortalInvitation,
+  getPortalInvitePreview,
+} from "@/features/portals/invitations";
 import { portalClientHome } from "@/features/portals/routes";
+import { InviteCodeAccess } from "@/features/portals/components/invite-code-access";
 
 export const metadata = { title: "Accept invitation" };
 export const dynamic = "force-dynamic";
@@ -36,9 +39,17 @@ export default async function AcceptInvitationPage({
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  const next = `/portal/accept?token=${encodeURIComponent(token)}`;
   if (!user) {
-    return <InviteAccessBox next={next} />;
+    const preview = await getPortalInvitePreview(token);
+    if (!preview) {
+      return (
+        <ErrorBox
+          title="This invitation is no longer active"
+          message="Ask the freelancer to send a fresh invitation from their dashboard."
+        />
+      );
+    }
+    return <InviteAccessBox invite={preview} />;
   }
 
   const res = await acceptPortalInvitation(token);
@@ -71,7 +82,15 @@ export default async function AcceptInvitationPage({
   return <ErrorBox title={title} message={message} />;
 }
 
-function InviteAccessBox({ next }: { next: string }) {
+function InviteAccessBox({
+  invite,
+}: {
+  invite: {
+    email: string;
+    portalName: string;
+    expiresAt: string;
+  };
+}) {
   return (
     <Card className="mx-auto w-full max-w-md">
       <CardContent className="space-y-5 p-5 sm:p-6">
@@ -84,12 +103,11 @@ function InviteAccessBox({ next }: { next: string }) {
               Stackivo Portal
             </p>
             <h1 className="mt-1 text-lg font-semibold tracking-tight">
-              Your client portal is ready
+              {invite.portalName} is ready
             </h1>
             <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
-              Continue with the email address this invitation was sent to. Once
-              accepted, you can add the portal to your home screen for quick
-              access.
+              We will send a one-time code to {invite.email}. Enter it here
+              and you will go straight into the client portal.
             </p>
           </div>
         </div>
@@ -99,23 +117,12 @@ function InviteAccessBox({ next }: { next: string }) {
             <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
             <p className="text-xs leading-relaxed text-muted-foreground">
               This invite is private and time-limited. The portal opens only
-              after the invited email is signed in.
+              after the invited email is verified.
             </p>
           </div>
         </div>
 
-        <div className="grid gap-2">
-          <Button asChild className="w-full">
-            <Link href={`${AUTH_LOGIN_ROUTE}?next=${encodeURIComponent(next)}`}>
-              Continue to portal
-            </Link>
-          </Button>
-          <Button asChild variant="outline" className="w-full">
-            <Link href={`/signup?next=${encodeURIComponent(next)}`}>
-              Create account
-            </Link>
-          </Button>
-        </div>
+        <InviteCodeAccess email={invite.email} />
       </CardContent>
     </Card>
   );

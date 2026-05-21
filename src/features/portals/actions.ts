@@ -312,7 +312,7 @@ export async function acceptPortalInvitationAction(
 ): Promise<ActionResult<{ portalId: string; alreadyMember: boolean }>> {
   const parsed = acceptSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "Invalid token." };
-  return acceptPortalInvitation(parsed.data.token);
+  return acceptPortalInvitation(parsed.data.token, { revalidate: true });
 }
 
 export async function revokePortalMemberAction(input: {

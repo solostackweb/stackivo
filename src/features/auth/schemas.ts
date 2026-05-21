@@ -38,6 +38,18 @@ export const loginSchema = z.object({
   password: z.string().min(1, "Password is required"),
 });
 
+export const portalCodeRequestSchema = z.object({
+  email: emailSchema,
+});
+
+export const portalCodeVerifySchema = z.object({
+  email: emailSchema,
+  code: z
+    .string()
+    .trim()
+    .regex(/^\d{6}$/, "Enter the 6-digit code"),
+});
+
 export const forgotPasswordSchema = z.object({
   email: emailSchema,
 });
@@ -56,5 +68,7 @@ export const resetPasswordSchema = z
 
 export type SignupInput = z.infer<typeof signupSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
+export type PortalCodeRequestInput = z.infer<typeof portalCodeRequestSchema>;
+export type PortalCodeVerifyInput = z.infer<typeof portalCodeVerifySchema>;
 export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
