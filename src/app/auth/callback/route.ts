@@ -23,6 +23,7 @@ import { getServerSupabase } from "@/lib/supabase/server";
 import {
   AUTH_DEFAULT_REDIRECT,
   AUTH_LOGIN_ROUTE,
+  isClientPortalPath,
 } from "@/features/auth/routes";
 
 function sanitiseNext(raw: string | null): string {
@@ -40,11 +41,20 @@ function sanitiseErrorRedirect(raw: string | null): typeof AUTH_LOGIN_ROUTE | "/
   return raw === "/signup" ? "/signup" : AUTH_LOGIN_ROUTE;
 }
 
-function redirectAndClearOauthCookies(url: string): NextResponse {
+function redirectAndClearOauthCookies(url: string, next?: string): NextResponse {
   const response = NextResponse.redirect(url);
   response.cookies.delete("stackivo_oauth_next");
   response.cookies.delete("stackivo_oauth_from");
   response.cookies.delete("stackivo_signup_next");
+  if (next && isClientPortalPath(next)) {
+    response.cookies.set("stackivo_portal_return_to", next, {
+      httpOnly: true,
+      maxAge: 5 * 60,
+      path: "/",
+      sameSite: "lax",
+      secure: url.startsWith("https://"),
+    });
+  }
   return response;
 }
 
@@ -97,5 +107,5 @@ export async function GET(request: NextRequest) {
   }
 
   // Session established — send the user to their destination.
-  return redirectAndClearOauthCookies(`${origin}${next}`);
+  return redirectAndClearOauthCookies(`${origin}${next}`, next);
 }

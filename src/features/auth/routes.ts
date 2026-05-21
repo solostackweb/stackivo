@@ -19,6 +19,9 @@ export const AUTH_LOGIN_ROUTE = "/login";
 /** The route pattern for anything requiring authentication. */
 export const PROTECTED_PREFIXES = ["/dashboard", "/admin", "/onboarding"] as const;
 
+/** Authenticated client-portal routes that intentionally skip freelancer onboarding. */
+export const CLIENT_PORTAL_PREFIX = "/portal";
+
 /** Fully public routes (marketing, auth). No session check, no redirect. */
 export const PUBLIC_EXACT_ROUTES = [
   "/",
@@ -50,6 +53,10 @@ export function isProtectedPath(pathname: string): boolean {
   return PROTECTED_PREFIXES.some(
     (p) => pathname === p || pathname.startsWith(`${p}/`),
   );
+}
+
+export function isClientPortalPath(pathname: string): boolean {
+  return pathname === CLIENT_PORTAL_PREFIX || pathname.startsWith(`${CLIENT_PORTAL_PREFIX}/`);
 }
 
 export function isAuthOnlyPath(pathname: string): boolean {

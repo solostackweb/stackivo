@@ -8,6 +8,7 @@ import "server-only";
  */
 
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import { AUTH_LOGIN_ROUTE } from "@/features/auth/routes";
 import { getProfile } from "@/features/profile/server";
 import type { BusinessProfile } from "./types";
@@ -43,6 +44,12 @@ export async function requireOnboarded(): Promise<BusinessProfile> {
 export async function requireMidOnboarding(
   currentPathname: string,
 ): Promise<BusinessProfile> {
+  const cookieStore = await cookies();
+  const portalReturnTo = cookieStore.get("stackivo_portal_return_to")?.value;
+  if (portalReturnTo?.startsWith("/portal")) {
+    redirect(portalReturnTo);
+  }
+
   const profile = await getBusinessProfile();
   if (!profile) redirect(AUTH_LOGIN_ROUTE);
   if (profile.onboardingCompleted) redirect("/dashboard");

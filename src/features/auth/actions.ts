@@ -29,7 +29,11 @@ import {
   forgotPasswordSchema,
   resetPasswordSchema,
 } from "./schemas";
-import { AUTH_DEFAULT_REDIRECT, AUTH_LOGIN_ROUTE } from "./routes";
+import {
+  AUTH_DEFAULT_REDIRECT,
+  AUTH_LOGIN_ROUTE,
+  isClientPortalPath,
+} from "./routes";
 
 export type ActionResult<T = undefined> =
   | { ok: true; data?: T; message?: string }
@@ -282,7 +286,9 @@ export async function signupAction(
     return {
       ok: true,
       message:
-        "Check your inbox to verify your email. If it is not there, check Spam or Promotions too. Clicking the link signs you in and drops you into onboarding.",
+        isClientPortalPath(next)
+          ? "Check your inbox to verify your email. If it is not there, check Spam or Promotions too. Clicking the link signs you in and opens your client portal."
+          : "Check your inbox to verify your email. If it is not there, check Spam or Promotions too. Clicking the link signs you in and drops you into onboarding.",
     };
   } catch (err) {
     const message = userSafeErrorMessage(err);
