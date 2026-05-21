@@ -1,11 +1,10 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { cookies } from "next/headers";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { AlertTriangle, MailQuestion, ShieldCheck, Workflow } from "lucide-react";
 import { getServerSupabase } from "@/lib/supabase/server";
-import { acceptPortalInvitationAction } from "@/features/portals/actions";
+import { acceptPortalInvitation } from "@/features/portals/invitations";
 import { AUTH_LOGIN_ROUTE } from "@/features/auth/routes";
 import { portalClientHome } from "@/features/portals/routes";
 
@@ -42,10 +41,8 @@ export default async function AcceptInvitationPage({
     return <InviteAccessBox next={next} />;
   }
 
-  const res = await acceptPortalInvitationAction({ token });
+  const res = await acceptPortalInvitation(token);
   if (res.ok) {
-    const cookieStore = await cookies();
-    cookieStore.delete("stackivo_portal_return_to");
     // Bounce straight into the portal — the user just signed in to
     // accept, so there's no friction to skip.
     redirect(portalClientHome(res.data!.portalId));
