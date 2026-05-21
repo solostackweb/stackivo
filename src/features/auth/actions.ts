@@ -436,7 +436,7 @@ export async function requestPortalCodeAction(
   if (!gate.ok) return { ok: false, error: gate.message };
 
   const genericMessage =
-    "If this email has portal access, we've sent a 6-digit code.";
+    "If this email has portal access, we've sent a one-time code.";
 
   const accessContext = await getPortalEmailAccessContext(email);
   if (!accessContext) {
@@ -511,7 +511,7 @@ export async function verifyPortalCodeAction(
   if (!parsed.success) {
     return {
       ok: false,
-      error: "Enter the 6-digit code from your email.",
+      error: "Enter the code from your email.",
       fieldErrors: parsed.error.flatten().fieldErrors,
     };
   }

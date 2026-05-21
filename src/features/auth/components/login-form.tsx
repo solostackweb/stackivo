@@ -121,7 +121,7 @@ export function LoginForm({
         <div className="space-y-1">
           <p className="text-sm font-semibold">Client portal access</p>
           <p className="text-xs leading-relaxed text-muted-foreground">
-            Invited as a client? Get a 6-digit code and open your portal.
+            Invited as a client? Get a one-time code and open your portal.
           </p>
         </div>
 
@@ -162,9 +162,9 @@ export function LoginForm({
             <Input
               name="portalCode"
               inputMode="numeric"
-              pattern="[0-9]{6}"
-              maxLength={6}
-              placeholder="6-digit code"
+              pattern="[0-9]{6,8}"
+              maxLength={8}
+              placeholder="Email code"
               required
               className="h-10 tracking-widest"
             />

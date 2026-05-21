@@ -47,7 +47,7 @@ export const portalCodeVerifySchema = z.object({
   code: z
     .string()
     .trim()
-    .regex(/^\d{6}$/, "Enter the 6-digit code"),
+    .regex(/^\d{6,8}$/, "Enter the code from your email"),
 });
 
 export const forgotPasswordSchema = z.object({

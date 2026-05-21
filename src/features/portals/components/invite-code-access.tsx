@@ -53,9 +53,9 @@ export function InviteCodeAccess({ email }: { email: string }) {
               id="invite-portal-code"
               name="portalCode"
               inputMode="numeric"
-              pattern="[0-9]{6}"
-              maxLength={6}
-              placeholder="6-digit code"
+              pattern="[0-9]{6,8}"
+              maxLength={8}
+              placeholder="Email code"
               required
               className="h-10 tracking-widest"
             />
