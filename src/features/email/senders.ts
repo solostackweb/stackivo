@@ -43,7 +43,7 @@ export const emailSenders = {
   },
   share: {
     type: "share",
-    name: "Stackivo Share",
+    name: "Stackivo",
     email: "share@stackivo.me",
   },
 } as const satisfies Record<EmailSenderType, EmailSenderProfile>;

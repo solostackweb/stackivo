@@ -65,6 +65,29 @@ export async function createPortalAction(
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Not authenticated." };
 
+  const { data: clientRow } = await supabase
+    .from("clients")
+    .select("id, email, full_name, business_name")
+    .eq("id", parsed.data.clientId)
+    .maybeSingle();
+  const client = clientRow as
+    | {
+        id: string;
+        email: string | null;
+        full_name: string | null;
+        business_name: string | null;
+      }
+    | null;
+  if (!client) {
+    return { ok: false, error: "Client not found." };
+  }
+  if (!client.email) {
+    return {
+      ok: false,
+      error: "Add an email to the client profile before creating a portal.",
+    };
+  }
+
   const { data: existing } = await supabase
     .from("portals")
     .select("id")
@@ -102,11 +125,30 @@ export async function createPortalAction(
     payload: { name: parsed.data.name, plan: sub.plan },
   });
 
+  const invite = await createAndSendPortalInvitation({
+    portalId,
+    portalName: parsed.data.name,
+    clientId: parsed.data.clientId,
+    userId: user.id,
+    clientName: client.full_name ?? client.business_name ?? undefined,
+    email: client.email,
+  });
+
   revalidatePath(PORTAL_DASHBOARD_INDEX);
+  revalidatePath(portalDashboardDetail(portalId));
+
+  if (!invite.ok) {
+    return {
+      ok: true,
+      data: { portalId },
+      message: `Portal created, but the invitation was not sent: ${invite.error}`,
+    };
+  }
+
   return {
     ok: true,
     data: { portalId },
-    message: "Portal created.",
+    message: `Portal created and invitation sent to ${client.email}.`,
   };
 }
 
@@ -237,7 +279,6 @@ export async function invitePortalMemberAction(
     return { ok: false, error: accessErrorMessage(access) };
   }
 
-  const admin = getAdminSupabase();
   if (!access.portal.client_id) {
     return {
       ok: false,
@@ -245,137 +286,17 @@ export async function invitePortalMemberAction(
     };
   }
 
-  const { data: clientRow } = await admin
-    .from("clients")
-    .select("email")
-    .eq("id", access.portal.client_id)
-    .maybeSingle();
-  const clientEmail =
-    (clientRow as { email: string | null } | null)?.email ?? null;
-  if (!clientEmail) {
-    return {
-      ok: false,
-      error: "Add an email to the client profile before inviting.",
-    };
-  }
-  if (clientEmail.toLowerCase() !== parsed.data.email.toLowerCase()) {
-    return {
-      ok: false,
-      error: "Invite must be sent to the client email on file.",
-    };
-  }
-
-  const [{ data: activeMember }, { data: activeInvite }] = await Promise.all([
-    admin
-      .from("portal_members")
-      .select("user_id")
-      .eq("portal_id", parsed.data.portalId)
-      .is("revoked_at", null)
-      .limit(1),
-    admin
-      .from("portal_invitations")
-      .select("id")
-      .eq("portal_id", parsed.data.portalId)
-      .is("accepted_at", null)
-      .gt("expires_at", new Date().toISOString())
-      .limit(1),
-  ]);
-
-  if (activeMember && activeMember.length > 0) {
-    return {
-      ok: false,
-      error: "This portal already has a client assigned.",
-    };
-  }
-
-  if (activeInvite && activeInvite.length > 0) {
-    return {
-      ok: false,
-      error: "There is already a pending invitation for this portal.",
-    };
-  }
-
-  // Mint an unforgeable random token, but persist only its SHA-256 hash.
-  // The plaintext goes in the email link only.
-  const tokenPlain = crypto.randomBytes(24).toString("base64url");
-  const tokenHash = crypto.createHash("sha256").update(tokenPlain).digest("hex");
-  const expiresAt = new Date(Date.now() + INVITE_TTL_MS).toISOString();
-
-  const { data: invRow, error } = await admin
-    .from("portal_invitations")
-    .insert({
-      portal_id: parsed.data.portalId,
-      email: parsed.data.email.toLowerCase(),
-      token_hash: tokenHash,
-      invited_by: access.userId,
-      expires_at: expiresAt,
-    } as never)
-    .select("id")
-    .single();
-  if (error || !invRow) {
-    return { ok: false, error: error?.message ?? "Could not create invitation." };
-  }
-  const invitationId = (invRow as { id: string }).id;
-
-  // Resolve sender identity for the email --------------------------------
-  const { data: profile } = await admin
-    .from("user_profiles")
-    .select("business_name, legal_name, full_name, email")
-    .eq("id", access.userId)
-    .maybeSingle();
-  const p = profile as
-    | {
-        business_name?: string | null;
-        legal_name?: string | null;
-        full_name?: string | null;
-        email?: string | null;
-      }
-    | null;
-  const senderName =
-    p?.business_name ?? p?.legal_name ?? p?.full_name ?? "Stackivo";
-
-  const acceptUrl = `${env.appUrl.replace(/\/$/, "")}/portal/accept?token=${encodeURIComponent(
-    tokenPlain,
-  )}`;
-
-  const rendered = renderPortalInviteEmail({
-    portalName: access.portal.name,
-    clientName: parsed.data.name ?? null,
-    senderName,
-    senderEmail: getEmailSender("share").email,
-    acceptUrl,
-    expiresIso: expiresAt,
-  });
-
-  await dispatchDelivery({
-    userId: access.userId,
-    kind: "portal_invite",
-    entityType: "system",
-    senderType: "share",
-    entityId: parsed.data.portalId,
-    to: { email: parsed.data.email, name: parsed.data.name ?? undefined },
-    replyTo: p?.email ? { email: p.email, name: senderName } : undefined,
-    subject: rendered.subject,
-    html: rendered.html,
-    text: rendered.text,
-    metadata: { portalId: parsed.data.portalId, invitationId },
-    tags: ["portal", "invite"],
-    idempotencyKey: `portal-invite:${invitationId}`,
-  });
-
-  await recordPortalActivity({
+  const result = await createAndSendPortalInvitation({
     portalId: parsed.data.portalId,
-    actorId: access.userId,
-    type: "portal.member_invited",
-    payload: { email: parsed.data.email },
+    portalName: access.portal.name,
+    clientId: access.portal.client_id,
+    userId: access.userId,
+    email: parsed.data.email,
+    clientName: parsed.data.name,
   });
 
-  revalidatePath(portalDashboardDetail(parsed.data.portalId));
-  return {
-    ok: true,
-    data: { invitationId },
-    message: `Invitation sent to ${parsed.data.email}.`,
-  };
+  if (result.ok) revalidatePath(portalDashboardDetail(parsed.data.portalId));
+  return result;
 }
 
 const acceptSchema = z.object({ token: z.string().min(8) });
@@ -807,3 +728,160 @@ function accessErrorMessage(err: PortalAccessError): string {
   }
 }
 
+async function createAndSendPortalInvitation(input: {
+  portalId: string;
+  portalName: string;
+  clientId: string;
+  userId: string;
+  email: string;
+  clientName?: string | null;
+}): Promise<ActionResult<{ invitationId: string }>> {
+  const admin = getAdminSupabase();
+  const { data: clientRow } = await admin
+    .from("clients")
+    .select("email")
+    .eq("id", input.clientId)
+    .maybeSingle();
+  const clientEmail =
+    (clientRow as { email: string | null } | null)?.email ?? null;
+  if (!clientEmail) {
+    return {
+      ok: false,
+      error: "Add an email to the client profile before inviting.",
+    };
+  }
+  if (clientEmail.toLowerCase() !== input.email.toLowerCase()) {
+    return {
+      ok: false,
+      error: "Invite must be sent to the client email on file.",
+    };
+  }
+
+  const [{ data: activeMember }, { data: activeInvite }] = await Promise.all([
+    admin
+      .from("portal_members")
+      .select("user_id")
+      .eq("portal_id", input.portalId)
+      .is("revoked_at", null)
+      .limit(1),
+    admin
+      .from("portal_invitations")
+      .select("id")
+      .eq("portal_id", input.portalId)
+      .is("accepted_at", null)
+      .gt("expires_at", new Date().toISOString())
+      .limit(1),
+  ]);
+
+  if (activeMember && activeMember.length > 0) {
+    return {
+      ok: false,
+      error: "This portal already has a client assigned.",
+    };
+  }
+
+  if (activeInvite && activeInvite.length > 0) {
+    return {
+      ok: false,
+      error: "There is already a pending invitation for this portal.",
+    };
+  }
+
+  const tokenPlain = crypto.randomBytes(24).toString("base64url");
+  const tokenHash = crypto.createHash("sha256").update(tokenPlain).digest("hex");
+  const expiresAt = new Date(Date.now() + INVITE_TTL_MS).toISOString();
+
+  const { data: invRow, error } = await admin
+    .from("portal_invitations")
+    .insert({
+      portal_id: input.portalId,
+      email: input.email.toLowerCase(),
+      token_hash: tokenHash,
+      invited_by: input.userId,
+      expires_at: expiresAt,
+    } as never)
+    .select("id")
+    .single();
+  if (error || !invRow) {
+    return { ok: false, error: error?.message ?? "Could not create invitation." };
+  }
+  const invitationId = (invRow as { id: string }).id;
+
+  const { data: profile } = await admin
+    .from("user_profiles")
+    .select("business_name, legal_name, full_name, email")
+    .eq("id", input.userId)
+    .maybeSingle();
+  const p = profile as
+    | {
+        business_name?: string | null;
+        legal_name?: string | null;
+        full_name?: string | null;
+        email?: string | null;
+      }
+    | null;
+  const senderName =
+    p?.business_name ?? p?.legal_name ?? p?.full_name ?? "Stackivo";
+
+  const acceptUrl = `${env.appUrl.replace(/\/$/, "")}/portal/accept?token=${encodeURIComponent(
+    tokenPlain,
+  )}`;
+
+  const rendered = renderPortalInviteEmail({
+    portalName: input.portalName,
+    clientName: input.clientName ?? null,
+    senderName,
+    senderEmail: getEmailSender("share").email,
+    acceptUrl,
+    expiresIso: expiresAt,
+  });
+
+  const delivery = await dispatchDelivery({
+    userId: input.userId,
+    kind: "portal_invite",
+    entityType: "system",
+    senderType: "share",
+    entityId: input.portalId,
+    to: { email: input.email, name: input.clientName ?? undefined },
+    replyTo: p?.email ? { email: p.email, name: senderName } : undefined,
+    subject: rendered.subject,
+    html: rendered.html,
+    text: rendered.text,
+    metadata: { portalId: input.portalId, invitationId },
+    tags: ["portal", "invite"],
+    idempotencyKey: `portal-invite:${invitationId}`,
+  });
+
+  if (!delivery.ok) {
+    await admin.from("portal_invitations").delete().eq("id", invitationId);
+    await recordPortalActivity({
+      portalId: input.portalId,
+      actorId: input.userId,
+      type: "portal.invite_failed",
+      payload: {
+        email: input.email,
+        deliveryError: delivery.error,
+      },
+    });
+    return {
+      ok: false,
+      error: `Could not send invitation: ${delivery.error}`,
+    };
+  }
+
+  await recordPortalActivity({
+    portalId: input.portalId,
+    actorId: input.userId,
+    type: "portal.member_invited",
+    payload: {
+      email: input.email,
+      deliveryStatus: "sent",
+    },
+  });
+
+  return {
+    ok: true,
+    data: { invitationId },
+    message: `Invitation sent to ${input.email}.`,
+  };
+}

@@ -60,6 +60,10 @@ export function CreatePortalButton({
     () => new Set(activeClientIds),
     [activeClientIds],
   );
+  const selectedClient = React.useMemo(
+    () => clientOptions.find((client) => client.id === clientId) ?? null,
+    [clientId, clientOptions],
+  );
 
   React.useEffect(() => {
     setClientOptions(clients);
@@ -78,6 +82,11 @@ export function CreatePortalButton({
     if (blockedClientIds.has(clientId)) {
       setPending(false);
       setError("That client already has an active portal.");
+      return;
+    }
+    if (!selectedClient?.email) {
+      setPending(false);
+      setError("Add an email to the client before creating the portal.");
       return;
     }
     const res = await createPortalAction({
@@ -129,12 +138,12 @@ export function CreatePortalButton({
                     <SelectItem
                       key={client.id}
                       value={client.id}
-                      disabled={blockedClientIds.has(client.id)}
+                      disabled={blockedClientIds.has(client.id) || !client.email}
                     >
                       {client.businessName
                         ? `${client.businessName} · ${client.fullName}`
                         : client.fullName}
-                      {client.email ? ` (${client.email})` : ""}
+                      {client.email ? ` (${client.email})` : " (add email first)"}
                       {blockedClientIds.has(client.id)
                         ? " · active portal exists"
                         : ""}
@@ -213,6 +222,7 @@ export function CreatePortalButton({
                 pending ||
                 name.trim().length < 2 ||
                 clientId.length === 0 ||
+                !selectedClient?.email ||
                 clientOptions.length === 0
               }
             >

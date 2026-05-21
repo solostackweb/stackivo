@@ -601,27 +601,27 @@ export function renderPortalInviteEmail(input: PortalInviteInput): EmailRender {
       });
   const paragraphs = [
     greeting,
-    `${input.senderName} has invited you to “${input.portalName}” — your shared workspace for files, contracts, and invoices.`,
-    `Click the button below to accept the invitation. The link expires on ${expiryHuman}.`,
+    `${input.senderName} has invited you to ${input.portalName}.`,
+    `Use the button below to open the portal and set up access. This invitation expires on ${expiryHuman}.`,
   ];
   return {
-    subject: `${input.senderName} invited you to ${input.portalName}`,
+    subject: `Invitation to ${input.portalName}`,
     html: envelope({
-      preheader: `Accept your invitation to ${input.portalName}`,
+      preheader: `Open your invitation to ${input.portalName}`,
       eyebrow: "Client Portal",
-      heading: `You're invited to ${input.portalName}`,
+      heading: `Invitation to ${input.portalName}`,
       subheading: `Expires ${expiryHuman}`,
       paragraphs,
-      cta: { label: "Accept invitation", href: input.acceptUrl },
+      cta: { label: "Open portal", href: input.acceptUrl },
       secondaryParagraphs: [
-        "If you don't have a Stackivo account yet, you'll be prompted to create one — it takes about 30 seconds.",
+        "If you do not have a Stackivo account yet, you will be prompted to create one.",
       ],
       signature: formatSenderSignature(input.senderName, input.senderEmail),
       brand: input.brand,
     }),
     text: plain(
       paragraphs,
-      { label: "Accept invitation", href: input.acceptUrl },
+      { label: "Open portal", href: input.acceptUrl },
       formatSenderSignature(input.senderName, input.senderEmail),
     ),
   };
