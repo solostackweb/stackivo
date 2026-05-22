@@ -4,10 +4,24 @@ import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
+  ArrowLeft,
+  Bell,
+  CheckCircle2,
+  CheckSquare,
+  Clock3,
+  CreditCard,
+  Download,
+  Eye,
   FileText,
   Receipt,
   Files,
+  Grid2X2,
+  HelpCircle,
+  Home,
+  Info,
+  List,
   MessageSquare,
+  MoreHorizontal,
   Video,
   UserPlus,
   Trash2,
@@ -15,7 +29,6 @@ import {
   Loader2,
   Upload,
   ExternalLink,
-  Paperclip,
   ShieldCheck,
   Sparkles,
   File,
@@ -24,6 +37,8 @@ import {
   FileCode,
   Music,
   Film,
+  Share2,
+  Wallet,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useConfirm } from "@/components/ui/confirm-dialog";
@@ -164,6 +179,10 @@ interface ViewProps {
 export function PortalView(props: ViewProps) {
   const isOwner = props.role === "owner";
 
+  if (!isOwner) {
+    return <ClientPortalExperience {...props} />;
+  }
+
   // Owner: Updates → Meetings → Contracts → Invoices → Welcome → Files → Chat
   // Client: Updates → Meetings → Invoices → Contracts → Welcome → Files → Chat
   const mainSections = isOwner ? (
@@ -300,6 +319,812 @@ export function PortalView(props: ViewProps) {
       <MobileNavBar />
     </div>
   );
+}
+
+// ============================================================================
+// Client portal app shell
+// ============================================================================
+
+type PortalDocument = {
+  title: string;
+  url: string;
+  mimeType?: string | null;
+  kind: "file" | "invoice" | "contract" | "guide" | "link";
+};
+
+function ClientPortalExperience(props: ViewProps) {
+  const [viewerDoc, setViewerDoc] = React.useState<PortalDocument | null>(null);
+  const paidAmount = props.invoices
+    .filter((invoice) => invoice.status === "paid")
+    .reduce((sum, invoice) => sum + invoice.total_amount, 0);
+  const outstandingAmount = props.invoices
+    .filter((invoice) => invoice.status !== "paid" && invoice.status !== "cancelled")
+    .reduce((sum, invoice) => sum + invoice.total_amount, 0);
+  const overdueAmount = props.invoices
+    .filter((invoice) => invoice.status === "overdue")
+    .reduce((sum, invoice) => sum + invoice.total_amount, 0);
+  const currency = props.invoices[0]?.currency ?? "INR";
+  const latestDeliverable =
+    props.files.find((file) => file.category === "deliverable") ??
+    props.files[0] ??
+    null;
+  const currentDeliverable =
+    latestDeliverable?.name ??
+    props.updates.find((update) => update.update_type === "deliverable")?.title ??
+    "No deliverable shared yet";
+  const upcomingMeeting = props.meetings.find(
+    (meeting) => meeting.status === "accepted" || meeting.status === "pending",
+  );
+  const pendingApprovals = props.updates.filter(
+    (update) =>
+      update.update_type === "deliverable" &&
+      update.approval_status !== "approved" &&
+      update.approval_status !== "none",
+  ).length;
+  const latestUpdate = props.updates[0] ?? null;
+  const completion = calculatePortalCompletion(props);
+  const phase = latestUpdate
+    ? formatUpdateType(latestUpdate.update_type)
+    : props.portalStatus === "active"
+      ? "In progress"
+      : props.portalStatus.replace(/_/g, " ");
+  const primaryInvoice = props.invoices.find(
+    (invoice) => invoice.status !== "paid" && invoice.status !== "cancelled",
+  ) ?? props.invoices[0] ?? null;
+  const primaryApproval = props.updates.find(
+    (update) => update.update_type === "deliverable" && update.approval_status !== "approved",
+  );
+
+  return (
+    <div className="relative min-h-[calc(100svh-7rem)] pb-28">
+      <ClientTopBar portalName={props.portalName} />
+
+      <div id="portal-home" className="space-y-5 scroll-mt-24">
+        <section
+          className="overflow-hidden rounded-[1.35rem] border bg-card shadow-sm"
+          style={{ borderTop: `4px solid ${props.brandColor}` }}
+        >
+          <div className="space-y-5 p-5 sm:p-6">
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <p className="text-xs font-medium text-muted-foreground">Good to see you</p>
+                <h1 className="mt-1 truncate text-2xl font-bold tracking-tight sm:text-3xl">
+                  {props.portalName}
+                </h1>
+                <p className="mt-1 text-sm font-medium capitalize text-muted-foreground">
+                  {phase} • {completion}% Complete
+                </p>
+              </div>
+              <div
+                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-sm font-bold text-white shadow-sm"
+                style={{ background: props.brandColor }}
+                aria-hidden
+              >
+                {initialsFromPortalName(props.portalName)}
+              </div>
+            </div>
+            <div className="h-2 overflow-hidden rounded-full bg-muted">
+              <div
+                className="h-full rounded-full transition-[width]"
+                style={{ width: `${completion}%`, background: props.brandColor }}
+              />
+            </div>
+          </div>
+        </section>
+
+        <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <ClientStatusCard
+            icon={Wallet}
+            label="Payments"
+            title={formatPortalCurrency(currency, outstandingAmount)}
+            meta={`${formatPortalCurrency(currency, paidAmount)} paid • ${formatPortalCurrency(currency, overdueAmount)} overdue`}
+          />
+          <ClientStatusCard
+            icon={CheckSquare}
+            label="Current deliverable"
+            title={currentDeliverable}
+            meta={latestDeliverable ? "Ready to view or download" : "Your freelancer will share it here"}
+          />
+          <ClientStatusCard
+            icon={Clock3}
+            label="Upcoming meeting"
+            title={upcomingMeeting?.proposed_time ?? "No meeting scheduled"}
+            meta={upcomingMeeting?.topic ?? "Request one when you need alignment"}
+          />
+          <ClientStatusCard
+            icon={CheckCircle2}
+            label="Pending approvals"
+            title={pendingApprovals > 0 ? `${pendingApprovals} awaiting review` : "Nothing pending"}
+            meta={primaryApproval?.title ?? "You are all caught up"}
+          />
+          <ClientStatusCard
+            icon={MessageSquare}
+            label="Recent update"
+            title={latestUpdate?.title ?? "No updates yet"}
+            meta={latestUpdate?.body ?? "Progress notes will appear here"}
+            className="sm:col-span-2 lg:col-span-1"
+          />
+        </section>
+
+        <ClientQuickActions
+          portalId={props.portalId}
+          invoice={primaryInvoice}
+          deliverable={latestDeliverable}
+          meeting={upcomingMeeting ?? null}
+          approval={primaryApproval ?? null}
+          onOpenDocument={setViewerDoc}
+        />
+
+        <ClientActivityTimeline activity={props.activity} />
+      </div>
+
+      <section id="portal-updates" className="mt-6 scroll-mt-24">
+        <UpdatesSection
+          portalId={props.portalId}
+          portalName={props.portalName}
+          updates={props.updates}
+          isOwner={false}
+          currentUserId={props.currentUserId}
+        />
+      </section>
+
+      <ClientFilesPanel
+        portalId={props.portalId}
+        files={props.files}
+        invoices={props.invoices}
+        contracts={props.contracts}
+        welcomeDocuments={props.welcomeDocuments}
+        currentUserId={props.currentUserId}
+        r2Enabled={props.r2Enabled}
+        onOpenDocument={setViewerDoc}
+      />
+
+      <section id="portal-meetings" className="mt-6 scroll-mt-24">
+        <MeetingsSection
+          portalId={props.portalId}
+          portalName={props.portalName}
+          meetings={props.meetings}
+          isOwner={false}
+          currentUserId={props.currentUserId}
+        />
+      </section>
+
+      <ClientMorePanel
+        portalName={props.portalName}
+        members={props.members}
+        messages={props.messages}
+        portalId={props.portalId}
+      />
+
+      <ClientBottomNav />
+      <DocumentViewer document={viewerDoc} onClose={() => setViewerDoc(null)} />
+    </div>
+  );
+}
+
+function ClientTopBar({ portalName }: { portalName: string }) {
+  return (
+    <div
+      className="sticky top-14 z-20 -mx-4 mb-4 border-b bg-background/90 px-4 py-3 backdrop-blur-md sm:-mx-6 sm:px-6"
+      style={{ top: "calc(3.5rem + env(safe-area-inset-top, 0px))" }}
+    >
+      <div className="mx-auto flex max-w-5xl items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="truncate text-sm font-semibold">{portalName}</p>
+          <p className="text-[11px] text-muted-foreground">Client companion app</p>
+        </div>
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full" aria-label="Notifications">
+            <Bell className="h-4 w-4" />
+          </Button>
+          <Button asChild variant="ghost" size="icon" className="h-10 w-10 rounded-full" aria-label="More">
+            <a href="#portal-more">
+              <MoreHorizontal className="h-4 w-4" />
+            </a>
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ClientStatusCard({
+  icon: Icon,
+  label,
+  title,
+  meta,
+  className,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  title: string;
+  meta: string;
+  className?: string;
+}) {
+  return (
+    <div className={`rounded-2xl border bg-card p-4 shadow-sm ${className ?? ""}`}>
+      <div className="mb-3 flex items-center gap-2 text-xs font-medium text-muted-foreground">
+        <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-muted">
+          <Icon className="h-4 w-4" />
+        </span>
+        {label}
+      </div>
+      <p className="line-clamp-2 text-sm font-semibold leading-snug">{title}</p>
+      <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-muted-foreground">{meta}</p>
+    </div>
+  );
+}
+
+function ClientQuickActions({
+  portalId,
+  invoice,
+  deliverable,
+  meeting,
+  approval,
+  onOpenDocument,
+}: {
+  portalId: string;
+  invoice: ViewProps["invoices"][number] | null;
+  deliverable: PortalFileRow | null;
+  meeting: ViewProps["meetings"][number] | null;
+  approval: ViewProps["updates"][number] | null;
+  onOpenDocument: (document: PortalDocument) => void;
+}) {
+  const invoiceUrl = invoice?.public_token ? `/i/${invoice.public_token}` : null;
+  const fileUrl = deliverable ? `/api/portals/${portalId}/files/${deliverable.id}/download` : null;
+
+  return (
+    <section className="rounded-2xl border bg-card p-4 shadow-sm">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <h2 className="text-sm font-semibold">Quick actions</h2>
+        <span className="text-[11px] text-muted-foreground">What matters now</span>
+      </div>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+        <QuickAction
+          icon={Video}
+          label="Join Meeting"
+          href={meeting?.meet_link}
+          disabled={!meeting?.meet_link}
+          external
+        />
+        <QuickAction
+          icon={CreditCard}
+          label="View Invoice"
+          disabled={!invoiceUrl}
+          onClick={() => invoiceUrl && onOpenDocument({ title: invoice?.invoice_number ?? "Invoice", url: invoiceUrl, kind: "invoice" })}
+        />
+        <QuickAction
+          icon={Download}
+          label="Download Deliverable"
+          href={fileUrl}
+          disabled={!fileUrl}
+        />
+        <QuickAction
+          icon={CheckCircle2}
+          label="Approve Deliverable"
+          href="#portal-updates"
+          disabled={!approval}
+        />
+        <QuickAction
+          icon={MessageSquare}
+          label="Open WhatsApp"
+          href="https://wa.me/"
+          external
+        />
+        <QuickAction
+          icon={Files}
+          label="View Files"
+          href="#portal-files"
+        />
+      </div>
+    </section>
+  );
+}
+
+function QuickAction({
+  icon: Icon,
+  label,
+  href,
+  disabled,
+  external,
+  onClick,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  href?: string | null;
+  disabled?: boolean;
+  external?: boolean;
+  onClick?: () => void;
+}) {
+  const className =
+    "flex min-h-14 items-center justify-center gap-2 rounded-xl border bg-background px-3 py-3 text-xs font-semibold shadow-sm transition hover:border-primary/40 hover:bg-muted/40 disabled:pointer-events-none disabled:opacity-45";
+  if (onClick) {
+    return (
+      <button type="button" className={className} onClick={onClick} disabled={disabled}>
+        <Icon className="h-4 w-4" />
+        <span>{label}</span>
+      </button>
+    );
+  }
+  return (
+    <a
+      href={disabled ? undefined : href ?? "#"}
+      target={external ? "_blank" : undefined}
+      rel={external ? "noreferrer" : undefined}
+      className={`${className} ${disabled ? "pointer-events-none opacity-45" : ""}`}
+      aria-disabled={disabled}
+    >
+      <Icon className="h-4 w-4" />
+      <span>{label}</span>
+    </a>
+  );
+}
+
+function ClientActivityTimeline({ activity }: { activity: ViewProps["activity"] }) {
+  const visible = [...activity]
+    .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))
+    .slice(0, 6);
+
+  return (
+    <section className="rounded-2xl border bg-card p-4 shadow-sm">
+      <h2 className="mb-4 text-sm font-semibold">Recent activity</h2>
+      {visible.length === 0 ? (
+        <EmptyState
+          icon={<ShieldCheck className="h-7 w-7 text-muted-foreground/30" />}
+          message="No activity yet."
+          hint="Updates, invoices, files, and meetings will appear here."
+        />
+      ) : (
+        <ol className="space-y-0">
+          {visible.map((item, index) => (
+            <li key={item.id} className="relative flex gap-3 pb-4 last:pb-0">
+              {index !== visible.length - 1 && (
+                <span className="absolute left-[7px] top-4 h-full w-px bg-border" />
+              )}
+              <span className={`relative mt-1 h-3.5 w-3.5 shrink-0 rounded-full ${getActivityDotColor(item.type)}`} />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-start justify-between gap-3">
+                  <p className="text-xs font-semibold">{formatActivityTitle(item)}</p>
+                  <time className="shrink-0 text-[10px] text-muted-foreground" dateTime={item.created_at}>
+                    {getRelativeTime(item.created_at)}
+                  </time>
+                </div>
+                {formatActivityDescription(item) && (
+                  <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
+                    {formatActivityDescription(item)}
+                  </p>
+                )}
+              </div>
+            </li>
+          ))}
+        </ol>
+      )}
+    </section>
+  );
+}
+
+function ClientFilesPanel({
+  portalId,
+  files,
+  invoices,
+  contracts,
+  welcomeDocuments,
+  currentUserId,
+  r2Enabled,
+  onOpenDocument,
+}: {
+  portalId: string;
+  files: PortalFileRow[];
+  invoices: ViewProps["invoices"];
+  contracts: ViewProps["contracts"];
+  welcomeDocuments: ViewProps["welcomeDocuments"];
+  currentUserId: string;
+  r2Enabled: boolean;
+  onOpenDocument: (document: PortalDocument) => void;
+}) {
+  const [view, setView] = React.useState<"list" | "grid">("list");
+  const categories = ["deliverable", "contract", "invoice", "asset", "meeting_note", "misc"];
+
+  return (
+    <section id="portal-files" className="mt-6 scroll-mt-24 rounded-2xl border bg-card p-4 shadow-sm">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div>
+          <h2 className="text-sm font-semibold">Files</h2>
+          <p className="text-xs text-muted-foreground">Deliverables, contracts, invoices, assets, and notes.</p>
+        </div>
+        <div className="flex rounded-full border bg-background p-1">
+          <button
+            type="button"
+            className={`rounded-full p-2 ${view === "list" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
+            onClick={() => setView("list")}
+            aria-label="List view"
+          >
+            <List className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            className={`rounded-full p-2 ${view === "grid" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
+            onClick={() => setView("grid")}
+            aria-label="Grid view"
+          >
+            <Grid2X2 className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+
+      {r2Enabled && <div className="mb-4"><FileUploadButton portalId={portalId} /></div>}
+
+      {(invoices.length > 0 || contracts.length > 0 || welcomeDocuments.length > 0) && (
+        <div className="mb-5 space-y-2">
+          <p className="text-xs font-semibold text-muted-foreground">Portal documents</p>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {invoices.map((invoice) => (
+              <PortalDocumentCard
+                key={`invoice-${invoice.id}`}
+                icon={Receipt}
+                title={invoice.invoice_number}
+                meta={`${formatPortalCurrency(invoice.currency, invoice.total_amount)} • ${invoice.status.replace(/_/g, " ")}`}
+                disabled={!invoice.public_token}
+                onOpen={() =>
+                  invoice.public_token &&
+                  onOpenDocument({
+                    title: invoice.invoice_number,
+                    url: `/i/${invoice.public_token}`,
+                    kind: "invoice",
+                  })
+                }
+              />
+            ))}
+            {contracts.map((contract) => (
+              <PortalDocumentCard
+                key={`contract-${contract.id}`}
+                icon={FileText}
+                title={contract.title}
+                meta={contract.status.replace(/_/g, " ")}
+                disabled={!contract.public_token}
+                onOpen={() =>
+                  contract.public_token &&
+                  onOpenDocument({
+                    title: contract.title,
+                    url: `/c/${contract.public_token}`,
+                    kind: "contract",
+                  })
+                }
+              />
+            ))}
+            {welcomeDocuments.map((document) => (
+              <PortalDocumentCard
+                key={`welcome-${document.id}`}
+                icon={Sparkles}
+                title={document.title}
+                meta={`${document.status.replace(/_/g, " ")}${document.acknowledgement_required ? " • acknowledgement required" : ""}`}
+                disabled={!document.public_token}
+                onOpen={() =>
+                  document.public_token &&
+                  onOpenDocument({
+                    title: document.title,
+                    url: `/w/${document.public_token}`,
+                    kind: "guide",
+                  })
+                }
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {files.length === 0 ? (
+        <EmptyState
+          icon={<Files className="h-7 w-7 text-muted-foreground/30" />}
+          message="No files shared yet."
+          hint="Important delivery files will stay organized here."
+        />
+      ) : (
+        <div className="space-y-5">
+          {categories.map((category) => {
+            const grouped = files.filter((file) => (file.category ?? "misc") === category);
+            if (grouped.length === 0) return null;
+            return (
+              <div key={category} className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className={`rounded-full px-2 py-1 text-[10px] font-semibold ${CATEGORY_STYLE[category] ?? "bg-muted text-muted-foreground"}`}>
+                    {CATEGORY_LABEL[category] || "Other"}
+                  </span>
+                  <span className="text-[11px] text-muted-foreground">{grouped.length} file{grouped.length > 1 ? "s" : ""}</span>
+                </div>
+                <div className={view === "grid" ? "grid gap-2 sm:grid-cols-2" : "space-y-2"}>
+                  {grouped.map((file) => (
+                    <ClientFileCard
+                      key={file.id}
+                      portalId={portalId}
+                      file={file}
+                      uploadedBy={file.uploaded_by === currentUserId ? "You" : "Freelancer"}
+                      onOpenDocument={onOpenDocument}
+                    />
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function PortalDocumentCard({
+  icon: Icon,
+  title,
+  meta,
+  disabled,
+  onOpen,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  title: string;
+  meta: string;
+  disabled?: boolean;
+  onOpen: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className="flex items-center gap-3 rounded-xl border bg-background p-3 text-left transition hover:border-primary/40 disabled:pointer-events-none disabled:opacity-45"
+      onClick={onOpen}
+      disabled={disabled}
+    >
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
+        <Icon className="h-4 w-4" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-semibold">{title}</span>
+        <span className="block truncate text-[11px] capitalize text-muted-foreground">{meta}</span>
+      </span>
+      <Eye className="h-4 w-4 shrink-0 text-muted-foreground" />
+    </button>
+  );
+}
+
+function ClientFileCard({
+  portalId,
+  file,
+  uploadedBy,
+  onOpenDocument,
+}: {
+  portalId: string;
+  file: PortalFileRow;
+  uploadedBy: string;
+  onOpenDocument: (document: PortalDocument) => void;
+}) {
+  const url = `/api/portals/${portalId}/files/${file.id}/download`;
+
+  async function shareFile() {
+    const nav = globalThis.navigator as
+      | (Navigator & { share?: (data: ShareData) => Promise<void> })
+      | undefined;
+    if (nav?.share) {
+      await nav.share({ title: file.name, url });
+      return;
+    }
+    await nav?.clipboard?.writeText(`${window.location.origin}${url}`);
+  }
+
+  return (
+    <article className="flex items-center gap-3 rounded-xl border bg-background p-3">
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
+        <FileTypeIcon mimeType={file.mime_type ?? ""} className="h-5 w-5" />
+      </span>
+      <button
+        type="button"
+        className="min-w-0 flex-1 text-left"
+        onClick={() => onOpenDocument({ title: file.name, url, mimeType: file.mime_type, kind: "file" })}
+      >
+        <p className="truncate text-sm font-semibold">{file.name}</p>
+        <p className="mt-0.5 text-[11px] text-muted-foreground">
+          {formatBytes(file.size_bytes)} • {uploadedBy} • {formatDate(file.created_at)}
+        </p>
+      </button>
+      <div className="flex shrink-0 items-center gap-1">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="h-9 w-9 rounded-full"
+          onClick={() => onOpenDocument({ title: file.name, url, mimeType: file.mime_type, kind: "file" })}
+          aria-label={`Preview ${file.name}`}
+        >
+          <Eye className="h-4 w-4" />
+        </Button>
+        <Button asChild variant="ghost" size="icon" className="h-9 w-9 rounded-full" aria-label={`Download ${file.name}`}>
+          <a href={url}>
+            <Download className="h-4 w-4" />
+          </a>
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="h-9 w-9 rounded-full"
+          onClick={shareFile}
+          aria-label={`Share ${file.name}`}
+        >
+          <Share2 className="h-4 w-4" />
+        </Button>
+      </div>
+    </article>
+  );
+}
+
+function ClientMorePanel({
+  portalName,
+  members,
+  messages,
+  portalId,
+}: {
+  portalName: string;
+  members: ViewProps["members"];
+  messages: ViewProps["messages"];
+  portalId: string;
+}) {
+  const client = members.find((member) => member.role === "client") ?? members[0] ?? null;
+
+  return (
+    <section id="portal-more" className="mt-6 scroll-mt-24 space-y-4">
+      <div className="rounded-2xl border bg-card p-4 shadow-sm">
+        <h2 className="text-sm font-semibold">More</h2>
+        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+          <MoreRow icon={UserPlus} title="Profile" meta={client?.profile?.email ?? "Client access"} />
+          <MoreRow icon={Bell} title="Notifications" meta="Portal alerts and reminders" />
+          <MoreRow icon={HelpCircle} title="Help & support" meta="Get help from your freelancer" />
+          <MoreRow icon={Info} title="Portal information" meta={portalName} />
+        </div>
+      </div>
+      <MessagesSection portalId={portalId} messages={messages} />
+    </section>
+  );
+}
+
+function MoreRow({
+  icon: Icon,
+  title,
+  meta,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  title: string;
+  meta: string;
+}) {
+  return (
+    <div className="flex items-center gap-3 rounded-xl border bg-background p-3">
+      <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-muted text-muted-foreground">
+        <Icon className="h-4 w-4" />
+      </span>
+      <span className="min-w-0">
+        <span className="block text-sm font-semibold">{title}</span>
+        <span className="block truncate text-xs text-muted-foreground">{meta}</span>
+      </span>
+    </div>
+  );
+}
+
+function ClientBottomNav() {
+  const items = [
+    { href: "#portal-home", icon: Home, label: "Home" },
+    { href: "#portal-updates", icon: MessageSquare, label: "Updates" },
+    { href: "#portal-files", icon: Files, label: "Files" },
+    { href: "#portal-meetings", icon: Video, label: "Meetings" },
+    { href: "#portal-more", icon: MoreHorizontal, label: "More" },
+  ] as const;
+
+  return (
+    <nav
+      aria-label="Client portal navigation"
+      className="fixed inset-x-0 bottom-0 z-50 px-3 pb-3 sm:hidden"
+      style={{ paddingBottom: "max(env(safe-area-inset-bottom, 0px), 0.75rem)" }}
+    >
+      <div className="mx-auto flex max-w-md items-center justify-between rounded-full border bg-background/95 p-1.5 shadow-2xl shadow-slate-900/15 backdrop-blur-md">
+        {items.map(({ href, icon: Icon, label }, index) => (
+          <a
+            key={href}
+            href={href}
+            className={`flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-full px-1.5 py-2 text-[10px] font-semibold transition ${
+              index === 0
+                ? "bg-primary text-primary-foreground shadow-sm"
+                : "text-muted-foreground hover:bg-muted hover:text-foreground"
+            }`}
+          >
+            <Icon className="h-[18px] w-[18px]" />
+            <span>{label}</span>
+          </a>
+        ))}
+      </div>
+    </nav>
+  );
+}
+
+function DocumentViewer({
+  document,
+  onClose,
+}: {
+  document: PortalDocument | null;
+  onClose: () => void;
+}) {
+  if (!document) return null;
+  const isImage = document.mimeType?.startsWith("image/");
+
+  async function shareDocument() {
+    if (!document) return;
+    const nav = globalThis.navigator as
+      | (Navigator & { share?: (data: ShareData) => Promise<void> })
+      | undefined;
+    if (nav?.share) {
+      await nav.share({ title: document.title, url: document.url });
+      return;
+    }
+    await nav?.clipboard?.writeText(`${window.location.origin}${document.url}`);
+  }
+
+  return (
+    <div className="fixed inset-0 z-[80] flex flex-col bg-background">
+      <div
+        className="flex items-center gap-2 border-b bg-background/95 px-3 py-2 backdrop-blur"
+        style={{ paddingTop: "max(env(safe-area-inset-top, 0px), 0.5rem)" }}
+      >
+        <Button type="button" variant="ghost" size="icon" className="h-10 w-10 rounded-full" onClick={onClose} aria-label="Back">
+          <ArrowLeft className="h-5 w-5" />
+        </Button>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-semibold">{document.title}</p>
+          <p className="text-[11px] capitalize text-muted-foreground">{document.kind}</p>
+        </div>
+        <Button type="button" variant="ghost" size="icon" className="h-10 w-10 rounded-full" onClick={shareDocument} aria-label="Share">
+          <Share2 className="h-4 w-4" />
+        </Button>
+        <Button asChild variant="ghost" size="icon" className="h-10 w-10 rounded-full" aria-label="Download">
+          <a href={document.url}>
+            <Download className="h-4 w-4" />
+          </a>
+        </Button>
+      </div>
+      <div className="flex min-h-0 flex-1 bg-muted/40">
+        {isImage ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={document.url} alt={document.title} className="m-auto max-h-full max-w-full object-contain" />
+        ) : (
+          <iframe
+            title={document.title}
+            src={document.url}
+            className="h-full w-full border-0 bg-background"
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function calculatePortalCompletion(props: ViewProps): number {
+  const totalSignals =
+    props.updates.length +
+    props.files.length +
+    props.invoices.length +
+    props.contracts.length +
+    props.meetings.length;
+  if (totalSignals === 0) return 12;
+  const completedSignals =
+    props.updates.filter((update) => update.approval_status === "approved").length +
+    props.files.length +
+    props.invoices.filter((invoice) => invoice.status === "paid").length +
+    props.contracts.filter((contract) => contract.status === "signed").length +
+    props.meetings.filter((meeting) => meeting.status === "completed").length;
+  return Math.max(12, Math.min(96, Math.round((completedSignals / totalSignals) * 100)));
+}
+
+function formatUpdateType(type: ViewProps["updates"][number]["update_type"]): string {
+  return type.replace(/_/g, " ");
+}
+
+function initialsFromPortalName(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "S";
+  return `${parts[0]?.[0] ?? ""}${parts.at(-1)?.[0] ?? ""}`.toUpperCase() || "S";
 }
 
 // ============================================================================
