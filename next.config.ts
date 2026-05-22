@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { withSentryConfig } from "@sentry/nextjs";
 
 /**
  * Production response headers.
@@ -32,6 +33,7 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  outputFileTracingRoot: process.cwd(),
   async redirects() {
     return [
       {
@@ -103,43 +105,36 @@ const nextConfig: NextConfig = {
  *
  * `withSentryConfig` rewrites the module tree to upload source maps
  * during `next build` and patches server actions for automatic error
- * capture. We only apply it when SENTRY_AUTH_TOKEN is present so CI
- * and local builds without Sentry credentials keep working.
- *
- * The plugin is loaded lazily to keep the cold-start cost of
- * next.config itself trivial for everyone else.
+ * capture. We only apply it when all build-time Sentry credentials are
+ * present so CI and local builds without Sentry credentials keep working.
  */
-async function applySentry(config: NextConfig): Promise<NextConfig> {
-  if (
-    !process.env.SENTRY_AUTH_TOKEN ||
-    !process.env.SENTRY_ORG ||
-    !process.env.SENTRY_PROJECT
-  ) {
+function applySentry(config: NextConfig): NextConfig {
+  const authToken = process.env.SENTRY_AUTH_TOKEN;
+  const org = process.env.SENTRY_ORG;
+  const project = process.env.SENTRY_PROJECT;
+
+  if (!authToken || !org || !project) {
     return config;
   }
-  try {
-    const { withSentryConfig } = await import("@sentry/nextjs");
-    return withSentryConfig(config, {
-      // Silence build-time output when there's no DSN configured.
-      silent: !process.env.NEXT_PUBLIC_SENTRY_DSN,
-      org: process.env.SENTRY_ORG,
-      project: process.env.SENTRY_PROJECT,
-      authToken: process.env.SENTRY_AUTH_TOKEN,
-      // Upload source maps but DO NOT expose them publicly. v10's
-      // sourcemaps options replace the older `hideSourceMaps` flag.
-      widenClientFileUpload: true,
-      sourcemaps: {
-        deleteSourcemapsAfterUpload: true,
+
+  return withSentryConfig(config, {
+    // Silence build-time output when there's no DSN configured.
+    silent: !process.env.NEXT_PUBLIC_SENTRY_DSN,
+    org,
+    project,
+    authToken,
+    // Upload source maps but DO NOT expose them publicly. v10's
+    // sourcemaps options replace the older `hideSourceMaps` flag.
+    widenClientFileUpload: true,
+    sourcemaps: {
+      deleteSourcemapsAfterUpload: true,
+    },
+    webpack: {
+      treeshake: {
+        removeDebugLogging: true,
       },
-      webpack: {
-        treeshake: {
-          removeDebugLogging: true,
-        },
-      },
-    });
-  } catch {
-    return config;
-  }
+    },
+  });
 }
 
 export default applySentry(nextConfig);
