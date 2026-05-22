@@ -24,7 +24,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(
-  _req: Request,
+  req: Request,
   ctx: { params: Promise<{ portalId: string; fileId: string }> },
 ): Promise<Response> {
   if (!isR2Configured()) {
@@ -63,6 +63,9 @@ export async function GET(
   const presigned = await presignGet({
     key: file.r2_key,
     downloadFilename: file.name,
+    disposition: new URL(req.url).searchParams.get("preview") === "1"
+      ? "inline"
+      : "attachment",
     forcePresign: true,
   });
 

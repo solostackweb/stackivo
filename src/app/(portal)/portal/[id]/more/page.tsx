@@ -1,10 +1,10 @@
 import { getClientPortalProps } from "@/features/portals/client-portal-data";
-import { ClientPortalHome } from "@/features/portals/components/client-portal-pages";
+import { ClientPortalMore } from "@/features/portals/components/client-portal-pages";
 
 export const metadata = { title: "Portal" };
 export const dynamic = "force-dynamic";
 
-export default async function ClientPortalHomePage({
+export default async function ClientPortalMorePage({
   params,
 }: {
   params: Promise<{ id: string }>;
@@ -12,5 +12,5 @@ export default async function ClientPortalHomePage({
   const { id } = await params;
   const data = await getClientPortalProps(id);
 
-  return <ClientPortalHome data={data} />;
+  return <ClientPortalMore data={data} />;
 }

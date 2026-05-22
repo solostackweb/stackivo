@@ -152,6 +152,7 @@ export async function presignGet(input: {
   forcePresign?: boolean;
   /** Filename to send in `Content-Disposition`. */
   downloadFilename?: string;
+  disposition?: "attachment" | "inline";
 }): Promise<{ url: string; expiresAt: string | null }> {
   const { client, cfg } = getClient();
 
@@ -166,7 +167,7 @@ export async function presignGet(input: {
     Bucket: cfg.bucket,
     Key: input.key,
     ResponseContentDisposition: input.downloadFilename
-      ? `attachment; filename="${sanitizeFilename(input.downloadFilename)}"`
+      ? `${input.disposition ?? "attachment"}; filename="${sanitizeFilename(input.downloadFilename)}"`
       : undefined,
   });
   const ttl = input.ttlSeconds ?? R2_DEFAULT_GET_TTL_SECONDS;

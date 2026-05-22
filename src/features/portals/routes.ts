@@ -21,6 +21,14 @@ export const portalClientHome = (portalId: string): string =>
   `/portal/${portalId}`;
 export const portalClientFiles = (portalId: string): string =>
   `/portal/${portalId}/files`;
+export const portalClientFile = (portalId: string, fileId: string): string =>
+  `/portal/${portalId}/files/${fileId}`;
+export const portalClientUpdates = (portalId: string): string =>
+  `/portal/${portalId}/updates`;
+export const portalClientMeetings = (portalId: string): string =>
+  `/portal/${portalId}/meetings`;
+export const portalClientMore = (portalId: string): string =>
+  `/portal/${portalId}/more`;
 export const portalClientContracts = (portalId: string): string =>
   `/portal/${portalId}/contracts`;
 export const portalClientInvoices = (portalId: string): string =>

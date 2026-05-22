@@ -86,7 +86,7 @@ import type {
   PortalMeetingRow,
 } from "@/lib/supabase/types";
 
-interface ViewProps {
+export interface ViewProps {
   portalId: string;
   portalName: string;
   brandColor: string;
