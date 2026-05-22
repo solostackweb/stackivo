@@ -74,6 +74,8 @@ export default async function PortalDetailPage({
         welcomeDocuments={snapshot.welcomeDocuments}
         availableWelcomeDocuments={snapshot.availableWelcomeDocuments}
         activity={snapshot.activity}
+        updates={snapshot.updates}
+        meetings={snapshot.meetings}
         storageUsage={snapshot.storageUsage}
         storageCap={limitFor(sub, "storage_bytes")}
         r2Enabled={isR2Configured()}

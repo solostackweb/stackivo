@@ -8,7 +8,6 @@ import {
   Receipt,
   Files,
   MessageSquare,
-  Video,
   UserPlus,
   Trash2,
   Send,
@@ -53,11 +52,16 @@ import {
 } from "../actions";
 import { attachWelcomeToPortalAction } from "@/features/welcome-documents/actions";
 import { PORTAL_DASHBOARD_INDEX } from "@/features/portals/routes";
+import { UpdatesSection } from "./updates-section";
+import { MeetingsSection } from "./meetings-section";
 import type {
   PortalActivityRow,
   PortalFileRow,
   PortalMessageRow,
   PortalRole,
+  PortalUpdateRow,
+  PortalUpdateReactionRow,
+  PortalMeetingRow,
 } from "@/lib/supabase/types";
 
 interface ViewProps {
@@ -129,6 +133,21 @@ interface ViewProps {
   storageCap: number;
   /** Whether the R2 backend is configured. Hides upload UI when false. */
   r2Enabled: boolean;
+  updates: Array<
+    PortalUpdateRow & {
+      author: { full_name: string | null; email: string | null } | null;
+      reactions: Array<
+        PortalUpdateReactionRow & {
+          profile: { full_name: string | null; email: string | null } | null;
+        }
+      >;
+    }
+  >;
+  meetings: Array<
+    PortalMeetingRow & {
+      requester: { full_name: string | null; email: string | null } | null;
+    }
+  >;
 }
 
 /**
@@ -155,6 +174,18 @@ export function PortalView(props: ViewProps) {
   // pill links above scroll smoothly into the right place on any phone.
   const mainSections = isOwner ? (
     <>
+      <UpdatesSection
+        portalId={props.portalId}
+        updates={props.updates}
+        isOwner={isOwner}
+        currentUserId={props.currentUserId}
+      />
+      <MeetingsSection
+        portalId={props.portalId}
+        meetings={props.meetings}
+        isOwner={isOwner}
+        currentUserId={props.currentUserId}
+      />
       <WelcomeDocumentsSection
         documents={props.welcomeDocuments}
         available={props.availableWelcomeDocuments}
@@ -189,6 +220,18 @@ export function PortalView(props: ViewProps) {
     </>
   ) : (
     <>
+      <UpdatesSection
+        portalId={props.portalId}
+        updates={props.updates}
+        isOwner={isOwner}
+        currentUserId={props.currentUserId}
+      />
+      <MeetingsSection
+        portalId={props.portalId}
+        meetings={props.meetings}
+        isOwner={isOwner}
+        currentUserId={props.currentUserId}
+      />
       <InvoicesSection
         invoices={props.invoices}
         available={props.availableInvoices}
@@ -739,13 +782,6 @@ function MessagesSection({
   const [body, setBody] = React.useState("");
   const [pending, setPending] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
-  const [meetingOpen, setMeetingOpen] = React.useState(false);
-  const [meetingTopic, setMeetingTopic] = React.useState("");
-  const [meetingTime, setMeetingTime] = React.useState("");
-  const [meetingLink, setMeetingLink] = React.useState("https://meet.google.com/new");
-  const [meetingNotes, setMeetingNotes] = React.useState("");
-  const [meetingPending, setMeetingPending] = React.useState(false);
-  const [meetingError, setMeetingError] = React.useState<string | null>(null);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -765,42 +801,6 @@ function MessagesSection({
     router.refresh();
   }
 
-  async function onMeetingRequest(e: React.FormEvent) {
-    e.preventDefault();
-    if (meetingPending) return;
-    setMeetingPending(true);
-    setMeetingError(null);
-
-    const lines = ["Meeting request"];
-    const topic = meetingTopic.trim();
-    const time = meetingTime.trim();
-    const link = meetingLink.trim();
-    const notes = meetingNotes.trim();
-
-    if (topic) lines.push(`Topic: ${topic}`);
-    if (time) lines.push(`Proposed time: ${time}`);
-    if (link) lines.push(`Meet link: ${link}`);
-    if (notes) lines.push(`Notes: ${notes}`);
-
-    const res = await postPortalMessageAction({
-      portalId,
-      body: lines.join("\n"),
-    });
-
-    setMeetingPending(false);
-    if (!res.ok) {
-      setMeetingError(res.error);
-      return;
-    }
-
-    setMeetingTopic("");
-    setMeetingTime("");
-    setMeetingLink("https://meet.google.com/new");
-    setMeetingNotes("");
-    setMeetingOpen(false);
-    router.refresh();
-  }
-
   // Reverse chronological from server → render oldest-first for natural reading.
   const ordered = [...messages].reverse();
 
@@ -810,16 +810,6 @@ function MessagesSection({
         <CardTitle className="flex items-center gap-2 text-base">
           <MessageSquare className="h-4 w-4" /> Chat
         </CardTitle>
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => {
-            setMeetingError(null);
-            setMeetingOpen(true);
-          }}
-        >
-          <Video className="h-3.5 w-3.5" /> Request meeting
-        </Button>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="rounded-md border bg-muted/10 p-3">
@@ -863,92 +853,6 @@ function MessagesSection({
             </div>
           </form>
         </div>
-        <Dialog
-          open={meetingOpen}
-          onOpenChange={(next) => {
-            setMeetingOpen(next);
-            if (!next) setMeetingError(null);
-          }}
-        >
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Request a meeting</DialogTitle>
-              <DialogDescription>
-                Propose a time and drop a Google Meet link if you have one.
-              </DialogDescription>
-            </DialogHeader>
-            <form onSubmit={onMeetingRequest} className="space-y-3">
-              <div className="space-y-1">
-                <Label htmlFor="meeting-topic" className="text-xs">
-                  Topic
-                </Label>
-                <Input
-                  id="meeting-topic"
-                  placeholder="Project update"
-                  value={meetingTopic}
-                  onChange={(e) => setMeetingTopic(e.target.value)}
-                />
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="meeting-time" className="text-xs">
-                  Proposed time
-                </Label>
-                <Input
-                  id="meeting-time"
-                  placeholder="Tomorrow, 3pm IST"
-                  value={meetingTime}
-                  onChange={(e) => setMeetingTime(e.target.value)}
-                />
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="meeting-link" className="text-xs">
-                  Google Meet link
-                </Label>
-                <Input
-                  id="meeting-link"
-                  placeholder="https://meet.google.com/xxx-xxxx-xxx"
-                  value={meetingLink}
-                  onChange={(e) => setMeetingLink(e.target.value)}
-                />
-                <Button asChild size="sm" variant="ghost" className="px-0">
-                  <a href="https://meet.google.com/new" target="_blank" rel="noreferrer">
-                    Create a Google Meet link
-                  </a>
-                </Button>
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="meeting-notes" className="text-xs">
-                  Notes (optional)
-                </Label>
-                <Textarea
-                  id="meeting-notes"
-                  placeholder="What should we cover?"
-                  value={meetingNotes}
-                  onChange={(e) => setMeetingNotes(e.target.value)}
-                  rows={3}
-                />
-              </div>
-              {meetingError && (
-                <p className="rounded-md bg-destructive/10 p-2 text-xs text-destructive">
-                  {meetingError}
-                </p>
-              )}
-              <DialogFooter>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={() => setMeetingOpen(false)}
-                  disabled={meetingPending}
-                >
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={meetingPending}>
-                  {meetingPending ? <Loader2 className="animate-spin" /> : "Send request"}
-                </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
         {ordered.length === 0 ? (
           <p className="rounded-md border border-dashed p-6 text-center text-xs text-muted-foreground">
             No messages yet. Use the form above to start.
@@ -1538,26 +1442,27 @@ function formatDateTime(iso: string): string {
 
 function formatActivityTitle(item: PortalActivityRow): string {
   switch (item.type) {
-    case "portal.created":
-      return "Portal created";
-    case "portal.renamed":
-      return "Portal renamed";
-    case "portal.member_invited":
-      return "Member invited";
-    case "portal.member_joined":
-      return "Member joined";
-    case "portal.member_revoked":
-      return "Member revoked";
-    case "contract.attached":
-      return "Contract attached";
-    case "invoice.attached":
-      return "Invoice attached";
-    case "message.posted":
-      return "Message sent";
-    case "file.deleted":
-      return "File deleted";
+    case "portal.created":           return "Portal created";
+    case "portal.renamed":           return "Portal renamed";
+    case "portal.member_invited":    return "Member invited";
+    case "portal.member_joined":     return "Member joined";
+    case "portal.member_revoked":    return "Member revoked";
+    case "contract.attached":        return "Contract attached";
+    case "invoice.attached":         return "Invoice attached";
+    case "message.posted":           return "Message sent";
+    case "file.uploaded":            return "File uploaded";
+    case "file.deleted":             return "File deleted";
+    case "update.posted":            return "Update posted";
+    case "update.acknowledged":      return "Update acknowledged";
+    case "update.approved":          return "Update approved";
+    case "update.revision_requested":return "Revision requested";
+    case "update.comment":           return "Comment added";
+    case "meeting.requested":        return "Meeting requested";
+    case "meeting.accepted":         return "Meeting confirmed";
+    case "meeting.declined":         return "Meeting declined";
+    case "meeting.completed":        return "Meeting completed";
     default:
-      return item.type.replace(/_/g, " ");
+      return item.type.replace(/[._]/g, " ");
   }
 }
 
@@ -1592,12 +1497,14 @@ function formatActivityDescription(item: PortalActivityRow): string | null {
 
 function getActivityIcon(item: PortalActivityRow) {
   const className = "h-3.5 w-3.5 text-muted-foreground";
-  if (item.type.startsWith("contract.")) return <FileText className={className} />;
-  if (item.type.startsWith("invoice.")) return <Receipt className={className} />;
-  if (item.type.startsWith("message.")) return <MessageSquare className={className} />;
-  if (item.type.startsWith("file.")) return <Paperclip className={className} />;
+  if (item.type.startsWith("contract."))  return <FileText className={className} />;
+  if (item.type.startsWith("invoice."))   return <Receipt className={className} />;
+  if (item.type.startsWith("message."))   return <MessageSquare className={className} />;
+  if (item.type.startsWith("file."))      return <Paperclip className={className} />;
+  if (item.type.startsWith("update."))    return <MessageSquare className={className} />;
+  if (item.type.startsWith("meeting."))   return <Receipt className={className} />;
   if (item.type.startsWith("portal.member")) return <UserPlus className={className} />;
-  if (item.type.startsWith("portal.")) return <ShieldCheck className={className} />;
+  if (item.type.startsWith("portal."))    return <ShieldCheck className={className} />;
   return <Sparkles className={className} />;
 }
 

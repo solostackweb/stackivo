@@ -134,6 +134,8 @@ export default async function ClientPortalHomePage({
         welcomeDocuments={snapshot.welcomeDocuments}
         availableWelcomeDocuments={[]}
         activity={snapshot.activity}
+        updates={snapshot.updates}
+        meetings={snapshot.meetings}
         storageUsage={snapshot.storageUsage}
         storageCap={Number.POSITIVE_INFINITY}
         r2Enabled={isR2Configured()}

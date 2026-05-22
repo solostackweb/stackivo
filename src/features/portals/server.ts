@@ -226,6 +226,21 @@ export interface PortalSnapshot {
     acknowledgement_required: boolean;
   }>;
   activity: Array<import("@/lib/supabase/types").PortalActivityRow>;
+  updates: Array<
+    import("@/lib/supabase/types").PortalUpdateRow & {
+      author: { full_name: string | null; email: string | null } | null;
+      reactions: Array<
+        import("@/lib/supabase/types").PortalUpdateReactionRow & {
+          profile: { full_name: string | null; email: string | null } | null;
+        }
+      >;
+    }
+  >;
+  meetings: Array<
+    import("@/lib/supabase/types").PortalMeetingRow & {
+      requester: { full_name: string | null; email: string | null } | null;
+    }
+  >;
 }
 
 /**
@@ -317,6 +332,8 @@ export async function getPortalSnapshot(
     welcomeDocsRes,
     activityRes,
     clientRes,
+    updatesRes,
+    meetingsRes,
   ] = await Promise.all([
     admin
       .from("portal_members")
@@ -379,6 +396,19 @@ export async function getPortalSnapshot(
           .eq("id", access.portal.client_id)
           .maybeSingle()
       : Promise.resolve({ data: null }),
+    admin
+      .from("portal_updates")
+      .select("*")
+      .eq("portal_id", portalId)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false })
+      .limit(50),
+    admin
+      .from("portal_meetings")
+      .select("*")
+      .eq("portal_id", portalId)
+      .order("created_at", { ascending: false })
+      .limit(50),
   ]);
 
   // Hydrate member profiles in one query so the detail page can show
@@ -509,6 +539,90 @@ export async function getPortalSnapshot(
     };
   });
 
+  // ---------------------------------------------------------------------------
+  // Hydrate portal_updates with author profiles and their reactions
+  // ---------------------------------------------------------------------------
+  const updateRows = (updatesRes.data ?? []) as import("@/lib/supabase/types").PortalUpdateRow[];
+
+  // Collect all user IDs from updates + meetings for profile lookup
+  const meetingRows = (meetingsRes.data ?? []) as import("@/lib/supabase/types").PortalMeetingRow[];
+  const extraIds = [
+    ...updateRows.map((u) => u.author_id),
+    ...meetingRows.map((m) => m.requested_by),
+  ].filter((id) => !profileMap.has(id));
+  const uniqueExtra = Array.from(new Set(extraIds));
+  if (uniqueExtra.length) {
+    const extraProfiles = await admin
+      .from("user_profiles")
+      .select("id, full_name, email")
+      .in("id", uniqueExtra);
+    for (const p of (extraProfiles.data ?? []) as Array<{
+      id: string;
+      full_name: string | null;
+      email: string | null;
+    }>) {
+      profileMap.set(p.id, { full_name: p.full_name, email: p.email });
+    }
+  }
+
+  // Fetch all reactions for the loaded updates in one query
+  const updateIds = updateRows.map((u) => u.id);
+  const reactionsRows = updateIds.length
+    ? ((
+        await admin
+          .from("portal_update_reactions")
+          .select("*")
+          .in("update_id", updateIds)
+          .order("created_at", { ascending: true })
+      ).data ?? [])
+    : [];
+
+  // Collect reaction author IDs not already in profileMap
+  const reactionAuthorIds = (
+    reactionsRows as Array<import("@/lib/supabase/types").PortalUpdateReactionRow>
+  )
+    .map((r) => r.user_id)
+    .filter((id) => !profileMap.has(id));
+  const uniqueReactionAuthors = Array.from(new Set(reactionAuthorIds));
+  if (uniqueReactionAuthors.length) {
+    const rProfiles = await admin
+      .from("user_profiles")
+      .select("id, full_name, email")
+      .in("id", uniqueReactionAuthors);
+    for (const p of (rProfiles.data ?? []) as Array<{
+      id: string;
+      full_name: string | null;
+      email: string | null;
+    }>) {
+      profileMap.set(p.id, { full_name: p.full_name, email: p.email });
+    }
+  }
+
+  // Group reactions by update_id
+  const reactionsByUpdate = new Map<
+    string,
+    Array<import("@/lib/supabase/types").PortalUpdateReactionRow>
+  >();
+  for (const r of reactionsRows as Array<import("@/lib/supabase/types").PortalUpdateReactionRow>) {
+    const arr = reactionsByUpdate.get(r.update_id) ?? [];
+    arr.push(r);
+    reactionsByUpdate.set(r.update_id, arr);
+  }
+
+  const updates = updateRows.map((u) => ({
+    ...u,
+    author: profileMap.get(u.author_id) ?? null,
+    reactions: (reactionsByUpdate.get(u.id) ?? []).map((r) => ({
+      ...r,
+      profile: profileMap.get(r.user_id) ?? null,
+    })),
+  }));
+
+  const meetings = meetingRows.map((m) => ({
+    ...m,
+    requester: profileMap.get(m.requested_by) ?? null,
+  }));
+
   const usage = (usageRes.data as { total_bytes?: number; file_count?: number } | null) ?? null;
 
   let availableContracts: PortalSnapshot["availableContracts"] = [];
@@ -626,6 +740,8 @@ export async function getPortalSnapshot(
     welcomeDocuments,
     availableWelcomeDocuments,
     activity: (activityRes.data ?? []) as import("@/lib/supabase/types").PortalActivityRow[],
+    updates,
+    meetings,
   };
 }
 

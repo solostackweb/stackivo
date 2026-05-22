@@ -721,8 +721,61 @@ export interface PortalFileRow {
   name: string;
   size_bytes: number;
   mime_type: string;
+  category: "contract" | "deliverable" | "asset" | "invoice" | "meeting_note" | "misc";
+  approval_status: "none" | "submitted" | "under_review" | "approved" | "revision_requested";
   created_at: string;
   deleted_at: string | null;
+}
+
+export type PortalUpdateType =
+  | "progress" | "deliverable" | "revision"
+  | "payment" | "milestone" | "meeting" | "general";
+
+export type PortalUpdateApprovalStatus =
+  | "none" | "submitted" | "under_review" | "approved" | "revision_requested";
+
+export type PortalFileCategory =
+  | "contract" | "deliverable" | "asset" | "invoice" | "meeting_note" | "misc";
+
+export interface PortalUpdateRow {
+  id: string;
+  portal_id: string;
+  author_id: string;
+  update_type: PortalUpdateType;
+  title: string;
+  body: string | null;
+  approval_status: PortalUpdateApprovalStatus;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+}
+
+export type PortalUpdateReactionKind =
+  | "acknowledged" | "comment" | "approved" | "revision_requested";
+
+export interface PortalUpdateReactionRow {
+  id: string;
+  update_id: string;
+  user_id: string;
+  kind: PortalUpdateReactionKind;
+  body: string | null;
+  created_at: string;
+}
+
+export type PortalMeetingStatus =
+  | "pending" | "accepted" | "declined" | "completed" | "cancelled";
+
+export interface PortalMeetingRow {
+  id: string;
+  portal_id: string;
+  requested_by: string;
+  topic: string;
+  proposed_time: string | null;
+  meet_link: string | null;
+  notes: string | null;
+  status: PortalMeetingStatus;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface PortalMessageRow {
@@ -1097,6 +1150,24 @@ export interface Database {
             "recipient_id" | "event_type" | "payload"
           >;
         Update: Partial<PortalNotificationOutboxRow>;
+      };
+      portal_updates: {
+        Row: PortalUpdateRow;
+        Insert: Partial<PortalUpdateRow> &
+          Pick<PortalUpdateRow, "portal_id" | "author_id" | "title">;
+        Update: Partial<PortalUpdateRow>;
+      };
+      portal_update_reactions: {
+        Row: PortalUpdateReactionRow;
+        Insert: Partial<PortalUpdateReactionRow> &
+          Pick<PortalUpdateReactionRow, "update_id" | "user_id" | "kind">;
+        Update: Partial<PortalUpdateReactionRow>;
+      };
+      portal_meetings: {
+        Row: PortalMeetingRow;
+        Insert: Partial<PortalMeetingRow> &
+          Pick<PortalMeetingRow, "portal_id" | "requested_by" | "topic">;
+        Update: Partial<PortalMeetingRow>;
       };
       portal_contracts: {
         Row: PortalContractRow;

@@ -29,11 +29,16 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+const VALID_CATEGORIES = [
+  "contract", "deliverable", "asset", "invoice", "meeting_note", "misc",
+] as const;
+
 const inputSchema = z.object({
   fileId: z.string().uuid(),
   key: z.string().trim().min(1).max(2000),
   filename: z.string().trim().min(1).max(300),
   mimeType: z.string().trim().min(1).max(255),
+  category: z.enum(VALID_CATEGORIES).optional().default("misc"),
 });
 
 export async function POST(
@@ -114,6 +119,7 @@ export async function POST(
     name: parsed.data.filename,
     size_bytes: head.size,
     mime_type: head.contentType ?? parsed.data.mimeType,
+    category: parsed.data.category,
   } as never);
   if (insertErr) {
     return NextResponse.json(
