@@ -2,7 +2,9 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
-import { ExternalLink } from "lucide-react";
+import {
+  ExternalLink, Users, Files, TrendingUp, Video, CheckCircle2,
+} from "lucide-react";
 import { requireFeature } from "@/features/subscription/server";
 import { limitFor } from "@/features/subscription/features";
 import {
@@ -33,27 +35,116 @@ export default async function PortalDetailPage({
     throw err;
   }
 
+  const { access } = snapshot;
+  const portal = access.portal;
+
+  // Derived stats for the overview strip
+  const activeMeetings = snapshot.meetings.filter(
+    (m) => m.status === "pending" || m.status === "accepted",
+  ).length;
+  const pendingApprovals = snapshot.updates.filter(
+    (u) => u.approval_status === "submitted" || u.approval_status === "under_review",
+  ).length;
+  const clientName =
+    snapshot.client?.fullName ?? snapshot.client?.businessName ?? null;
+  const isActive = portal.status === "active";
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader
-        title={snapshot.access.portal.name}
-        description="Manage members, attach contracts, share files, and chat in one place."
+        title={portal.name}
+        description={
+          clientName
+            ? `Client: ${clientName}`
+            : "Manage your portal — attach documents, share files, and collaborate."
+        }
         actions={
           <Button asChild variant="outline" size="sm">
             <Link href={portalClientHome(id)} target="_blank">
-              View as client <ExternalLink />
+              View as client <ExternalLink className="h-3.5 w-3.5" />
             </Link>
           </Button>
         }
       />
+
+      {/* ── Compact overview strip ─────────────────────────────────────────── */}
+      <div className="flex flex-wrap gap-2 text-[11px]">
+        {/* Status */}
+        <span
+          className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-semibold ${
+            isActive
+              ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+              : "border-border bg-muted text-muted-foreground"
+          }`}
+        >
+          <span
+            className={`h-1.5 w-1.5 rounded-full ${isActive ? "bg-emerald-500" : "bg-muted-foreground/40"}`}
+            aria-hidden
+          />
+          {isActive ? "Active" : portal.status}
+        </span>
+
+        {/* Client */}
+        {snapshot.members.length > 0 ? (
+          <span className="inline-flex items-center gap-1.5 rounded-full border bg-card px-2.5 py-1 font-medium text-foreground">
+            <Users className="h-3 w-3 text-muted-foreground" />
+            {snapshot.members.find((m) => m.role !== "owner")?.profile?.full_name
+              ?? snapshot.members.find((m) => m.role !== "owner")?.profile?.email
+              ?? "Client connected"}
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-dashed bg-card px-2.5 py-1 text-muted-foreground">
+            <Users className="h-3 w-3" />
+            No client yet
+          </span>
+        )}
+
+        {/* Files */}
+        <span className="inline-flex items-center gap-1.5 rounded-full border bg-card px-2.5 py-1 font-medium text-foreground">
+          <Files className="h-3 w-3 text-muted-foreground" />
+          {snapshot.files.length} file{snapshot.files.length !== 1 ? "s" : ""}
+        </span>
+
+        {/* Active meetings */}
+        {activeMeetings > 0 && (
+          <Link
+            href="#portal-meetings"
+            className="inline-flex items-center gap-1.5 rounded-full border border-violet-500/30 bg-violet-500/10 px-2.5 py-1 font-semibold text-violet-700 transition-colors hover:bg-violet-500/15 dark:text-violet-400"
+          >
+            <Video className="h-3 w-3" />
+            {activeMeetings} meeting{activeMeetings > 1 ? "s" : ""}
+          </Link>
+        )}
+
+        {/* Pending approvals */}
+        {pendingApprovals > 0 && (
+          <Link
+            href="#portal-updates"
+            className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 font-semibold text-amber-700 transition-colors hover:bg-amber-500/15 dark:text-amber-400"
+          >
+            <TrendingUp className="h-3 w-3" />
+            {pendingApprovals} pending review
+          </Link>
+        )}
+
+        {/* All good */}
+        {activeMeetings === 0 && pendingApprovals === 0 && snapshot.members.length > 0 && (
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 font-medium text-emerald-700 dark:text-emerald-400">
+            <CheckCircle2 className="h-3 w-3" />
+            All up to date
+          </span>
+        )}
+      </div>
+      {/* ─────────────────────────────────────────────────────────────────── */}
+
       <PortalView
         portalId={id}
-        portalName={snapshot.access.portal.name}
-        brandColor={snapshot.access.portal.brand_color ?? "#6366F1"}
-        portalStatus={snapshot.access.portal.status}
-        currentUserId={snapshot.access.userId}
+        portalName={portal.name}
+        brandColor={portal.brand_color ?? "#6366F1"}
+        portalStatus={portal.status}
+        currentUserId={access.userId}
         role="owner"
-        clientId={snapshot.client?.id ?? snapshot.access.portal.client_id}
+        clientId={snapshot.client?.id ?? portal.client_id}
         clientEmail={snapshot.client?.email ?? null}
         members={snapshot.members.map((m) => ({
           user_id: m.user_id,

@@ -8,6 +8,7 @@ import {
   Receipt,
   Files,
   MessageSquare,
+  Video,
   UserPlus,
   Trash2,
   Send,
@@ -17,6 +18,12 @@ import {
   Paperclip,
   ShieldCheck,
   Sparkles,
+  File,
+  FileImage,
+  FileArchive,
+  FileCode,
+  Music,
+  Film,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useConfirm } from "@/components/ui/confirm-dialog";
@@ -131,7 +138,6 @@ interface ViewProps {
   activity: PortalActivityRow[];
   storageUsage: { totalBytes: number; fileCount: number };
   storageCap: number;
-  /** Whether the R2 backend is configured. Hides upload UI when false. */
   r2Enabled: boolean;
   updates: Array<
     PortalUpdateRow & {
@@ -151,27 +157,15 @@ interface ViewProps {
 }
 
 /**
- * Single canonical view of a portal. Mounted on both:
- *   /dashboard/portal/<id>   (freelancer / owner — full controls)
- *   /portal/<id>             (client / member — read-mostly)
- *
- * The `role` prop drives which mutating affordances are visible. Server
- * actions ALSO re-check the role, so a tampered DOM can't escalate.
+ * Single canonical portal view — rendered on both the freelancer dashboard
+ * (/dashboard/portal/<id>) and the client workspace (/portal/<id>).
+ * `role` drives which controls are visible; server actions also re-check.
  */
 export function PortalView(props: ViewProps) {
   const isOwner = props.role === "owner";
 
-  // Section order is intentionally different for clients vs owners.
-  //   - Clients open the portal to DO something (pay/sign/acknowledge).
-  //     We surface invoices and contracts first, then files, then the
-  //     conversation. Welcome guides slot above invoices because they
-  //     set context for everything below.
-  //   - Owners use it as an admin/CRM panel. Welcome → Contracts →
-  //     Invoices → Files → Conversation reads better top-to-bottom for
-  //     creation flow.
-  //
-  // Sections take their anchor `id` from `#portal-{kind}` so the hero
-  // pill links above scroll smoothly into the right place on any phone.
+  // Owner: Updates → Meetings → Contracts → Invoices → Welcome → Files → Chat
+  // Client: Updates → Meetings → Invoices → Contracts → Welcome → Files → Chat
   const mainSections = isOwner ? (
     <>
       <UpdatesSection
@@ -186,12 +180,6 @@ export function PortalView(props: ViewProps) {
         isOwner={isOwner}
         currentUserId={props.currentUserId}
       />
-      <WelcomeDocumentsSection
-        documents={props.welcomeDocuments}
-        available={props.availableWelcomeDocuments}
-        isOwner={isOwner}
-        portalId={props.portalId}
-      />
       <ContractsSection
         contracts={props.contracts}
         available={props.availableContracts}
@@ -201,6 +189,12 @@ export function PortalView(props: ViewProps) {
       <InvoicesSection
         invoices={props.invoices}
         available={props.availableInvoices}
+        isOwner={isOwner}
+        portalId={props.portalId}
+      />
+      <WelcomeDocumentsSection
+        documents={props.welcomeDocuments}
+        available={props.availableWelcomeDocuments}
         isOwner={isOwner}
         portalId={props.portalId}
       />
@@ -267,38 +261,78 @@ export function PortalView(props: ViewProps) {
   );
 
   return (
-    <div className="grid gap-6 lg:grid-cols-3">
-      <div className="space-y-4 sm:space-y-6 lg:col-span-2">
-        {mainSections}
-      </div>
-      {/* Right-rail: owner-only admin chrome. Clients don't see settings,
-          member management, or the raw activity log — those are admin
-          concerns that just add noise to the client view. */}
-      {isOwner && (
-        <div className="space-y-4 sm:space-y-6">
-          <PortalSettingsSection
-            portalId={props.portalId}
-            status={props.portalStatus}
-            portalName={props.portalName}
-            isOwner={isOwner}
-          />
-          <MembersSection
-            portalId={props.portalId}
-            members={props.members}
-            pendingInvitations={props.pendingInvitations}
-            isOwner={isOwner}
-            clientId={props.clientId ?? null}
-            clientEmail={props.clientEmail ?? null}
-          />
-          <ActivitySection activity={props.activity} />
+    // pb-20 reserves space for the mobile bottom nav bar (hidden on sm+)
+    <div className="relative pb-20 sm:pb-0">
+      <div className="grid gap-5 lg:grid-cols-3">
+        <div className="space-y-5 lg:col-span-2">
+          {mainSections}
         </div>
-      )}
+
+        {/* Right rail — owner-only admin chrome */}
+        {isOwner && (
+          <div className="space-y-4">
+            {/* Members first — most actionable for the freelancer */}
+            <MembersSection
+              portalId={props.portalId}
+              members={props.members}
+              pendingInvitations={props.pendingInvitations}
+              isOwner={isOwner}
+              clientId={props.clientId ?? null}
+              clientEmail={props.clientEmail ?? null}
+            />
+            <ActivitySection activity={props.activity} />
+            {/* Settings last — destructive actions should be out of the way */}
+            <PortalSettingsSection
+              portalId={props.portalId}
+              status={props.portalStatus}
+              portalName={props.portalName}
+              isOwner={isOwner}
+            />
+          </div>
+        )}
+      </div>
+
+      {/* Mobile bottom nav — anchor-scroll to key sections */}
+      <MobileNavBar />
     </div>
   );
 }
 
 // ============================================================================
-// Sections
+// Mobile bottom navigation
+// ============================================================================
+
+function MobileNavBar() {
+  const items = [
+    { href: "#portal-updates",  icon: MessageSquare, label: "Updates" },
+    { href: "#portal-meetings", icon: Video,         label: "Meetings" },
+    { href: "#portal-files",    icon: Files,         label: "Files"    },
+    { href: "#portal-chat",     icon: Send,          label: "Chat"     },
+  ] as const;
+
+  return (
+    <nav
+      aria-label="Portal sections"
+      className="fixed bottom-0 inset-x-0 z-50 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 sm:hidden"
+    >
+      <div className="flex items-stretch justify-around">
+        {items.map(({ href, icon: Icon, label }) => (
+          <a
+            key={href}
+            href={href}
+            className="flex min-w-0 flex-1 flex-col items-center gap-0.5 px-1 py-2 text-[10px] font-medium text-muted-foreground transition-colors hover:text-foreground active:text-foreground"
+          >
+            <Icon className="h-[18px] w-[18px]" />
+            <span>{label}</span>
+          </a>
+        ))}
+      </div>
+    </nav>
+  );
+}
+
+// ============================================================================
+// Section: Welcome guides
 // ============================================================================
 
 function WelcomeDocumentsSection({
@@ -313,55 +347,44 @@ function WelcomeDocumentsSection({
   portalId: string;
 }) {
   return (
-    <Card id="portal-welcome" className="scroll-mt-20">
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-        <CardTitle className="flex items-center gap-2 text-base">
-          <Sparkles className="h-4 w-4" /> Welcome guides
+    <Card id="portal-welcome" className="scroll-mt-24">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+        <CardTitle className="flex items-center gap-2 text-sm font-semibold">
+          <Sparkles className="h-4 w-4 text-muted-foreground" />
+          Welcome guides
         </CardTitle>
         {isOwner && (
           <AttachExistingDialog
-            triggerLabel="Attach existing"
+            triggerLabel="Attach"
             title="Attach a welcome guide"
             description="Pick a welcome document to share in this portal."
             emptyMessage="No welcome documents available to attach."
             items={available.map((doc) => ({
               id: doc.id,
               label: doc.title,
-              meta: `${doc.status.replace(/_/g, " ")}${doc.acknowledgement_required ? " · acknowledgement" : ""}`,
+              meta: `${doc.status.replace(/_/g, " ")}${doc.acknowledgement_required ? " · ack" : ""}`,
             }))}
-            onAttach={async (id) => attachWelcomeToPortalAction({
-              portalId,
-              documentId: id,
-            })}
+            onAttach={async (id) => attachWelcomeToPortalAction({ portalId, documentId: id })}
           />
         )}
-        {/* "Owner managed" placeholder removed — it added noise to the
-            client view without giving them any way to act. */}
       </CardHeader>
       <CardContent>
         {documents.length === 0 ? (
-          <p className="rounded-md border border-dashed p-6 text-center text-xs text-muted-foreground">
-            {isOwner
-              ? "Attach a welcome document so the client knows how things will run."
-              : "No onboarding guides attached yet."}
-          </p>
+          <EmptyState
+            icon={<Sparkles className="h-7 w-7 text-muted-foreground/30" />}
+            message={isOwner ? "Attach a welcome guide to onboard your client." : "No onboarding guides attached yet."}
+          />
         ) : (
-          <ul className="divide-y rounded-md border">
+          <ul className="divide-y rounded-lg border">
             {documents.map((d) => {
-              const needsAck =
-                d.acknowledgement_required && d.status !== "acknowledged";
+              const needsAck = d.acknowledgement_required && d.status !== "acknowledged";
               return (
-                <li
-                  key={d.id}
-                  className="flex items-center justify-between gap-3 px-3 py-3"
-                >
+                <li key={d.id} className="flex items-center justify-between gap-3 px-3 py-3">
                   <div className="min-w-0">
                     <p className="truncate text-sm font-medium">{d.title}</p>
-                    <p className="text-[11px] capitalize text-muted-foreground">
+                    <p className="mt-0.5 text-[11px] capitalize text-muted-foreground">
                       {d.status.replace(/_/g, " ")}
-                      {d.acknowledgement_required
-                        ? " · acknowledgement required"
-                        : ""}
+                      {d.acknowledgement_required ? " · acknowledgement required" : ""}
                     </p>
                   </div>
                   {d.public_token && (
@@ -369,7 +392,7 @@ function WelcomeDocumentsSection({
                       asChild
                       size="sm"
                       variant={needsAck ? "default" : "outline"}
-                      className="h-9 shrink-0"
+                      className="h-8 shrink-0"
                     >
                       <Link href={`/w/${d.public_token}`} target="_blank">
                         {needsAck ? "Read & acknowledge" : "Read guide"}
@@ -387,6 +410,10 @@ function WelcomeDocumentsSection({
   );
 }
 
+// ============================================================================
+// Section: Contracts
+// ============================================================================
+
 function ContractsSection({
   contracts,
   available,
@@ -398,48 +425,52 @@ function ContractsSection({
   isOwner: boolean;
   portalId: string;
 }) {
+  const pendingCount = contracts.filter(
+    (c) => c.status !== "signed" && c.status !== "declined",
+  ).length;
+
   return (
-    <Card id="portal-contracts" className="scroll-mt-20">
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-        <CardTitle className="flex items-center gap-2 text-base">
-          <FileText className="h-4 w-4" /> Contracts
+    <Card id="portal-contracts" className="scroll-mt-24">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+        <CardTitle className="flex items-center gap-2 text-sm font-semibold">
+          <FileText className="h-4 w-4 text-muted-foreground" />
+          Contracts
+          {pendingCount > 0 && (
+            <span className="rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-400">
+              {pendingCount} to sign
+            </span>
+          )}
         </CardTitle>
         {isOwner && (
           <AttachExistingDialog
-            triggerLabel="Attach existing"
+            triggerLabel="Attach"
             title="Attach a contract"
             description="Pick a contract to attach to this portal."
             emptyMessage="No contracts available to attach."
-            items={available.map((contract) => ({
-              id: contract.id,
-              label: contract.title,
-              meta: contract.status.replace(/_/g, " "),
+            items={available.map((c) => ({
+              id: c.id,
+              label: c.title,
+              meta: c.status.replace(/_/g, " "),
             }))}
-            onAttach={async (id) => attachContractToPortalAction({
-              portalId,
-              contractId: id,
-            })}
+            onAttach={async (id) => attachContractToPortalAction({ portalId, contractId: id })}
           />
         )}
       </CardHeader>
       <CardContent>
         {contracts.length === 0 ? (
-          <p className="rounded-md border border-dashed p-6 text-center text-xs text-muted-foreground">
-            No contracts attached yet.
-          </p>
+          <EmptyState
+            icon={<FileText className="h-7 w-7 text-muted-foreground/30" />}
+            message="No contracts attached yet."
+          />
         ) : (
-          <ul className="divide-y rounded-md border">
+          <ul className="divide-y rounded-lg border">
             {contracts.map((c) => {
-              const needsSign =
-                c.status !== "signed" && c.status !== "declined";
+              const needsSign = c.status !== "signed" && c.status !== "declined";
               return (
-                <li
-                  key={c.id}
-                  className="flex items-center justify-between gap-3 px-3 py-3"
-                >
+                <li key={c.id} className="flex items-center justify-between gap-3 px-3 py-3">
                   <div className="min-w-0">
                     <p className="truncate text-sm font-medium">{c.title}</p>
-                    <p className="text-[11px] capitalize text-muted-foreground">
+                    <p className="mt-0.5 text-[11px] capitalize text-muted-foreground">
                       {c.status.replace(/_/g, " ")}
                     </p>
                   </div>
@@ -448,7 +479,7 @@ function ContractsSection({
                       asChild
                       size="sm"
                       variant={needsSign ? "default" : "outline"}
-                      className="h-9 shrink-0"
+                      className="h-8 shrink-0"
                     >
                       <Link href={`/c/${c.public_token}`} target="_blank">
                         {needsSign ? "Review & sign" : "View"}
@@ -466,6 +497,10 @@ function ContractsSection({
   );
 }
 
+// ============================================================================
+// Section: Invoices
+// ============================================================================
+
 function InvoicesSection({
   invoices,
   available,
@@ -477,54 +512,57 @@ function InvoicesSection({
   isOwner: boolean;
   portalId: string;
 }) {
+  const unpaidCount = invoices.filter(
+    (i) => i.status !== "paid" && i.status !== "cancelled",
+  ).length;
+
   return (
-    <Card id="portal-invoices" className="scroll-mt-20">
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-        <CardTitle className="flex items-center gap-2 text-base">
-          <Receipt className="h-4 w-4" /> Invoices
+    <Card id="portal-invoices" className="scroll-mt-24">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+        <CardTitle className="flex items-center gap-2 text-sm font-semibold">
+          <Receipt className="h-4 w-4 text-muted-foreground" />
+          Invoices
+          {unpaidCount > 0 && (
+            <span className="rounded-full bg-blue-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 dark:text-blue-400">
+              {unpaidCount} unpaid
+            </span>
+          )}
         </CardTitle>
         {isOwner && (
           <AttachExistingDialog
-            triggerLabel="Attach existing"
+            triggerLabel="Attach"
             title="Attach an invoice"
             description="Pick an invoice to share in this portal."
             emptyMessage="No invoices available to attach."
-            items={available.map((invoice) => ({
-              id: invoice.id,
-              label: invoice.invoice_number,
-              meta: `${invoice.currency} ${invoice.total_amount} · ${invoice.status}`,
+            items={available.map((i) => ({
+              id: i.id,
+              label: i.invoice_number,
+              meta: `${i.currency} ${i.total_amount} · ${i.status}`,
             }))}
-            onAttach={async (id) => attachInvoiceToPortalAction({
-              portalId,
-              invoiceId: id,
-            })}
+            onAttach={async (id) => attachInvoiceToPortalAction({ portalId, invoiceId: id })}
           />
         )}
       </CardHeader>
       <CardContent>
         {invoices.length === 0 ? (
-          <p className="rounded-md border border-dashed p-6 text-center text-xs text-muted-foreground">
-            No invoices attached yet.
-          </p>
+          <EmptyState
+            icon={<Receipt className="h-7 w-7 text-muted-foreground/30" />}
+            message="No invoices attached yet."
+          />
         ) : (
-          <ul className="divide-y rounded-md border">
+          <ul className="divide-y rounded-lg border">
             {invoices.map((i) => {
               const paid = i.status === "paid";
               const cancelled = i.status === "cancelled";
               return (
-                <li
-                  key={i.id}
-                  className="flex items-center justify-between gap-3 px-3 py-3"
-                >
+                <li key={i.id} className="flex items-center justify-between gap-3 px-3 py-3">
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">
-                      {i.invoice_number}
-                    </p>
-                    <p className="text-[11px] text-muted-foreground">
-                      <span className="font-medium text-foreground tabular-nums">
+                    <p className="truncate text-sm font-medium">{i.invoice_number}</p>
+                    <p className="mt-0.5 text-[11px] text-muted-foreground">
+                      <span className="font-medium tabular-nums text-foreground">
                         {formatPortalCurrency(i.currency, i.total_amount)}
-                      </span>{" "}
-                      ·{" "}
+                      </span>
+                      {" · "}
                       <span
                         className={
                           paid
@@ -543,10 +581,10 @@ function InvoicesSection({
                       asChild
                       size="sm"
                       variant={paid || cancelled ? "outline" : "default"}
-                      className="h-9 shrink-0"
+                      className="h-8 shrink-0"
                     >
                       <Link href={`/i/${i.public_token}`} target="_blank">
-                        {paid ? "View receipt" : cancelled ? "View" : "Pay invoice"}
+                        {paid ? "View receipt" : cancelled ? "View" : "Pay now"}
                         <ExternalLink className="h-3.5 w-3.5" />
                       </Link>
                     </Button>
@@ -561,14 +599,43 @@ function InvoicesSection({
   );
 }
 
-function formatPortalCurrency(currency: string, amount: number): string {
-  if (!Number.isFinite(amount)) return `${currency} 0`;
-  // Use locale formatting so big values read naturally on a phone.
-  return `${currency} ${new Intl.NumberFormat("en-IN", {
-    minimumFractionDigits: Number.isInteger(amount) ? 0 : 2,
-    maximumFractionDigits: 2,
-  }).format(amount)}`;
+// ============================================================================
+// Section: Files
+// ============================================================================
+
+// Map MIME type → icon component
+function FileTypeIcon({ mimeType, className }: { mimeType: string; className?: string }) {
+  const cls = className ?? "h-4 w-4 shrink-0";
+  if (mimeType.startsWith("image/"))  return <FileImage   className={cls} />;
+  if (mimeType.startsWith("video/"))  return <Film        className={cls} />;
+  if (mimeType.startsWith("audio/"))  return <Music       className={cls} />;
+  if (mimeType.includes("pdf") || mimeType.includes("word") || mimeType.includes("document"))
+                                      return <FileText    className={cls} />;
+  if (mimeType.includes("zip") || mimeType.includes("tar") || mimeType.includes("gzip") || mimeType.includes("archive"))
+                                      return <FileArchive className={cls} />;
+  if (mimeType.startsWith("text/code") || mimeType.includes("javascript") || mimeType.includes("typescript") || mimeType.includes("json"))
+                                      return <FileCode    className={cls} />;
+  if (mimeType.startsWith("text/"))   return <FileText    className={cls} />;
+  return <File className={cls} />;
 }
+
+const CATEGORY_LABEL: Record<string, string> = {
+  contract:     "Contract",
+  deliverable:  "Deliverable",
+  asset:        "Asset",
+  invoice:      "Invoice",
+  meeting_note: "Meeting note",
+  misc:         "",
+};
+
+const CATEGORY_STYLE: Record<string, string> = {
+  contract:     "bg-blue-500/10 text-blue-700 dark:text-blue-400",
+  deliverable:  "bg-violet-500/10 text-violet-700 dark:text-violet-400",
+  asset:        "bg-indigo-500/10 text-indigo-700 dark:text-indigo-400",
+  invoice:      "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+  meeting_note: "bg-amber-500/10 text-amber-700 dark:text-amber-400",
+  misc:         "",
+};
 
 function FilesSection({
   portalId,
@@ -589,11 +656,14 @@ function FilesSection({
 }) {
   const router = useRouter();
   const confirm = useConfirm();
-  const usagePct = Number.isFinite(cap) ? Math.min(100, (usage.totalBytes / cap) * 100) : 0;
+  const usagePct = Number.isFinite(cap) && cap > 0
+    ? Math.min(100, (usage.totalBytes / cap) * 100)
+    : 0;
 
-  async function onDelete(fileId: string) {
+  async function onDelete(fileId: string, fileName: string) {
     const ok = await confirm({
-      title: "Delete this file?",
+      title: `Delete "${fileName}"?`,
+      description: "This file will be permanently removed from the portal.",
       confirmLabel: "Delete",
       variant: "destructive",
     });
@@ -603,67 +673,101 @@ function FilesSection({
   }
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-        <CardTitle className="flex items-center gap-2 text-base">
-          <Files className="h-4 w-4" /> Files
-          <span className="ml-2 text-[11px] font-normal text-muted-foreground">
+    <Card id="portal-files" className="scroll-mt-24">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+        <CardTitle className="flex items-center gap-2 text-sm font-semibold">
+          <Files className="h-4 w-4 text-muted-foreground" />
+          Files
+          <span className="text-[11px] font-normal text-muted-foreground">
             {formatBytes(usage.totalBytes)}
             {Number.isFinite(cap) ? ` / ${formatBytes(cap)}` : ""}
           </span>
         </CardTitle>
-        {r2Enabled && (
-          <FileUploadButton portalId={portalId} />
-        )}
+        {r2Enabled && <FileUploadButton portalId={portalId} />}
       </CardHeader>
       <CardContent className="space-y-3">
+        {/* Storage bar */}
         {Number.isFinite(cap) && (
-          <div className="h-1 w-full overflow-hidden rounded bg-muted">
+          <div
+            className="h-1.5 w-full overflow-hidden rounded-full bg-muted"
+            role="progressbar"
+            aria-valuenow={usagePct}
+            aria-valuemin={0}
+            aria-valuemax={100}
+          >
             <div
-              className="h-full bg-primary transition-[width]"
+              className={`h-full rounded-full transition-[width] ${usagePct > 90 ? "bg-destructive" : "bg-primary"}`}
               style={{ width: `${usagePct}%` }}
             />
           </div>
         )}
+
+        {/* R2 not configured warning */}
         {!r2Enabled && (
-          <p className="rounded-md border border-amber-500/30 bg-amber-500/5 p-3 text-[11px] text-amber-700 dark:text-amber-300">
-            File storage isn&apos;t configured. Set R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET in your env to enable uploads.
+          <p className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-[11px] text-amber-700 dark:text-amber-300">
+            File storage isn&apos;t configured. Set{" "}
+            <code className="font-mono">R2_ACCOUNT_ID</code>,{" "}
+            <code className="font-mono">R2_ACCESS_KEY_ID</code>,{" "}
+            <code className="font-mono">R2_SECRET_ACCESS_KEY</code>,{" "}
+            <code className="font-mono">R2_BUCKET</code> in your environment to
+            enable uploads.
           </p>
         )}
+
         {files.length === 0 ? (
-          <p className="rounded-md border border-dashed p-6 text-center text-xs text-muted-foreground">
-            No files yet.
-          </p>
+          <EmptyState
+            icon={<Files className="h-7 w-7 text-muted-foreground/30" />}
+            message="No files shared yet."
+            hint={r2Enabled ? "Upload files to share them with your client." : undefined}
+          />
         ) : (
-          <ul className="divide-y rounded-md border">
-            {files.map((f) => (
-              <li
-                key={f.id}
-                className="flex items-center justify-between gap-3 px-3 py-2.5"
-              >
-                <a
-                  href={`/api/portals/${portalId}/files/${f.id}/download`}
-                  className="flex min-w-0 flex-1 items-center gap-2 text-sm hover:underline"
+          <ul className="divide-y rounded-lg border">
+            {files.map((f) => {
+              const catLabel = CATEGORY_LABEL[f.category ?? "misc"] ?? "";
+              const catStyle = CATEGORY_STYLE[f.category ?? "misc"] ?? "";
+              return (
+                <li
+                  key={f.id}
+                  className="group flex items-center gap-3 px-3 py-2.5"
                 >
-                  <Paperclip className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                  <span className="truncate">{f.name}</span>
-                  <span className="ml-auto shrink-0 text-[11px] text-muted-foreground">
-                    {formatBytes(f.size_bytes)}
+                  {/* File type icon */}
+                  <span className="shrink-0 text-muted-foreground">
+                    <FileTypeIcon mimeType={f.mime_type ?? ""} />
                   </span>
-                </a>
-                {(isOwner || f.uploaded_by === currentUserId) && (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="shrink-0"
-                    onClick={() => onDelete(f.id)}
-                    aria-label={`Delete ${f.name}`}
+
+                  {/* Name + category */}
+                  <a
+                    href={`/api/portals/${portalId}/files/${f.id}/download`}
+                    className="flex min-w-0 flex-1 flex-col gap-0.5 hover:underline"
                   >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
-                )}
-              </li>
-            ))}
+                    <span className="truncate text-sm font-medium leading-tight">
+                      {f.name}
+                    </span>
+                    <span className="text-[11px] text-muted-foreground">
+                      {catLabel && (
+                        <span className={`mr-1.5 rounded px-1 py-0.5 text-[10px] font-medium ${catStyle}`}>
+                          {catLabel}
+                        </span>
+                      )}
+                      {formatBytes(f.size_bytes)}
+                    </span>
+                  </a>
+
+                  {/* Delete */}
+                  {(isOwner || f.uploaded_by === currentUserId) && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 w-7 shrink-0 p-0 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+                      onClick={() => onDelete(f.id, f.name)}
+                      aria-label={`Delete ${f.name}`}
+                    >
+                      <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
+                    </Button>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         )}
       </CardContent>
@@ -684,18 +788,15 @@ function FileUploadButton({ portalId }: { portalId: string }) {
     try {
       for (const file of Array.from(filelist)) {
         // Step 1: presign
-        const presignRes = await fetch(
-          `/api/portals/${portalId}/files/presign`,
-          {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({
-              filename: file.name,
-              mimeType: file.type || "application/octet-stream",
-              sizeBytes: file.size,
-            }),
-          },
-        );
+        const presignRes = await fetch(`/api/portals/${portalId}/files/presign`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            filename: file.name,
+            mimeType: file.type || "application/octet-stream",
+            sizeBytes: file.size,
+          }),
+        });
         const presign = (await presignRes.json()) as
           | { ok: true; fileId: string; key: string; putUrl: string }
           | { ok: false; error: string };
@@ -705,26 +806,21 @@ function FileUploadButton({ portalId }: { portalId: string }) {
         const putRes = await fetch(presign.putUrl, {
           method: "PUT",
           body: file,
-          headers: {
-            "content-type": file.type || "application/octet-stream",
-          },
+          headers: { "content-type": file.type || "application/octet-stream" },
         });
         if (!putRes.ok) throw new Error(`Upload failed (${putRes.status})`);
 
         // Step 3: commit
-        const commitRes = await fetch(
-          `/api/portals/${portalId}/files/commit`,
-          {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({
-              fileId: presign.fileId,
-              key: presign.key,
-              filename: file.name,
-              mimeType: file.type || "application/octet-stream",
-            }),
-          },
-        );
+        const commitRes = await fetch(`/api/portals/${portalId}/files/commit`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            fileId: presign.fileId,
+            key: presign.key,
+            filename: file.name,
+            mimeType: file.type || "application/octet-stream",
+          }),
+        });
         const commit = (await commitRes.json()) as
           | { ok: true }
           | { ok: false; error: string };
@@ -751,25 +847,28 @@ function FileUploadButton({ portalId }: { portalId: string }) {
       <Button
         size="sm"
         variant="outline"
+        className="h-8"
         onClick={() => inputRef.current?.click()}
         disabled={pending}
       >
         {pending ? (
-          <>
-            <Loader2 className="animate-spin" /> Uploading
-          </>
+          <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Uploading…</>
         ) : (
-          <>
-            <Upload /> Upload
-          </>
+          <><Upload className="h-3.5 w-3.5" /> Upload</>
         )}
       </Button>
       {error && (
-        <span className="text-[11px] text-destructive">{error}</span>
+        <span className="max-w-[140px] truncate text-[11px] text-destructive">
+          {error}
+        </span>
       )}
     </div>
   );
 }
+
+// ============================================================================
+// Section: Chat
+// ============================================================================
 
 function MessagesSection({
   portalId,
@@ -788,85 +887,82 @@ function MessagesSection({
     if (pending || body.trim().length === 0) return;
     setPending(true);
     setError(null);
-    const res = await postPortalMessageAction({
-      portalId,
-      body: body.trim(),
-    });
+    const res = await postPortalMessageAction({ portalId, body: body.trim() });
     setPending(false);
-    if (!res.ok) {
-      setError(res.error);
-      return;
-    }
+    if (!res.ok) { setError(res.error); return; }
     setBody("");
     router.refresh();
   }
 
-  // Reverse chronological from server → render oldest-first for natural reading.
+  // Server returns newest-first → render oldest-first for natural chat reading
   const ordered = [...messages].reverse();
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-        <CardTitle className="flex items-center gap-2 text-base">
-          <MessageSquare className="h-4 w-4" /> Chat
+    <Card id="portal-chat" className="scroll-mt-24">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+        <CardTitle className="flex items-center gap-2 text-sm font-semibold">
+          <MessageSquare className="h-4 w-4 text-muted-foreground" />
+          Chat
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="rounded-md border bg-muted/10 p-3">
-          <form onSubmit={onSubmit} className="space-y-2">
-            <div className="space-y-1">
-              <Label htmlFor="portal-message" className="text-xs">
-                Send a message
-              </Label>
-              <Textarea
-                id="portal-message"
-                placeholder="Write a message, ask a question, or share an update..."
-                value={body}
-                onChange={(e) => setBody(e.target.value)}
-                maxLength={8000}
-                rows={3}
-                required
-              />
-              <p className="text-[11px] text-muted-foreground">
-                Keep files in the Files section so they stay organized.
-              </p>
-            </div>
+        {/* Compose */}
+        <div className="rounded-lg border bg-muted/20 p-3">
+          <form onSubmit={onSubmit} className="space-y-2.5">
+            <Textarea
+              id="portal-message"
+              placeholder="Write a message, ask a question, or share a quick note…"
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              maxLength={8000}
+              rows={3}
+              required
+              aria-label="Message"
+            />
             {error && (
               <p className="rounded-md bg-destructive/10 p-2 text-xs text-destructive">
                 {error}
               </p>
             )}
-            <div className="flex justify-end">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-[11px] text-muted-foreground">
+                For files, use the Files section above.
+              </p>
               <Button
                 type="submit"
                 size="sm"
+                className="h-8 shrink-0"
                 disabled={pending || body.trim().length === 0}
               >
                 {pending ? (
-                  <Loader2 className="animate-spin" />
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
                 ) : (
-                  <>
-                    <Send /> Send message
-                  </>
+                  <><Send className="h-3.5 w-3.5" /> Send</>
                 )}
               </Button>
             </div>
           </form>
         </div>
+
+        {/* Message thread */}
         {ordered.length === 0 ? (
-          <p className="rounded-md border border-dashed p-6 text-center text-xs text-muted-foreground">
-            No messages yet. Use the form above to start.
-          </p>
+          <EmptyState
+            icon={<MessageSquare className="h-7 w-7 text-muted-foreground/30" />}
+            message="No messages yet."
+            hint="Use the form above to start the conversation."
+          />
         ) : (
-          <ul className="space-y-3">
+          <ul className="space-y-2.5">
             {ordered.map((m) => (
-              <li key={m.id} className="rounded-md border p-3">
-                <div className="mb-1 flex items-center gap-2 text-[11px] text-muted-foreground">
-                  <span className="font-medium text-foreground">
+              <li key={m.id} className="rounded-lg border bg-card p-3">
+                <div className="mb-1.5 flex items-center gap-2 text-[11px] text-muted-foreground">
+                  <span className="font-semibold text-foreground">
                     {m.author?.full_name ?? m.author?.email ?? "Someone"}
                   </span>
-                  <span>·</span>
-                  <span>{new Date(m.created_at).toLocaleString()}</span>
+                  <span aria-hidden>·</span>
+                  <time dateTime={m.created_at} className="tabular-nums">
+                    {getRelativeTime(m.created_at)}
+                  </time>
                 </div>
                 <p className="whitespace-pre-wrap text-sm leading-relaxed">
                   {m.body}
@@ -879,6 +975,10 @@ function MessagesSection({
     </Card>
   );
 }
+
+// ============================================================================
+// Section: Portal settings (owner only, destructive — lives at bottom of rail)
+// ============================================================================
 
 function PortalSettingsSection({
   portalId,
@@ -893,16 +993,11 @@ function PortalSettingsSection({
 }) {
   const router = useRouter();
   const [pending, setPending] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
   const [deleteOpen, setDeleteOpen] = React.useState(false);
   const [confirmName, setConfirmName] = React.useState("");
-  const [error, setError] = React.useState<string | null>(null);
-  const archived = status === "archived";
-
-  // Two separate error slots so the destructive-dialog error never bleeds
-  // back to the card behind it (the prior implementation re-used `error`
-  // and the failure message appeared underneath the open dialog instead
-  // of inside it).
   const [dialogError, setDialogError] = React.useState<string | null>(null);
+  const archived = status === "archived";
 
   async function onArchive() {
     if (pending || archived) return;
@@ -910,10 +1005,7 @@ function PortalSettingsSection({
     setError(null);
     const res = await archivePortalAction({ portalId });
     setPending(false);
-    if (!res.ok) {
-      setError(res.error ?? "Could not deactivate portal.");
-      return;
-    }
+    if (!res.ok) { setError(res.error ?? "Could not deactivate portal."); return; }
     router.refresh();
   }
 
@@ -927,10 +1019,7 @@ function PortalSettingsSection({
     setDialogError(null);
     const res = await deletePortalAction({ portalId });
     setPending(false);
-    if (!res.ok) {
-      setDialogError(res.error ?? "Could not delete portal.");
-      return;
-    }
+    if (!res.ok) { setDialogError(res.error ?? "Could not delete portal."); return; }
     setConfirmName("");
     setDeleteOpen(false);
     router.push(PORTAL_DASHBOARD_INDEX);
@@ -942,15 +1031,14 @@ function PortalSettingsSection({
   return (
     <Card>
       <CardHeader className="pb-3">
-        <CardTitle className="text-base">Portal settings</CardTitle>
+        <CardTitle className="text-sm font-semibold text-muted-foreground">
+          Portal settings
+        </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
         <p className="text-xs text-muted-foreground">
           Deactivate to pause client access. Delete to permanently remove the
           portal and all attachments.
-        </p>
-        <p className="text-[11px] text-muted-foreground">
-          You&apos;ll be asked to type the portal name to confirm deletion.
         </p>
         {error && (
           <p className="rounded-md bg-destructive/10 p-2 text-xs text-destructive">
@@ -963,34 +1051,30 @@ function PortalSettingsSection({
             size="sm"
             onClick={onArchive}
             disabled={pending || archived}
+            className="w-full"
           >
             {archived ? "Portal deactivated" : "Deactivate portal"}
           </Button>
           <Button
             variant="destructive"
             size="sm"
-            onClick={() => {
-              setError(null);
-              setDeleteOpen(true);
-            }}
+            onClick={() => { setError(null); setDeleteOpen(true); }}
             disabled={pending}
+            className="w-full"
           >
             Delete portal
           </Button>
         </div>
+
         <Dialog
           open={deleteOpen}
-          onOpenChange={(next) => {
-            setDeleteOpen(next);
-            // Clear any previous failure when the user reopens / closes.
-            if (!next) setDialogError(null);
-          }}
+          onOpenChange={(next) => { setDeleteOpen(next); if (!next) setDialogError(null); }}
         >
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Delete this portal?</DialogTitle>
               <DialogDescription>
-                This permanently removes the portal and its attachments. Type
+                This permanently removes the portal and all attachments. Type
                 the portal name to confirm.
                 <span className="mt-2 block text-xs text-muted-foreground">
                   Type <strong>{portalName}</strong> to confirm.
@@ -1015,10 +1099,7 @@ function PortalSettingsSection({
               <Button
                 type="button"
                 variant="ghost"
-                onClick={() => {
-                  setConfirmName("");
-                  setDeleteOpen(false);
-                }}
+                onClick={() => { setConfirmName(""); setDeleteOpen(false); }}
                 disabled={pending}
               >
                 Cancel
@@ -1038,6 +1119,286 @@ function PortalSettingsSection({
     </Card>
   );
 }
+
+// ============================================================================
+// Section: Members (owner right-rail, shown first)
+// ============================================================================
+
+function MembersSection({
+  portalId,
+  members,
+  pendingInvitations,
+  isOwner,
+  clientId,
+  clientEmail,
+}: {
+  portalId: string;
+  members: ViewProps["members"];
+  pendingInvitations: ViewProps["pendingInvitations"];
+  isOwner: boolean;
+  clientId: string | null;
+  clientEmail: string | null;
+}) {
+  const router = useRouter();
+  const confirm = useConfirm();
+  const [open, setOpen] = React.useState(false);
+  const [email, setEmail] = React.useState("");
+  const [name, setName] = React.useState("");
+  const [pending, setPending] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+
+  const hasClient = members.length > 0;
+  const hasPending = pendingInvitations.length > 0;
+  const missingClientEmail = !clientEmail;
+  const inviteDisabled = hasClient || hasPending || missingClientEmail;
+
+  async function onInvite(e: React.FormEvent) {
+    e.preventDefault();
+    if (pending) return;
+    setPending(true);
+    setError(null);
+    const res = await invitePortalMemberAction({
+      portalId,
+      email: email.trim(),
+      name: name.trim() || undefined,
+    });
+    setPending(false);
+    if (!res.ok) { setError(res.error); return; }
+    setEmail(""); setName(""); setOpen(false);
+    router.refresh();
+  }
+
+  async function onRevoke(userId: string) {
+    const ok = await confirm({
+      title: "Revoke access?",
+      description: "This member will immediately lose access to the portal.",
+      confirmLabel: "Revoke",
+      variant: "destructive",
+    });
+    if (!ok) return;
+    await revokePortalMemberAction({ portalId, userId });
+    router.refresh();
+  }
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+        <CardTitle className="flex items-center gap-2 text-sm font-semibold">
+          <UserPlus className="h-4 w-4 text-muted-foreground" />
+          Client access
+        </CardTitle>
+        {isOwner && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 text-xs"
+            onClick={() => setOpen((o) => !o)}
+            disabled={inviteDisabled}
+          >
+            Invite
+          </Button>
+        )}
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {isOwner && missingClientEmail && (
+          <div className="space-y-2 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+            <p className="text-[11px] text-amber-700 dark:text-amber-300">
+              Add an email to the client profile before inviting.
+            </p>
+            {clientId && (
+              <Button asChild size="sm" variant="outline" className="h-7 text-xs">
+                <Link href={`/dashboard/clients/${clientId}`}>
+                  Add client email
+                </Link>
+              </Button>
+            )}
+          </div>
+        )}
+        {isOwner && (hasClient || hasPending) && (
+          <p className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-[11px] text-amber-700 dark:text-amber-300">
+            One client per portal. Revoke current access before inviting another.
+          </p>
+        )}
+        {open && isOwner && !inviteDisabled && (
+          <form onSubmit={onInvite} className="space-y-2 rounded-lg border bg-muted/20 p-3">
+            <div className="space-y-1">
+              <Label htmlFor="invite-email" className="text-xs">Client email</Label>
+              <Input
+                id="invite-email"
+                type="email"
+                required
+                placeholder="client@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="h-8 text-sm"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="invite-name" className="text-xs">Name (optional)</Label>
+              <Input
+                id="invite-name"
+                placeholder="Sam"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="h-8 text-sm"
+              />
+            </div>
+            {error && (
+              <p className="rounded-md bg-destructive/10 p-2 text-xs text-destructive">{error}</p>
+            )}
+            <Button type="submit" size="sm" className="h-7 w-full text-xs" disabled={pending}>
+              {pending ? <Loader2 className="animate-spin" /> : "Send invite"}
+            </Button>
+          </form>
+        )}
+
+        {members.length === 0 && pendingInvitations.length === 0 ? (
+          <p className="rounded-lg border border-dashed p-5 text-center text-xs text-muted-foreground">
+            No client connected yet.
+          </p>
+        ) : (
+          <ul className="divide-y rounded-lg border">
+            {members.map((member) => {
+              const displayName = getMemberDisplayName(member.profile);
+              const memberEmail = getMemberEmail(member.profile);
+              const isOwnerMember = member.role === "owner";
+              return (
+                <li key={member.user_id} className="flex items-center justify-between gap-3 px-3 py-2.5">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">{displayName}</p>
+                    {memberEmail && (
+                      <p className="text-[11px] text-muted-foreground">{memberEmail}</p>
+                    )}
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <Badge variant={isOwnerMember ? "default" : "secondary"} className="text-[10px]">
+                      {isOwnerMember ? "Owner" : "Client"}
+                    </Badge>
+                    {isOwner && !isOwnerMember && (
+                      <Button size="sm" variant="ghost" className="h-7 text-xs text-muted-foreground" onClick={() => onRevoke(member.user_id)}>
+                        Revoke
+                      </Button>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+
+        {isOwner && pendingInvitations.length > 0 && (
+          <div className="space-y-1.5">
+            <p className="text-[11px] font-medium text-muted-foreground">Pending</p>
+            <ul className="divide-y rounded-lg border">
+              {pendingInvitations.map((inv) => (
+                <li key={inv.id} className="flex items-center justify-between gap-3 px-3 py-2.5">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">{inv.email}</p>
+                    <p className="text-[11px] text-muted-foreground">
+                      Expires {formatDate(inv.expires_at)}
+                    </p>
+                  </div>
+                  <Badge variant="outline" className="text-[10px]">Pending</Badge>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ============================================================================
+// Section: Activity feed (timeline style)
+// ============================================================================
+
+const ACTIVITY_LIMIT = 12;
+
+function getActivityDotColor(type: string): string {
+  if (type.startsWith("meeting."))      return "bg-violet-500";
+  if (type.startsWith("update."))       return "bg-sky-500";
+  if (type.startsWith("file."))         return "bg-amber-500";
+  if (type.startsWith("contract."))     return "bg-blue-500";
+  if (type.startsWith("invoice."))      return "bg-emerald-500";
+  if (type.startsWith("portal.member")) return "bg-pink-500";
+  return "bg-muted-foreground/40";
+}
+
+function ActivitySection({ activity }: { activity: ViewProps["activity"] }) {
+  const ordered = [...activity].sort(
+    (a, b) => Date.parse(b.created_at) - Date.parse(a.created_at),
+  );
+  const visible = ordered.slice(0, ACTIVITY_LIMIT);
+  const hiddenCount = ordered.length - visible.length;
+
+  return (
+    <Card>
+      <CardHeader className="pb-4">
+        <CardTitle className="flex items-center gap-2 text-sm font-semibold">
+          <ShieldCheck className="h-4 w-4 text-muted-foreground" />
+          Activity
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {visible.length === 0 ? (
+          <EmptyState
+            icon={<ShieldCheck className="h-7 w-7 text-muted-foreground/30" />}
+            message="No activity yet."
+          />
+        ) : (
+          <>
+            <ol className="relative space-y-0">
+              {visible.map((item, index) => {
+                const title = formatActivityTitle(item);
+                const description = formatActivityDescription(item);
+                const isLast = index === visible.length - 1 && hiddenCount === 0;
+                return (
+                  <li key={item.id} className="relative flex gap-3 pb-4 last:pb-0">
+                    {/* Connecting line */}
+                    {!isLast && (
+                      <div className="absolute left-[6px] top-[14px] bottom-0 w-px bg-border" />
+                    )}
+                    {/* Colored dot */}
+                    <div
+                      className={`relative z-10 mt-[3px] h-3.5 w-3.5 shrink-0 rounded-full ${getActivityDotColor(item.type)}`}
+                    />
+                    {/* Content */}
+                    <div className="min-w-0 flex-1 pb-0">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="text-xs font-medium leading-tight">{title}</p>
+                        <time
+                          dateTime={item.created_at}
+                          className="shrink-0 text-[10px] tabular-nums text-muted-foreground"
+                        >
+                          {getRelativeTime(item.created_at)}
+                        </time>
+                      </div>
+                      {description && (
+                        <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
+                          {description}
+                        </p>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
+            </ol>
+            {hiddenCount > 0 && (
+              <p className="mt-3 text-[11px] text-muted-foreground">
+                + {hiddenCount} older event{hiddenCount > 1 ? "s" : ""}
+              </p>
+            )}
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ============================================================================
+// Shared: AttachExistingDialog
+// ============================================================================
 
 function AttachExistingDialog({
   triggerLabel,
@@ -1066,10 +1427,7 @@ function AttachExistingDialog({
     setError(null);
     const res = await onAttach(selectedId);
     setPending(false);
-    if (!res.ok) {
-      setError(res.error ?? "Could not attach. Please try again.");
-      return;
-    }
+    if (!res.ok) { setError(res.error ?? "Could not attach. Please try again."); return; }
     setSelectedId("");
     setOpen(false);
     router.refresh();
@@ -1077,7 +1435,7 @@ function AttachExistingDialog({
 
   return (
     <>
-      <Button size="sm" variant="ghost" onClick={() => setOpen(true)}>
+      <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setOpen(true)}>
         {triggerLabel}
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
@@ -1087,7 +1445,7 @@ function AttachExistingDialog({
             <DialogDescription>{description}</DialogDescription>
           </DialogHeader>
           {items.length === 0 ? (
-            <p className="rounded-md border border-dashed p-3 text-xs text-muted-foreground">
+            <p className="rounded-lg border border-dashed p-3 text-xs text-muted-foreground">
               {emptyMessage}
             </p>
           ) : (
@@ -1113,12 +1471,7 @@ function AttachExistingDialog({
             </div>
           )}
           <DialogFooter>
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => setOpen(false)}
-              disabled={pending}
-            >
+            <Button type="button" variant="ghost" onClick={() => setOpen(false)} disabled={pending}>
               Cancel
             </Button>
             <Button
@@ -1135,274 +1488,72 @@ function AttachExistingDialog({
   );
 }
 
-function MembersSection({
-  portalId,
-  members,
-  pendingInvitations,
-  isOwner,
-  clientId,
-  clientEmail,
+// ============================================================================
+// Shared: EmptyState
+// ============================================================================
+
+function EmptyState({
+  icon,
+  message,
+  hint,
 }: {
-  portalId: string;
-  members: ViewProps["members"];
-  pendingInvitations: ViewProps["pendingInvitations"];
-  isOwner: boolean;
-  clientId: string | null;
-  clientEmail: string | null;
+  icon: React.ReactNode;
+  message: string;
+  hint?: string;
 }) {
-  const router = useRouter();
-  const confirm = useConfirm();
-  const [open, setOpen] = React.useState(false);
-  const [email, setEmail] = React.useState("");
-  const [name, setName] = React.useState("");
-  const [pending, setPending] = React.useState(false);
-  const [error, setError] = React.useState<string | null>(null);
-  const hasClient = members.length > 0;
-  const hasPending = pendingInvitations.length > 0;
-  const missingClientEmail = !clientEmail;
-  const inviteDisabled = hasClient || hasPending || missingClientEmail;
-
-  async function onInvite(e: React.FormEvent) {
-    e.preventDefault();
-    if (pending) return;
-    setPending(true);
-    setError(null);
-    const res = await invitePortalMemberAction({
-      portalId,
-      email: email.trim(),
-      name: name.trim() || undefined,
-    });
-    setPending(false);
-    if (!res.ok) {
-      setError(res.error);
-      return;
-    }
-    setEmail("");
-    setName("");
-    setOpen(false);
-    router.refresh();
-  }
-
-  async function onRevoke(userId: string) {
-    const ok = await confirm({
-      title: "Revoke access?",
-      description: "This member will immediately lose access to the portal.",
-      confirmLabel: "Revoke",
-      variant: "destructive",
-    });
-    if (!ok) return;
-    await revokePortalMemberAction({ portalId, userId });
-    router.refresh();
-  }
-
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-        <CardTitle className="text-base">Client access</CardTitle>
-        {isOwner && (
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => setOpen((o) => !o)}
-            disabled={inviteDisabled}
-          >
-            <UserPlus /> Invite
-          </Button>
-        )}
-      </CardHeader>
-      <CardContent className="space-y-3">
-        {isOwner && missingClientEmail && (
-          <div className="space-y-2 rounded-md border border-amber-500/30 bg-amber-500/5 p-3">
-            <p className="text-[11px] text-amber-700 dark:text-amber-300">
-              Add an email to the client profile before inviting.
-            </p>
-            {clientId && (
-              <Button asChild size="sm" variant="outline">
-                <Link href={`/dashboard/clients/${clientId}`}>
-                  Add client email
-                </Link>
-              </Button>
-            )}
-          </div>
-        )}
-        {isOwner && (hasClient || hasPending) && (
-          <p className="rounded-md border border-amber-500/30 bg-amber-500/5 p-3 text-[11px] text-amber-700 dark:text-amber-300">
-            This portal supports one client at a time. Revoke access or wait
-            for the pending invite before inviting another.
-          </p>
-        )}
-        {open && isOwner && !inviteDisabled && (
-          <form onSubmit={onInvite} className="space-y-2 rounded-md border p-3">
-            <p className="text-[11px] text-muted-foreground">
-              Only the client linked to this portal can be invited. Use the
-              client email on file.
-            </p>
-            <div className="space-y-1">
-              <Label htmlFor="invite-email" className="text-xs">
-                Client email
-              </Label>
-              <Input
-                id="invite-email"
-                type="email"
-                required
-                placeholder="client@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="invite-name" className="text-xs">
-                Name (optional)
-              </Label>
-              <Input
-                id="invite-name"
-                placeholder="Sam"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-              />
-            </div>
-            {error && (
-              <p className="rounded-md bg-destructive/10 p-2 text-xs text-destructive">
-                {error}
-              </p>
-            )}
-            <Button
-              type="submit"
-              size="sm"
-              className="w-full"
-              disabled={pending}
-            >
-              {pending ? <Loader2 className="animate-spin" /> : "Send invite"}
-            </Button>
-          </form>
-        )}
-        {members.length > 1 && (
-          <p className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-[11px] text-destructive">
-            Multiple clients are attached to this portal. This portal should
-            only have one client.
-          </p>
-        )}
-        {members.length === 0 ? (
-          <p className="rounded-md border border-dashed p-6 text-center text-xs text-muted-foreground">
-            No client connected yet.
-          </p>
-        ) : (
-          <ul className="divide-y rounded-md border">
-            {members.map((member) => {
-              const displayName = getMemberDisplayName(member.profile);
-              const email = getMemberEmail(member.profile);
-              const isOwnerMember = member.role === "owner";
-              return (
-                <li
-                  key={member.user_id}
-                  className="flex items-center justify-between gap-3 px-3 py-2.5"
-                >
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">
-                      {displayName}
-                    </p>
-                    <p className="text-[11px] text-muted-foreground">
-                      {email ?? "No email on file"}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant={isOwnerMember ? "default" : "secondary"}>
-                      {isOwnerMember ? "Owner" : "Client"}
-                    </Badge>
-                    {isOwner && !isOwnerMember && (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => onRevoke(member.user_id)}
-                      >
-                        Revoke
-                      </Button>
-                    )}
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-        {isOwner && pendingInvitations.length > 0 && (
-          <div className="space-y-2">
-            <p className="text-[11px] font-medium text-muted-foreground">
-              Pending invitation
-            </p>
-            <ul className="divide-y rounded-md border">
-              {pendingInvitations.map((inv) => (
-                <li
-                  key={inv.id}
-                  className="flex items-center justify-between gap-3 px-3 py-2.5"
-                >
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">{inv.email}</p>
-                    <p className="text-[11px] text-muted-foreground">
-                      Expires {formatDate(inv.expires_at)}
-                    </p>
-                  </div>
-                  <Badge variant="outline">Pending</Badge>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+    <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed px-4 py-8 text-center">
+      {icon}
+      <p className="text-sm text-muted-foreground">{message}</p>
+      {hint && (
+        <p className="text-xs text-muted-foreground/70">{hint}</p>
+      )}
+    </div>
   );
 }
 
-function ActivitySection({
-  activity,
-}: {
-  activity: ViewProps["activity"];
-}) {
-  const ordered = [...activity].sort(
-    (a, b) => Date.parse(b.created_at) - Date.parse(a.created_at),
-  );
+// ============================================================================
+// Helpers
+// ============================================================================
 
-  return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base">Activity</CardTitle>
-      </CardHeader>
-      <CardContent>
-        {ordered.length === 0 ? (
-          <p className="rounded-md border border-dashed p-6 text-center text-xs text-muted-foreground">
-            No activity yet.
-          </p>
-        ) : (
-          <ul className="divide-y rounded-md border">
-            {ordered.map((item) => {
-              const title = formatActivityTitle(item);
-              const description = formatActivityDescription(item);
-              return (
-                <li
-                  key={item.id}
-                  className="flex items-start gap-3 px-3 py-2.5"
-                >
-                  <span className="mt-0.5">
-                    {getActivityIcon(item)}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium">{title}</p>
-                    {description && (
-                      <p className="text-[11px] text-muted-foreground">
-                        {description}
-                      </p>
-                    )}
-                  </div>
-                  <span className="shrink-0 text-[11px] text-muted-foreground">
-                    {formatDate(item.created_at)}
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </CardContent>
-    </Card>
-  );
+function formatPortalCurrency(currency: string, amount: number): string {
+  if (!Number.isFinite(amount)) return `${currency} 0`;
+  return `${currency} ${new Intl.NumberFormat("en-IN", {
+    minimumFractionDigits: Number.isInteger(amount) ? 0 : 2,
+    maximumFractionDigits: 2,
+  }).format(amount)}`;
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes === Infinity) return "∞";
+  if (bytes < 1024) return `${bytes} B`;
+  const units = ["KB", "MB", "GB", "TB"] as const;
+  let v = bytes / 1024;
+  let i = 0;
+  while (v >= 1024 && i < units.length - 1) { v /= 1024; i++; }
+  return `${v.toFixed(v >= 10 ? 0 : 1)} ${units[i]}`;
+}
+
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+export function getRelativeTime(iso: string): string {
+  const diffMs   = Date.now() - Date.parse(iso);
+  const diffMins = Math.floor(diffMs / 60_000);
+  if (diffMins < 1)   return "just now";
+  if (diffMins < 60)  return `${diffMins}m ago`;
+  const diffHrs = Math.floor(diffMins / 60);
+  if (diffHrs < 24)   return `${diffHrs}h ago`;
+  const diffDays = Math.floor(diffHrs / 24);
+  if (diffDays === 1) return "yesterday";
+  if (diffDays < 7)   return `${diffDays}d ago`;
+  if (diffDays < 30)  return `${Math.floor(diffDays / 7)}w ago`;
+  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
 function getMemberDisplayName(
@@ -1414,53 +1565,30 @@ function getMemberDisplayName(
 function getMemberEmail(
   profile: ViewProps["members"][number]["profile"],
 ): string | null {
-  if (!profile) return null;
-  if (profile.full_name && profile.email) return profile.email;
-  return profile.email ?? null;
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes === Infinity) return "Infinity";
-  if (bytes < 1024) return `${bytes} B`;
-  const units = ["KB", "MB", "GB", "TB"];
-  let v = bytes / 1024;
-  let i = 0;
-  while (v >= 1024 && i < units.length - 1) {
-    v /= 1024;
-    i++;
-  }
-  return `${v.toFixed(v >= 10 ? 0 : 1)} ${units[i]}`;
-}
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString();
-}
-
-function formatDateTime(iso: string): string {
-  return new Date(iso).toLocaleString();
+  return profile?.email ?? null;
 }
 
 function formatActivityTitle(item: PortalActivityRow): string {
   switch (item.type) {
-    case "portal.created":           return "Portal created";
-    case "portal.renamed":           return "Portal renamed";
-    case "portal.member_invited":    return "Member invited";
-    case "portal.member_joined":     return "Member joined";
-    case "portal.member_revoked":    return "Member revoked";
-    case "contract.attached":        return "Contract attached";
-    case "invoice.attached":         return "Invoice attached";
-    case "message.posted":           return "Message sent";
-    case "file.uploaded":            return "File uploaded";
-    case "file.deleted":             return "File deleted";
-    case "update.posted":            return "Update posted";
-    case "update.acknowledged":      return "Update acknowledged";
-    case "update.approved":          return "Update approved";
-    case "update.revision_requested":return "Revision requested";
-    case "update.comment":           return "Comment added";
-    case "meeting.requested":        return "Meeting requested";
-    case "meeting.accepted":         return "Meeting confirmed";
-    case "meeting.declined":         return "Meeting declined";
-    case "meeting.completed":        return "Meeting completed";
+    case "portal.created":            return "Portal created";
+    case "portal.renamed":            return "Portal renamed";
+    case "portal.member_invited":     return "Client invited";
+    case "portal.member_joined":      return "Client joined";
+    case "portal.member_revoked":     return "Access revoked";
+    case "contract.attached":         return "Contract attached";
+    case "invoice.attached":          return "Invoice attached";
+    case "message.posted":            return "Message sent";
+    case "file.uploaded":             return "File uploaded";
+    case "file.deleted":              return "File deleted";
+    case "update.posted":             return "Update posted";
+    case "update.acknowledged":       return "Update acknowledged";
+    case "update.approved":           return "Update approved";
+    case "update.revision_requested": return "Revision requested";
+    case "update.comment":            return "Comment added";
+    case "meeting.requested":         return "Meeting requested";
+    case "meeting.accepted":          return "Meeting confirmed";
+    case "meeting.declined":          return "Meeting declined";
+    case "meeting.completed":         return "Meeting completed";
     default:
       return item.type.replace(/[._]/g, " ");
   }
@@ -1468,49 +1596,16 @@ function formatActivityTitle(item: PortalActivityRow): string {
 
 function formatActivityDescription(item: PortalActivityRow): string | null {
   const payload = parsePayload(item.payload);
-  if (item.type === "portal.renamed" && typeof payload.name === "string") {
-    return `Renamed to ${payload.name}`;
-  }
-  if (item.type === "portal.member_invited" && typeof payload.email === "string") {
-    return payload.email;
-  }
-  if (item.type === "portal.member_joined" && typeof payload.email === "string") {
-    return payload.email;
-  }
-  if (item.type === "contract.attached" && typeof payload.title === "string") {
-    return payload.title;
-  }
-  if (item.type === "invoice.attached" && typeof payload.number === "string") {
-    return `Invoice ${payload.number}`;
-  }
-  if (item.type === "message.posted" && typeof payload.preview === "string") {
-    return `\"${payload.preview}\"`;
-  }
-  if (item.type === "file.deleted" && typeof payload.name === "string") {
-    return payload.name;
-  }
-  if (typeof payload.name === "string") return payload.name;
-  if (typeof payload.title === "string") return payload.title;
-  if (typeof payload.email === "string") return payload.email;
+  if (typeof payload.name === "string")    return payload.name;
+  if (typeof payload.title === "string")   return payload.title;
+  if (typeof payload.topic === "string")   return payload.topic;
+  if (typeof payload.email === "string")   return payload.email;
+  if (typeof payload.number === "string")  return `Invoice ${payload.number}`;
+  if (typeof payload.preview === "string") return `"${payload.preview}"`;
   return null;
 }
 
-function getActivityIcon(item: PortalActivityRow) {
-  const className = "h-3.5 w-3.5 text-muted-foreground";
-  if (item.type.startsWith("contract."))  return <FileText className={className} />;
-  if (item.type.startsWith("invoice."))   return <Receipt className={className} />;
-  if (item.type.startsWith("message."))   return <MessageSquare className={className} />;
-  if (item.type.startsWith("file."))      return <Paperclip className={className} />;
-  if (item.type.startsWith("update."))    return <MessageSquare className={className} />;
-  if (item.type.startsWith("meeting."))   return <Receipt className={className} />;
-  if (item.type.startsWith("portal.member")) return <UserPlus className={className} />;
-  if (item.type.startsWith("portal."))    return <ShieldCheck className={className} />;
-  return <Sparkles className={className} />;
-}
-
 function parsePayload(payload: PortalActivityRow["payload"]): Record<string, unknown> {
-  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
-    return {};
-  }
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return {};
   return payload as Record<string, unknown>;
 }
