@@ -4,10 +4,10 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import {
   Video, Plus, Loader2, CheckCircle2, XCircle,
-  Clock, CalendarDays, Link2, ExternalLink, ChevronDown, ChevronUp,
+  CalendarDays, Link2, ExternalLink, ChevronDown, ChevronUp,
+  Clock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -41,49 +41,65 @@ interface MeetingsSectionProps {
 }
 
 // ---------------------------------------------------------------------------
-// Status badge helpers
+// Status config
 // ---------------------------------------------------------------------------
 
-const STATUS_LABELS: Record<PortalMeetingStatus, string> = {
-  pending:   "Pending",
-  accepted:  "Confirmed",
-  declined:  "Declined",
-  completed: "Completed",
-  cancelled: "Cancelled",
+const STATUS_CONFIG: Record<
+  PortalMeetingStatus,
+  { label: string; dot: string; badge: string }
+> = {
+  pending:   {
+    label: "Awaiting confirmation",
+    dot:   "bg-amber-500",
+    badge: "bg-amber-500/10 text-amber-700 dark:text-amber-400",
+  },
+  accepted:  {
+    label: "Confirmed",
+    dot:   "bg-emerald-500",
+    badge: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+  },
+  declined:  {
+    label: "Declined",
+    dot:   "bg-red-500",
+    badge: "bg-red-500/10 text-red-700 dark:text-red-400",
+  },
+  completed: {
+    label: "Completed",
+    dot:   "bg-sky-500",
+    badge: "bg-sky-500/10 text-sky-700 dark:text-sky-400",
+  },
+  cancelled: {
+    label: "Cancelled",
+    dot:   "bg-muted-foreground/40",
+    badge: "bg-muted text-muted-foreground",
+  },
 };
 
-const STATUS_CLASSES: Record<PortalMeetingStatus, string> = {
-  pending:   "bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30",
-  accepted:  "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30",
-  declined:  "bg-red-500/15 text-red-700 dark:text-red-400 border-red-500/30",
-  completed: "bg-sky-500/15 text-sky-700 dark:text-sky-400 border-sky-500/30",
-  cancelled: "bg-muted text-muted-foreground border-border",
-};
-
-function StatusBadge({ status }: { status: PortalMeetingStatus }) {
+function StatusPill({ status }: { status: PortalMeetingStatus }) {
+  const cfg = STATUS_CONFIG[status];
   return (
-    <span
-      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold ${STATUS_CLASSES[status]}`}
-    >
-      {STATUS_LABELS[status]}
+    <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-semibold ${cfg.badge}`}>
+      <span className={`h-1.5 w-1.5 rounded-full ${cfg.dot}`} aria-hidden />
+      {cfg.label}
     </span>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Relative timestamp
+// Relative time helper
 // ---------------------------------------------------------------------------
 
 function relativeTime(iso: string): string {
-  const diffMs = Date.now() - Date.parse(iso);
+  const diffMs   = Date.now() - Date.parse(iso);
   const diffMins = Math.floor(diffMs / 60_000);
   if (diffMins < 1)   return "just now";
   if (diffMins < 60)  return `${diffMins}m ago`;
   const diffHrs = Math.floor(diffMins / 60);
   if (diffHrs < 24)   return `${diffHrs}h ago`;
   const diffDays = Math.floor(diffHrs / 24);
+  if (diffDays === 1) return "yesterday";
   if (diffDays < 7)   return `${diffDays}d ago`;
-  return new Date(iso).toLocaleDateString();
+  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
 // ---------------------------------------------------------------------------
@@ -91,10 +107,7 @@ function relativeTime(iso: string): string {
 // ---------------------------------------------------------------------------
 
 function MeetingCard({
-  meeting,
-  isOwner,
-  currentUserId,
-  portalId,
+  meeting, isOwner, currentUserId, portalId,
 }: {
   meeting: MeetingWithData;
   isOwner: boolean;
@@ -109,7 +122,9 @@ function MeetingCard({
   const [error, setError] = React.useState<string | null>(null);
 
   const isRequester = meeting.requested_by === currentUserId;
-  const isActive = meeting.status === "pending" || meeting.status === "accepted";
+  const isActive    = meeting.status === "pending" || meeting.status === "accepted";
+  const isConfirmed = meeting.status === "accepted";
+  const isDimmed    = meeting.status === "declined" || meeting.status === "cancelled";
   const requesterName =
     meeting.requester?.full_name ?? meeting.requester?.email ?? "Someone";
 
@@ -118,13 +133,12 @@ function MeetingCard({
     setPending(true);
     setError(null);
     const res = await acceptPortalMeetingAction({
-      portalId,
-      meetingId: meeting.id,
+      portalId, meetingId: meeting.id,
       meetLink: meetLink.trim() || undefined,
       proposedTime: proposedTime.trim() || undefined,
     });
     setPending(false);
-    if (!res.ok) { setError(res.error ?? "Could not accept."); return; }
+    if (!res.ok) { setError(res.error ?? "Could not confirm."); return; }
     setAcceptOpen(false);
     router.refresh();
   }
@@ -153,153 +167,176 @@ function MeetingCard({
     router.refresh();
   }
 
-  const isDimmed = meeting.status === "declined" || meeting.status === "cancelled";
-
   return (
-    <li className={`rounded-lg border p-3 sm:p-4 transition-opacity ${isDimmed ? "opacity-60" : ""}`}>
-      {/* Header row */}
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <StatusBadge status={meeting.status as PortalMeetingStatus} />
+    <li
+      className={`overflow-hidden rounded-lg border bg-card transition-opacity ${isDimmed ? "opacity-55" : ""}`}
+    >
+      {/* Coloured top stripe for confirmed meetings */}
+      {isConfirmed && (
+        <div className="h-0.5 w-full bg-emerald-500" />
+      )}
+      {meeting.status === "pending" && (
+        <div className="h-0.5 w-full bg-amber-500" />
+      )}
+
+      <div className="p-4 space-y-3">
+        {/* Topic + status */}
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="min-w-0 flex-1 space-y-1">
             <p className="text-sm font-semibold leading-snug">{meeting.topic}</p>
+            <div className="flex flex-wrap items-center gap-2">
+              <StatusPill status={meeting.status as PortalMeetingStatus} />
+              <span className="text-[11px] text-muted-foreground">
+                by{" "}
+                <span className="font-medium text-foreground">{requesterName}</span>
+                {" · "}
+                {relativeTime(meeting.created_at)}
+              </span>
+            </div>
           </div>
-          <p className="mt-0.5 text-[11px] text-muted-foreground">
-            Requested by{" "}
-            <span className="font-medium text-foreground">{requesterName}</span>
-            {" · "}
-            {relativeTime(meeting.created_at)}
-          </p>
-        </div>
 
-        {/* Join button — shown when accepted and a meet link exists */}
-        {meeting.status === "accepted" && meeting.meet_link && (
-          <Button asChild size="sm" className="h-8 shrink-0 gap-1.5">
-            <a href={meeting.meet_link} target="_blank" rel="noreferrer">
-              <Video className="h-3.5 w-3.5" />
-              Join meeting
-              <ExternalLink className="h-3 w-3" />
-            </a>
-          </Button>
-        )}
-      </div>
-
-      {/* Details */}
-      {(meeting.proposed_time || meeting.meet_link || meeting.notes) && (
-        <div className="mt-2 space-y-1">
-          {meeting.proposed_time && (
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <CalendarDays className="h-3.5 w-3.5 shrink-0" />
-              <span>{meeting.proposed_time}</span>
-            </div>
-          )}
-          {meeting.meet_link && (
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <Link2 className="h-3.5 w-3.5 shrink-0" />
-              <a
-                href={meeting.meet_link}
-                target="_blank"
-                rel="noreferrer"
-                className="truncate hover:underline"
-              >
-                {meeting.meet_link}
+          {/* Primary CTA — Join button when confirmed */}
+          {isConfirmed && meeting.meet_link && (
+            <Button
+              asChild
+              size="sm"
+              className="h-8 shrink-0 bg-emerald-600 text-white hover:bg-emerald-700"
+            >
+              <a href={meeting.meet_link} target="_blank" rel="noreferrer">
+                <Video className="h-3.5 w-3.5" />
+                Join
+                <ExternalLink className="h-3 w-3" />
               </a>
-            </div>
-          )}
-          {meeting.notes && (
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              {meeting.notes}
-            </p>
+            </Button>
           )}
         </div>
-      )}
 
-      {/* Error feedback */}
-      {error && (
-        <p className="mt-2 rounded-md bg-destructive/10 px-2 py-1 text-xs text-destructive">
-          {error}
-        </p>
-      )}
+        {/* Meeting details: time + link + notes */}
+        {(meeting.proposed_time || meeting.meet_link || meeting.notes) && (
+          <div className="space-y-1.5 rounded-md bg-muted/40 px-3 py-2.5">
+            {meeting.proposed_time && (
+              <div className="flex items-center gap-2 text-xs">
+                <CalendarDays className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                <span className="font-medium">{meeting.proposed_time}</span>
+              </div>
+            )}
+            {meeting.meet_link && (
+              <div className="flex items-center gap-2 text-xs">
+                <Link2 className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                <a
+                  href={meeting.meet_link}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="truncate text-primary hover:underline"
+                >
+                  {meeting.meet_link}
+                </a>
+              </div>
+            )}
+            {meeting.notes && (
+              <p className="text-[11px] leading-relaxed text-muted-foreground">
+                {meeting.notes}
+              </p>
+            )}
+          </div>
+        )}
 
-      {/* Action row */}
-      {isActive && (
-        <div className="mt-3 flex flex-wrap gap-2">
-          {/* Owner: accept / decline */}
-          {isOwner && meeting.status === "pending" && (
-            <>
+        {/* Error */}
+        {error && (
+          <p className="rounded-md bg-destructive/10 px-2 py-1.5 text-xs text-destructive">
+            {error}
+          </p>
+        )}
+
+        {/* Actions */}
+        {isActive && (
+          <div className="flex flex-wrap gap-2 pt-1">
+            {/* Owner: Accept */}
+            {isOwner && meeting.status === "pending" && (
               <Button
                 size="sm"
-                variant="default"
                 className="h-8"
                 onClick={() => { setError(null); setAcceptOpen(true); }}
                 disabled={pending}
               >
                 <CheckCircle2 className="h-3.5 w-3.5" />
-                Accept
+                Confirm
               </Button>
+            )}
+            {/* Owner: Decline */}
+            {isOwner && meeting.status === "pending" && (
               <Button
                 size="sm"
                 variant="outline"
-                className="h-8 text-destructive hover:text-destructive"
+                className="h-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
                 onClick={handleDecline}
                 disabled={pending}
               >
-                {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <XCircle className="h-3.5 w-3.5" />}
+                {pending ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <XCircle className="h-3.5 w-3.5" />
+                )}
                 Decline
               </Button>
-            </>
-          )}
+            )}
+            {/* Owner: Mark completed */}
+            {isOwner && meeting.status === "accepted" && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-8"
+                onClick={handleComplete}
+                disabled={pending}
+              >
+                {pending ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                )}
+                Mark completed
+              </Button>
+            )}
+            {/* Requester or owner: Cancel */}
+            {(isRequester || isOwner) && (
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-8 text-muted-foreground"
+                onClick={handleCancel}
+                disabled={pending}
+              >
+                {pending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                Cancel
+              </Button>
+            )}
+          </div>
+        )}
+      </div>
 
-          {/* Owner: mark complete when accepted */}
-          {isOwner && meeting.status === "accepted" && (
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-8"
-              onClick={handleComplete}
-              disabled={pending}
-            >
-              {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
-              Mark completed
-            </Button>
-          )}
-
-          {/* Requester or owner: cancel */}
-          {(isRequester || isOwner) && (
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-8 text-muted-foreground"
-              onClick={handleCancel}
-              disabled={pending}
-            >
-              {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-              Cancel
-            </Button>
-          )}
-        </div>
-      )}
-
-      {/* Accept dialog */}
-      <Dialog open={acceptOpen} onOpenChange={(next) => { setAcceptOpen(next); if (!next) setError(null); }}>
+      {/* Accept / confirm dialog */}
+      <Dialog
+        open={acceptOpen}
+        onOpenChange={(next) => { setAcceptOpen(next); if (!next) setError(null); }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Confirm meeting</DialogTitle>
             <DialogDescription>
-              Optionally update the time and add a Google Meet link before confirming.
+              Set a time and add a Google Meet link before confirming.
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleAccept} className="space-y-3">
-            <div className="space-y-1">
+          <form onSubmit={handleAccept} className="space-y-4">
+            <div className="space-y-1.5">
               <Label htmlFor="accept-time" className="text-xs">Confirmed time</Label>
               <Input
                 id="accept-time"
-                placeholder="e.g. Friday 3pm IST"
+                placeholder="e.g. Friday 10 Jan, 3pm IST"
                 value={proposedTime}
                 onChange={(e) => setProposedTime(e.target.value)}
               />
             </div>
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               <Label htmlFor="accept-link" className="text-xs">Google Meet link</Label>
               <Input
                 id="accept-link"
@@ -318,10 +355,17 @@ function MeetingCard({
               </a>
             </div>
             {error && (
-              <p className="rounded-md bg-destructive/10 p-2 text-xs text-destructive">{error}</p>
+              <p className="rounded-md bg-destructive/10 p-2 text-xs text-destructive">
+                {error}
+              </p>
             )}
             <DialogFooter>
-              <Button type="button" variant="ghost" onClick={() => setAcceptOpen(false)} disabled={pending}>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setAcceptOpen(false)}
+                disabled={pending}
+              >
                 Cancel
               </Button>
               <Button type="submit" disabled={pending}>
@@ -339,11 +383,7 @@ function MeetingCard({
 // Request meeting dialog
 // ---------------------------------------------------------------------------
 
-function RequestMeetingDialog({
-  portalId,
-}: {
-  portalId: string;
-}) {
+function RequestMeetingDialog({ portalId }: { portalId: string }) {
   const router = useRouter();
   const [open, setOpen] = React.useState(false);
   const [topic, setTopic] = React.useState("");
@@ -378,44 +418,56 @@ function RequestMeetingDialog({
 
   return (
     <>
-      <Button size="sm" variant="outline" onClick={() => { reset(); setOpen(true); }}>
+      <Button
+        size="sm"
+        variant="outline"
+        className="h-8"
+        onClick={() => { reset(); setOpen(true); }}
+      >
         <Plus className="h-3.5 w-3.5" />
         Request meeting
       </Button>
+
       <Dialog open={open} onOpenChange={(next) => { setOpen(next); if (!next) setError(null); }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Request a meeting</DialogTitle>
             <DialogDescription>
-              Propose a topic and time. The other party will confirm or suggest a new time.
+              Propose a topic and time. The other party will confirm or suggest a change.
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-3">
-            <div className="space-y-1">
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-1.5">
               <Label htmlFor="req-topic" className="text-xs">
                 Topic <span className="text-destructive">*</span>
               </Label>
               <Input
                 id="req-topic"
-                placeholder="Project review, deliverable feedback…"
+                placeholder="Design review, project kickoff…"
                 value={topic}
                 onChange={(e) => setTopic(e.target.value)}
                 maxLength={200}
                 required
               />
             </div>
-            <div className="space-y-1">
-              <Label htmlFor="req-time" className="text-xs">Proposed time (optional)</Label>
+            <div className="space-y-1.5">
+              <Label htmlFor="req-time" className="text-xs">
+                Proposed time{" "}
+                <span className="font-normal text-muted-foreground">(optional)</span>
+              </Label>
               <Input
                 id="req-time"
-                placeholder="e.g. Monday 2pm IST or March 10th 4pm"
+                placeholder="e.g. Monday 2pm IST or 10 Jan at 4pm"
                 value={time}
                 onChange={(e) => setTime(e.target.value)}
                 maxLength={200}
               />
             </div>
-            <div className="space-y-1">
-              <Label htmlFor="req-link" className="text-xs">Google Meet link (optional)</Label>
+            <div className="space-y-1.5">
+              <Label htmlFor="req-link" className="text-xs">
+                Google Meet link{" "}
+                <span className="font-normal text-muted-foreground">(optional)</span>
+              </Label>
               <Input
                 id="req-link"
                 placeholder="https://meet.google.com/xxx-xxxx-xxx"
@@ -433,11 +485,14 @@ function RequestMeetingDialog({
                 Create a new Google Meet
               </a>
             </div>
-            <div className="space-y-1">
-              <Label htmlFor="req-notes" className="text-xs">Notes (optional)</Label>
+            <div className="space-y-1.5">
+              <Label htmlFor="req-notes" className="text-xs">
+                Notes{" "}
+                <span className="font-normal text-muted-foreground">(optional)</span>
+              </Label>
               <Textarea
                 id="req-notes"
-                placeholder="What should we cover? Any agenda items?"
+                placeholder="Agenda items, questions to cover…"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 rows={3}
@@ -445,7 +500,9 @@ function RequestMeetingDialog({
               />
             </div>
             {error && (
-              <p className="rounded-md bg-destructive/10 p-2 text-xs text-destructive">{error}</p>
+              <p className="rounded-md bg-destructive/10 p-2 text-xs text-destructive">
+                {error}
+              </p>
             )}
             <DialogFooter>
               <Button type="button" variant="ghost" onClick={() => setOpen(false)} disabled={pending}>
@@ -467,45 +524,68 @@ function RequestMeetingDialog({
 // ---------------------------------------------------------------------------
 
 export function MeetingsSection({
-  portalId,
-  meetings,
-  isOwner,
-  currentUserId,
+  portalId, meetings, isOwner, currentUserId,
 }: MeetingsSectionProps) {
   const [showHistory, setShowHistory] = React.useState(false);
 
-  // Split into active (pending / accepted) and history (declined / completed / cancelled)
-  const active = meetings.filter(
-    (m) => m.status === "pending" || m.status === "accepted",
-  );
+  const active  = meetings.filter((m) => m.status === "pending" || m.status === "accepted");
   const history = meetings.filter(
     (m) => m.status === "declined" || m.status === "completed" || m.status === "cancelled",
   );
 
+  // Next confirmed meeting (for the quick glance pill)
+  const nextMeeting = active.find((m) => m.status === "accepted") ?? active[0];
+
   return (
-    <Card id="portal-meetings" className="scroll-mt-20">
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-        <CardTitle className="flex items-center gap-2 text-base">
-          <Video className="h-4 w-4" /> Meetings
+    <Card id="portal-meetings" className="scroll-mt-24">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+        <CardTitle className="flex items-center gap-2 text-sm font-semibold">
+          <Video className="h-4 w-4 text-muted-foreground" />
+          Meetings
           {active.length > 0 && (
-            <span className="ml-1 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
+            <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
               {active.length}
             </span>
           )}
         </CardTitle>
         <RequestMeetingDialog portalId={portalId} />
       </CardHeader>
+
       <CardContent className="space-y-3">
+        {/* Quick-glance strip for the next confirmed meeting */}
+        {nextMeeting?.status === "accepted" && nextMeeting.proposed_time && (
+          <div className="flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/5 px-3 py-2">
+            <CalendarDays className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+            <div className="min-w-0">
+              <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">
+                Next: {nextMeeting.proposed_time}
+              </p>
+              <p className="text-[11px] text-muted-foreground">{nextMeeting.topic}</p>
+            </div>
+            {nextMeeting.meet_link && (
+              <Button asChild size="sm" className="ml-auto h-7 shrink-0 bg-emerald-600 text-white hover:bg-emerald-700">
+                <a href={nextMeeting.meet_link} target="_blank" rel="noreferrer">
+                  <Video className="h-3 w-3" />
+                  Join
+                </a>
+              </Button>
+            )}
+          </div>
+        )}
+
         {/* Active meetings */}
         {active.length === 0 ? (
-          <p className="rounded-md border border-dashed p-6 text-center text-xs text-muted-foreground">
-            No upcoming meetings.{" "}
-            {isOwner
-              ? "Request one or wait for your client to propose a time."
-              : "Request a meeting to get started."}
-          </p>
+          <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed px-4 py-8 text-center">
+            <Video className="h-7 w-7 text-muted-foreground/30" />
+            <p className="text-sm text-muted-foreground">No upcoming meetings.</p>
+            <p className="text-xs text-muted-foreground/70">
+              {isOwner
+                ? "Request a meeting or wait for your client to propose a time."
+                : "Use the button above to request a meeting."}
+            </p>
+          </div>
         ) : (
-          <ul className="space-y-2">
+          <ul className="space-y-2.5">
             {active.map((m) => (
               <MeetingCard
                 key={m.id}
@@ -518,12 +598,12 @@ export function MeetingsSection({
           </ul>
         )}
 
-        {/* History toggle */}
+        {/* History */}
         {history.length > 0 && (
           <div>
             <button
               type="button"
-              className="flex w-full items-center gap-1.5 py-1 text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors"
+              className="flex w-full items-center gap-1.5 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:text-foreground"
               onClick={() => setShowHistory((v) => !v)}
             >
               {showHistory ? (
@@ -531,10 +611,10 @@ export function MeetingsSection({
               ) : (
                 <ChevronDown className="h-3.5 w-3.5" />
               )}
-              {showHistory ? "Hide" : "Show"} history ({history.length})
+              {showHistory ? "Hide" : "Show"} past meetings ({history.length})
             </button>
             {showHistory && (
-              <ul className="mt-2 space-y-2">
+              <ul className="mt-2.5 space-y-2.5">
                 {history.map((m) => (
                   <MeetingCard
                     key={m.id}

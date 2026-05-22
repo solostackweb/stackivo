@@ -5,9 +5,9 @@ import { useRouter } from "next/navigation";
 import {
   Plus, Loader2, Trash2, CheckCircle2, MessageSquare,
   XCircle, ThumbsUp, RotateCcw, ChevronDown, ChevronUp,
+  TrendingUp,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -53,7 +53,7 @@ interface UpdatesSectionProps {
 }
 
 // ---------------------------------------------------------------------------
-// Label maps
+// Label / color maps
 // ---------------------------------------------------------------------------
 
 const UPDATE_TYPE_LABELS: Record<PortalUpdateType, string> = {
@@ -66,14 +66,25 @@ const UPDATE_TYPE_LABELS: Record<PortalUpdateType, string> = {
   general:     "Update",
 };
 
-const UPDATE_TYPE_COLORS: Record<PortalUpdateType, string> = {
-  progress:    "bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/20",
-  deliverable: "bg-violet-500/10 text-violet-700 dark:text-violet-400 border-violet-500/20",
-  revision:    "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20",
-  payment:     "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20",
-  milestone:   "bg-orange-500/10 text-orange-700 dark:text-orange-400 border-orange-500/20",
-  meeting:     "bg-sky-500/10 text-sky-700 dark:text-sky-400 border-sky-500/20",
-  general:     "bg-muted text-muted-foreground border-border",
+// Left-border accent colour per update type — the visual differentiator
+const UPDATE_TYPE_BORDER: Record<PortalUpdateType, string> = {
+  progress:    "border-l-blue-500",
+  deliverable: "border-l-violet-500",
+  revision:    "border-l-amber-500",
+  payment:     "border-l-emerald-500",
+  milestone:   "border-l-orange-500",
+  meeting:     "border-l-sky-500",
+  general:     "border-l-border",
+};
+
+const UPDATE_TYPE_BADGE: Record<PortalUpdateType, string> = {
+  progress:    "bg-blue-500/10 text-blue-700 dark:text-blue-400",
+  deliverable: "bg-violet-500/10 text-violet-700 dark:text-violet-400",
+  revision:    "bg-amber-500/10 text-amber-700 dark:text-amber-400",
+  payment:     "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+  milestone:   "bg-orange-500/10 text-orange-700 dark:text-orange-400",
+  meeting:     "bg-sky-500/10 text-sky-700 dark:text-sky-400",
+  general:     "bg-muted text-muted-foreground",
 };
 
 const APPROVAL_LABELS: Record<PortalUpdateApprovalStatus, string> = {
@@ -84,12 +95,12 @@ const APPROVAL_LABELS: Record<PortalUpdateApprovalStatus, string> = {
   revision_requested:  "Revision requested",
 };
 
-const APPROVAL_COLORS: Record<PortalUpdateApprovalStatus, string> = {
+const APPROVAL_BADGE: Record<PortalUpdateApprovalStatus, string> = {
   none:               "",
-  submitted:          "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20",
-  under_review:       "bg-sky-500/10 text-sky-700 dark:text-sky-400 border-sky-500/20",
-  approved:           "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20",
-  revision_requested: "bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/20",
+  submitted:          "bg-amber-500/10 text-amber-700 dark:text-amber-400",
+  under_review:       "bg-sky-500/10 text-sky-700 dark:text-sky-400",
+  approved:           "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+  revision_requested: "bg-rose-500/10 text-rose-700 dark:text-rose-400",
 };
 
 // ---------------------------------------------------------------------------
@@ -102,36 +113,47 @@ export function UpdatesSection({
   const [createOpen, setCreateOpen] = React.useState(false);
   const [showAll, setShowAll] = React.useState(false);
 
-  // Show 5 most recent, collapse the rest
   const visible = showAll ? updates : updates.slice(0, 5);
   const hasMore = updates.length > 5;
 
   return (
-    <Card id="portal-updates" className="scroll-mt-20">
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-        <CardTitle className="flex items-center gap-2 text-base">
-          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary/10 text-[10px] font-bold text-primary">
-            {updates.length > 0 ? updates.length : "·"}
-          </span>
+    <Card id="portal-updates" className="scroll-mt-24">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+        <CardTitle className="flex items-center gap-2 text-sm font-semibold">
+          <TrendingUp className="h-4 w-4 text-muted-foreground" />
           Updates
+          {updates.length > 0 && (
+            <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
+              {updates.length}
+            </span>
+          )}
         </CardTitle>
         {isOwner && (
-          <Button size="sm" variant="outline" onClick={() => setCreateOpen(true)}>
-            <Plus className="h-3.5 w-3.5" /> Post update
+          <Button size="sm" variant="outline" className="h-8" onClick={() => setCreateOpen(true)}>
+            <Plus className="h-3.5 w-3.5" />
+            Post update
           </Button>
         )}
       </CardHeader>
 
       <CardContent className="space-y-3">
         {updates.length === 0 ? (
-          <p className="rounded-md border border-dashed p-6 text-center text-xs text-muted-foreground">
-            {isOwner
-              ? "Post updates to keep your client informed — progress, deliverables, milestones."
-              : "No updates yet. Check back soon."}
-          </p>
+          <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed px-4 py-8 text-center">
+            <TrendingUp className="h-7 w-7 text-muted-foreground/30" />
+            <p className="text-sm text-muted-foreground">
+              {isOwner
+                ? "Post updates to keep your client informed."
+                : "No updates yet — check back soon."}
+            </p>
+            {isOwner && (
+              <p className="text-xs text-muted-foreground/70">
+                Share progress, milestones, deliverables, and revision notes here.
+              </p>
+            )}
+          </div>
         ) : (
           <>
-            <ul className="space-y-3">
+            <ul className="space-y-2.5">
               {visible.map((update) => (
                 <UpdateCard
                   key={update.id}
@@ -143,18 +165,17 @@ export function UpdatesSection({
               ))}
             </ul>
             {hasMore && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="w-full text-xs text-muted-foreground"
+              <button
+                type="button"
+                className="flex w-full items-center justify-center gap-1.5 py-1 text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors"
                 onClick={() => setShowAll((v) => !v)}
               >
                 {showAll ? (
-                  <><ChevronUp className="h-3 w-3" /> Show less</>
+                  <><ChevronUp className="h-3.5 w-3.5" /> Show less</>
                 ) : (
-                  <><ChevronDown className="h-3 w-3" /> Show {updates.length - 5} older updates</>
+                  <><ChevronDown className="h-3.5 w-3.5" /> Show {updates.length - 5} older updates</>
                 )}
-              </Button>
+              </button>
             )}
           </>
         )}
@@ -206,9 +227,7 @@ function UpdateCard({
   async function react(kind: "acknowledged" | "approved" | "revision_requested") {
     setPending(true);
     setError(null);
-    const res = await reactToPortalUpdateAction({
-      portalId, updateId: update.id, kind,
-    });
+    const res = await reactToPortalUpdateAction({ portalId, updateId: update.id, kind });
     setPending(false);
     if (!res.ok) { setError(res.error); return; }
     router.refresh();
@@ -240,34 +259,38 @@ function UpdateCard({
     router.refresh();
   }
 
+  const borderClass = UPDATE_TYPE_BORDER[update.update_type] ?? "border-l-border";
+
   return (
-    <li className="rounded-lg border bg-card p-4 space-y-3">
-      {/* Header row */}
+    <li className={`rounded-lg border border-l-4 bg-card p-4 space-y-3 ${borderClass}`}>
+      {/* Header row: badges + timestamp + delete */}
       <div className="flex items-start justify-between gap-2">
         <div className="flex flex-wrap items-center gap-1.5 min-w-0">
-          <span className={`inline-flex items-center rounded-md border px-1.5 py-0.5 text-[11px] font-medium ${UPDATE_TYPE_COLORS[update.update_type]}`}>
+          <span className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-semibold ${UPDATE_TYPE_BADGE[update.update_type]}`}>
             {UPDATE_TYPE_LABELS[update.update_type]}
           </span>
-          {update.approval_status !== "none" && (
-            <span className={`inline-flex items-center rounded-md border px-1.5 py-0.5 text-[11px] font-medium ${APPROVAL_COLORS[update.approval_status]}`}>
+          {update.approval_status !== "none" && APPROVAL_LABELS[update.approval_status] && (
+            <span className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-semibold ${APPROVAL_BADGE[update.approval_status]}`}>
               {APPROVAL_LABELS[update.approval_status]}
             </span>
           )}
         </div>
-        <div className="flex shrink-0 items-center gap-1">
-          <span className="text-[11px] text-muted-foreground whitespace-nowrap">
+        <div className="flex shrink-0 items-center gap-1.5">
+          <time
+            dateTime={update.created_at}
+            className="text-[11px] tabular-nums text-muted-foreground"
+          >
             {formatRelativeDate(update.created_at)}
-          </span>
+          </time>
           {isOwner && (
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
+            <button
+              type="button"
+              className="rounded p-0.5 text-muted-foreground/50 transition-colors hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive"
               onClick={handleDelete}
               aria-label="Delete update"
             >
               <Trash2 className="h-3.5 w-3.5" />
-            </Button>
+            </button>
           )}
         </div>
       </div>
@@ -281,24 +304,27 @@ function UpdateCard({
           </p>
         )}
         <p className="text-[11px] text-muted-foreground">
-          by {update.author?.full_name ?? update.author?.email ?? "Freelancer"}
+          by{" "}
+          <span className="font-medium text-foreground">
+            {update.author?.full_name ?? update.author?.email ?? "Freelancer"}
+          </span>
         </p>
       </div>
 
       {/* Error */}
       {error && (
-        <p className="rounded-md bg-destructive/10 px-2 py-1 text-xs text-destructive">
+        <p className="rounded-md bg-destructive/10 px-2 py-1.5 text-xs text-destructive">
           {error}
         </p>
       )}
 
-      {/* Comments */}
+      {/* Comments thread */}
       {comments.length > 0 && (
-        <ul className="space-y-1.5 border-t pt-2">
+        <ul className="space-y-1.5 border-t pt-3">
           {comments.map((c) => (
             <li key={c.id} className="flex gap-2 text-xs">
-              <span className="font-medium shrink-0">
-                {c.profile?.full_name ?? c.profile?.email ?? "User"}:
+              <span className="shrink-0 font-semibold text-foreground">
+                {c.profile?.full_name ?? c.profile?.email ?? "User"}
               </span>
               <span className="text-muted-foreground leading-relaxed">{c.body}</span>
             </li>
@@ -306,34 +332,38 @@ function UpdateCard({
         </ul>
       )}
 
-      {/* Actions */}
-      <div className="flex flex-wrap items-center gap-2 pt-1">
-        {/* Acknowledge (client only, not yet acknowledged) */}
+      {/* Action row */}
+      <div className="flex flex-wrap items-center gap-2">
+        {/* Acknowledge (client, not yet done) */}
         {!isOwner && !hasAcknowledged && update.approval_status !== "approved" && (
           <Button
             size="sm"
             variant="outline"
-            className="h-7 gap-1 text-xs"
+            className="h-7 gap-1.5 text-xs"
             disabled={pending}
             onClick={() => react("acknowledged")}
           >
-            {pending ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle2 className="h-3 w-3" />}
+            {pending ? (
+              <Loader2 className="h-3 w-3 animate-spin" />
+            ) : (
+              <CheckCircle2 className="h-3 w-3" />
+            )}
             Acknowledge
           </Button>
         )}
-        {!isOwner && hasAcknowledged && (
-          <span className="inline-flex items-center gap-1 text-[11px] text-emerald-600 dark:text-emerald-400">
+        {!isOwner && hasAcknowledged && update.approval_status !== "approved" && (
+          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
             <CheckCircle2 className="h-3 w-3" /> Acknowledged
           </span>
         )}
 
-        {/* Approve / Revision (deliverable-type, client only) */}
+        {/* Approve / Request revision (deliverable, client) */}
         {showApprovalActions && (
           <>
             <Button
               size="sm"
               variant="outline"
-              className="h-7 gap-1 text-xs border-emerald-500/40 text-emerald-700 hover:bg-emerald-500/10 dark:text-emerald-400"
+              className="h-7 gap-1.5 text-xs border-emerald-500/40 text-emerald-700 hover:bg-emerald-500/10 dark:text-emerald-400"
               disabled={pending || hasApproved}
               onClick={() => react("approved")}
             >
@@ -343,7 +373,7 @@ function UpdateCard({
             <Button
               size="sm"
               variant="outline"
-              className="h-7 gap-1 text-xs border-amber-500/40 text-amber-700 hover:bg-amber-500/10 dark:text-amber-400"
+              className="h-7 gap-1.5 text-xs border-amber-500/40 text-amber-700 hover:bg-amber-500/10 dark:text-amber-400"
               disabled={pending || hasRevisionRequested}
               onClick={() => react("revision_requested")}
             >
@@ -353,34 +383,34 @@ function UpdateCard({
           </>
         )}
         {!isOwner && hasApproved && (
-          <span className="inline-flex items-center gap-1 text-[11px] text-emerald-600 dark:text-emerald-400">
+          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
             <ThumbsUp className="h-3 w-3" /> Approved
           </span>
         )}
 
         {/* Comment */}
-        <Button
-          size="sm"
-          variant="ghost"
-          className="h-7 gap-1 text-xs text-muted-foreground"
+        <button
+          type="button"
+          className="inline-flex items-center gap-1 text-[11px] text-muted-foreground transition-colors hover:text-foreground"
           onClick={() => setCommentOpen((v) => !v)}
         >
           <MessageSquare className="h-3 w-3" />
-          {commentOpen ? "Cancel" : `Comment${comments.length > 0 ? ` (${comments.length})` : ""}`}
-        </Button>
+          {commentOpen ? "Cancel" : comments.length > 0 ? `${comments.length} comment${comments.length > 1 ? "s" : ""}` : "Comment"}
+        </button>
       </div>
 
       {/* Inline comment box */}
       {commentOpen && (
-        <form onSubmit={submitComment} className="space-y-2 border-t pt-2">
+        <form onSubmit={submitComment} className="space-y-2 border-t pt-3">
           <Textarea
-            placeholder="Add a comment or clarification..."
+            placeholder="Add a comment or clarification…"
             value={commentBody}
             onChange={(e) => setCommentBody(e.target.value)}
             rows={2}
             maxLength={4000}
             required
             className="text-xs"
+            aria-label="Comment"
           />
           <div className="flex justify-end gap-2">
             <Button
@@ -426,10 +456,7 @@ function CreateUpdateDialog({
   const [error, setError] = React.useState<string | null>(null);
 
   function reset() {
-    setType("progress");
-    setTitle("");
-    setBody("");
-    setError(null);
+    setType("progress"); setTitle(""); setBody(""); setError(null);
   }
 
   async function onSubmit(e: React.FormEvent) {
@@ -437,14 +464,12 @@ function CreateUpdateDialog({
     if (pending || !title.trim()) return;
     setPending(true);
     setError(null);
-
     const res = await createPortalUpdateAction({
       portalId,
       updateType: type,
       title: title.trim(),
       body: body.trim() || undefined,
     });
-
     setPending(false);
     if (!res.ok) { setError(res.error); return; }
     reset();
@@ -458,29 +483,31 @@ function CreateUpdateDialog({
         <DialogHeader>
           <DialogTitle>Post an update</DialogTitle>
           <DialogDescription>
-            Keep your client informed with structured updates.
+            Keep your client informed with structured, typed updates.
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={onSubmit} className="space-y-3">
-          <div className="space-y-1">
-            <Label className="text-xs">Type</Label>
+        <form onSubmit={onSubmit} className="space-y-4">
+          <div className="space-y-1.5">
+            <Label className="text-xs">Update type</Label>
             <Select value={type} onValueChange={(v) => setType(v as PortalUpdateType)}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="progress">Progress update</SelectItem>
-                <SelectItem value="deliverable">Deliverable shared</SelectItem>
-                <SelectItem value="revision">Revision update</SelectItem>
-                <SelectItem value="milestone">Milestone reached</SelectItem>
-                <SelectItem value="payment">Payment update</SelectItem>
-                <SelectItem value="meeting">Meeting summary</SelectItem>
-                <SelectItem value="general">General update</SelectItem>
+                <SelectItem value="progress">🔵 Progress update</SelectItem>
+                <SelectItem value="deliverable">🟣 Deliverable shared</SelectItem>
+                <SelectItem value="revision">🟡 Revision update</SelectItem>
+                <SelectItem value="milestone">🟠 Milestone reached</SelectItem>
+                <SelectItem value="payment">🟢 Payment update</SelectItem>
+                <SelectItem value="meeting">🔷 Meeting summary</SelectItem>
+                <SelectItem value="general">⬜ General update</SelectItem>
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-1">
-            <Label htmlFor="update-title" className="text-xs">Title</Label>
+          <div className="space-y-1.5">
+            <Label htmlFor="update-title" className="text-xs">
+              Title <span className="text-destructive">*</span>
+            </Label>
             <Input
               id="update-title"
               placeholder="e.g. Homepage design completed"
@@ -490,11 +517,11 @@ function CreateUpdateDialog({
               required
             />
           </div>
-          <div className="space-y-1">
+          <div className="space-y-1.5">
             <Label htmlFor="update-body" className="text-xs">Details (optional)</Label>
             <Textarea
               id="update-body"
-              placeholder="Add context, links, or notes for your client..."
+              placeholder="Add context, links, or notes for your client…"
               value={body}
               onChange={(e) => setBody(e.target.value)}
               rows={4}
@@ -502,9 +529,7 @@ function CreateUpdateDialog({
             />
           </div>
           {error && (
-            <p className="rounded-md bg-destructive/10 p-2 text-xs text-destructive">
-              {error}
-            </p>
+            <p className="rounded-md bg-destructive/10 p-2 text-xs text-destructive">{error}</p>
           )}
           <DialogFooter>
             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={pending}>
@@ -525,13 +550,14 @@ function CreateUpdateDialog({
 // ---------------------------------------------------------------------------
 
 function formatRelativeDate(iso: string): string {
-  const diff = Date.now() - Date.parse(iso);
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
+  const diff  = Date.now() - Date.parse(iso);
+  const mins  = Math.floor(diff / 60_000);
+  if (mins < 1)   return "just now";
+  if (mins < 60)  return `${mins}m ago`;
   const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
+  if (hrs < 24)   return `${hrs}h ago`;
   const days = Math.floor(hrs / 24);
-  if (days < 7) return `${days}d ago`;
-  return new Date(iso).toLocaleDateString();
+  if (days === 1) return "yesterday";
+  if (days < 7)   return `${days}d ago`;
+  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
