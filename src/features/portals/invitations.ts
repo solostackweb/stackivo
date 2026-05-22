@@ -266,13 +266,25 @@ export async function getPortalEmailAccessContext(email: string): Promise<{
 export async function activatePendingPortalInvitesForCurrentUser(
   email: string,
 ): Promise<ActionResult<{ portalIds: string[] }>> {
-  const normalised = normalisePortalEmail(email);
   const supabase = await getServerSupabase();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Please request a fresh code." };
-  if ((user.email ?? "").toLowerCase() !== normalised) {
+  return activatePortalAccessForUser({
+    email,
+    userId: user.id,
+    userEmail: user.email ?? null,
+  });
+}
+
+export async function activatePortalAccessForUser(input: {
+  email: string;
+  userId: string;
+  userEmail: string | null;
+}): Promise<ActionResult<{ portalIds: string[] }>> {
+  const normalised = normalisePortalEmail(input.email);
+  if ((input.userEmail ?? "").toLowerCase() !== normalised) {
     return {
       ok: false,
       error: "This code was verified for a different email address.",
@@ -285,7 +297,7 @@ export async function activatePendingPortalInvitesForCurrentUser(
   const { data: currentMemberships } = await admin
     .from("portal_members")
     .select("portal_id")
-    .eq("user_id", user.id)
+    .eq("user_id", input.userId)
     .is("revoked_at", null);
   for (const row of (currentMemberships ?? []) as Array<{ portal_id: string }>) {
     portalIds.add(row.portal_id);
@@ -314,13 +326,14 @@ export async function activatePendingPortalInvitesForCurrentUser(
       data: Array<{ user_id: string }> | null;
     };
     const hasDifferentClient =
-      existingMemberRows?.some((member) => member.user_id !== user.id) ?? false;
+      existingMemberRows?.some((member) => member.user_id !== input.userId) ??
+      false;
     if (hasDifferentClient) continue;
 
     await admin.from("portal_members").upsert(
       {
         portal_id: inv.portal_id,
-        user_id: user.id,
+        user_id: input.userId,
         role: "client",
         joined_at: new Date().toISOString(),
         revoked_at: null,
@@ -332,15 +345,15 @@ export async function activatePendingPortalInvitesForCurrentUser(
       .from("portal_invitations")
       .update({
         accepted_at: new Date().toISOString(),
-        accepted_by: user.id,
+        accepted_by: input.userId,
       } as never)
       .eq("id", inv.id);
 
     await recordPortalActivity({
       portalId: inv.portal_id,
-      actorId: user.id,
+      actorId: input.userId,
       type: "portal.member_joined",
-      payload: { email: user.email },
+      payload: { email: input.userEmail },
     });
 
     portalIds.add(inv.portal_id);
@@ -372,14 +385,14 @@ export async function activatePendingPortalInvitesForCurrentUser(
         data: Array<{ user_id: string }> | null;
       };
       const hasDifferentClient =
-        existingMemberRows?.some((member) => member.user_id !== user.id) ??
+        existingMemberRows?.some((member) => member.user_id !== input.userId) ??
         false;
       if (hasDifferentClient) continue;
 
       await admin.from("portal_members").upsert(
         {
           portal_id: portal.id,
-          user_id: user.id,
+          user_id: input.userId,
           role: "client",
           joined_at: new Date().toISOString(),
           revoked_at: null,

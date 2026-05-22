@@ -38,7 +38,7 @@ import {
   isClientPortalPath,
 } from "./routes";
 import {
-  activatePendingPortalInvitesForCurrentUser,
+  activatePortalAccessForUser,
   getPortalEmailAccessContext,
 } from "@/features/portals/invitations";
 import { portalClientHome } from "@/features/portals/routes";
@@ -522,7 +522,7 @@ export async function verifyPortalCodeAction(
   if (!gate.ok) return { ok: false, error: gate.message };
 
   const supabase = await getServerSupabase();
-  const { error } = await supabase.auth.verifyOtp({
+  const { data, error } = await supabase.auth.verifyOtp({
     email,
     token: parsed.data.code,
     type: "email",
@@ -540,7 +540,19 @@ export async function verifyPortalCodeAction(
     return { ok: false, error: "Invalid or expired code." };
   }
 
-  const activated = await activatePendingPortalInvitesForCurrentUser(email);
+  const verifiedUser = data.user;
+  if (!verifiedUser) {
+    return {
+      ok: false,
+      error: "We verified the code but could not open the portal. Try again.",
+    };
+  }
+
+  const activated = await activatePortalAccessForUser({
+    email,
+    userId: verifiedUser.id,
+    userEmail: verifiedUser.email ?? null,
+  });
   if (!activated.ok) {
     await supabase.auth.signOut();
     return {
