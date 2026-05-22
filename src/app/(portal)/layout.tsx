@@ -111,7 +111,7 @@ export default async function PortalLayout({
         </div>
       </header>
       <main
-        className="mx-auto w-full max-w-5xl flex-1 px-4 py-6 sm:px-6 sm:py-10"
+        className="mx-auto w-full max-w-5xl flex-1 px-4 py-6 sm:px-6 sm:py-10 motion-safe:animate-page-enter"
         style={{
           paddingBottom: "max(env(safe-area-inset-bottom, 0px), 2rem)",
         }}

@@ -11,6 +11,8 @@ import { UpdatePrompt } from "@/features/pwa/update-prompt";
 import { PostHogProvider } from "@/lib/analytics/posthog-provider";
 import { ClarityProvider } from "@/lib/analytics/clarity-provider";
 import { ConfirmDialogProvider } from "@/components/ui/confirm-dialog";
+import { RouteProgressBar } from "@/components/loading";
+import { PwaSplash } from "@/components/loading";
 
 export function AppProviders({ children }: { children: React.ReactNode }) {
   return (
@@ -23,6 +25,10 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
       <PostHogProvider>
         <TooltipProvider delayDuration={200}>
           <ConfirmDialogProvider>
+            {/* Premium route transition progress bar — fires on every navigation */}
+            <RouteProgressBar />
+            {/* PWA cold-start splash screen — standalone mode only */}
+            <PwaSplash />
             {children}
             <Toaster />
             <OfflineIndicator />
