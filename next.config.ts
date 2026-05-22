@@ -110,7 +110,13 @@ const nextConfig: NextConfig = {
  * next.config itself trivial for everyone else.
  */
 async function applySentry(config: NextConfig): Promise<NextConfig> {
-  if (!process.env.SENTRY_AUTH_TOKEN) return config;
+  if (
+    !process.env.SENTRY_AUTH_TOKEN ||
+    !process.env.SENTRY_ORG ||
+    !process.env.SENTRY_PROJECT
+  ) {
+    return config;
+  }
   try {
     const { withSentryConfig } = await import("@sentry/nextjs");
     return withSentryConfig(config, {
@@ -125,7 +131,11 @@ async function applySentry(config: NextConfig): Promise<NextConfig> {
       sourcemaps: {
         deleteSourcemapsAfterUpload: true,
       },
-      disableLogger: true,
+      webpack: {
+        treeshake: {
+          removeDebugLogging: true,
+        },
+      },
     });
   } catch {
     return config;
