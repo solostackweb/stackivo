@@ -311,6 +311,9 @@ export type DeliveryKind =
   | "welcome_document_acknowledged"
   | "portal_invite"
   | "portal_digest"
+  | "portal_update"
+  | "portal_meeting"
+  | "portal_file"
   | "custom";
 
 export type DeliveryChannel = "email" | "sms" | "inapp";

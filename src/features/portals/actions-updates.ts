@@ -15,6 +15,11 @@ import type {
   PortalUpdateApprovalStatus,
   PortalUpdateReactionKind,
 } from "@/lib/supabase/types";
+import {
+  dispatchPortalUpdatePostedComms,
+  dispatchPortalUpdateApprovedComms,
+  dispatchPortalRevisionRequestedComms,
+} from "./email";
 
 // =============================================================================
 // CREATE UPDATE
@@ -80,6 +85,16 @@ export async function createPortalUpdateAction(
       updateType: parsed.data.updateType,
       title: parsed.data.title,
     },
+  });
+
+  // Fire-and-forget comms (email + in-app notification for the client)
+  void dispatchPortalUpdatePostedComms({
+    portalId: parsed.data.portalId,
+    actorUserId: access.userId,
+    updateTitle: parsed.data.title,
+    updateType: parsed.data.updateType,
+    body: parsed.data.body ?? null,
+    idempotencyKey: `update_posted:${updateId}`,
   });
 
   revalidatePath(portalClientHome(parsed.data.portalId));
@@ -201,6 +216,37 @@ export async function reactToPortalUpdateAction(
     type: `update.${parsed.data.kind}`,
     payload: { updateId: parsed.data.updateId, kind: parsed.data.kind },
   });
+
+  // Fetch the update title for comms
+  if (parsed.data.kind === "approved" || parsed.data.kind === "revision_requested") {
+    const admin2 = getAdminSupabase();
+    const { data: updateRow } = await admin2
+      .from("portal_updates")
+      .select("title")
+      .eq("id", parsed.data.updateId)
+      .maybeSingle();
+    const updateTitle = (updateRow as { title: string } | null)?.title ?? "Update";
+
+    if (parsed.data.kind === "approved") {
+      void dispatchPortalUpdateApprovedComms({
+        portalId: parsed.data.portalId,
+        actorUserId: access.userId,
+        approverName: null, // resolved from profile in email.ts
+        updateTitle,
+        comment: parsed.data.body ?? null,
+        idempotencyKey: `update_approved:${reactionId}`,
+      });
+    } else {
+      void dispatchPortalRevisionRequestedComms({
+        portalId: parsed.data.portalId,
+        actorUserId: access.userId,
+        requesterName: null, // resolved from profile in email.ts
+        updateTitle,
+        comment: parsed.data.body ?? null,
+        idempotencyKey: `update_revision:${reactionId}`,
+      });
+    }
+  }
 
   revalidatePath(portalClientHome(parsed.data.portalId));
   revalidatePath(portalDashboardDetail(parsed.data.portalId));

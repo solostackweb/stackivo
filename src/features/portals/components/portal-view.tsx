@@ -170,12 +170,14 @@ export function PortalView(props: ViewProps) {
     <>
       <UpdatesSection
         portalId={props.portalId}
+        portalName={props.portalName}
         updates={props.updates}
         isOwner={isOwner}
         currentUserId={props.currentUserId}
       />
       <MeetingsSection
         portalId={props.portalId}
+        portalName={props.portalName}
         meetings={props.meetings}
         isOwner={isOwner}
         currentUserId={props.currentUserId}
@@ -216,12 +218,14 @@ export function PortalView(props: ViewProps) {
     <>
       <UpdatesSection
         portalId={props.portalId}
+        portalName={props.portalName}
         updates={props.updates}
         isOwner={isOwner}
         currentUserId={props.currentUserId}
       />
       <MeetingsSection
         portalId={props.portalId}
+        portalName={props.portalName}
         meetings={props.meetings}
         isOwner={isOwner}
         currentUserId={props.currentUserId}

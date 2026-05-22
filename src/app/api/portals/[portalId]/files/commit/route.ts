@@ -25,6 +25,7 @@ import {
   portalClientHome,
   portalDashboardDetail,
 } from "@/features/portals/routes";
+import { dispatchPortalFileUploadedComms } from "@/features/portals/email";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -137,6 +138,15 @@ export async function POST(
       name: parsed.data.filename,
       size: head.size,
     },
+  });
+
+  // Fire-and-forget comms (email + in-app notification for the client)
+  void dispatchPortalFileUploadedComms({
+    portalId,
+    actorUserId: access.userId,
+    fileName: parsed.data.filename,
+    fileCount: 1,
+    idempotencyKey: `file_uploaded:${parsed.data.fileId}`,
   });
 
   revalidatePath(portalClientHome(portalId));
