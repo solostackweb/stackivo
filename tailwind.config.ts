@@ -114,6 +114,32 @@ const config: Config = {
           from: { opacity: "0", transform: "scale(0.95)" },
           to: { opacity: "1", transform: "scale(1)" },
         },
+        // ── Brand loading system ────────────────────────────────────────────
+        // Calm pulse: the icon breathes — scale + opacity, never jarring.
+        "brand-breathe": {
+          "0%, 100%": { opacity: "1", transform: "scale(1)" },
+          "50%": { opacity: "0.7", transform: "scale(0.94)" },
+        },
+        // The two white bars slide in from left with stagger applied via delay
+        "bar-reveal": {
+          from: { opacity: "0", transform: "translateX(-6px)" },
+          to:   { opacity: "1", transform: "translateX(0)" },
+        },
+        // Page-level content fade+lift — after route lands
+        "page-enter": {
+          from: { opacity: "0", transform: "translateY(6px)" },
+          to:   { opacity: "1", transform: "translateY(0)" },
+        },
+        // Route progress bar fill
+        "progress-fill": {
+          from: { transform: "translateX(-100%)" },
+          to:   { transform: "translateX(-5%)" },
+        },
+        // Splash exit — the whole screen fades away
+        "splash-exit": {
+          from: { opacity: "1" },
+          to:   { opacity: "0", pointerEvents: "none" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -123,6 +149,12 @@ const config: Config = {
         "slide-up-fade": "slide-up-fade 0.22s cubic-bezier(0.22,1,0.36,1)",
         "slide-down-fade": "slide-down-fade 0.18s cubic-bezier(0.22,1,0.36,1)",
         "scale-in": "scale-in 0.18s cubic-bezier(0.22,1,0.36,1)",
+        // Brand loading system
+        "brand-breathe":  "brand-breathe 2.2s cubic-bezier(0.45,0,0.55,1) infinite",
+        "bar-reveal":     "bar-reveal 0.5s cubic-bezier(0.22,1,0.36,1) both",
+        "page-enter":     "page-enter 0.28s cubic-bezier(0.22,1,0.36,1) both",
+        "progress-fill":  "progress-fill 2.4s cubic-bezier(0.25,1,0.5,1) forwards",
+        "splash-exit":    "splash-exit 0.5s cubic-bezier(0.4,0,1,1) forwards",
       },
     },
   },
