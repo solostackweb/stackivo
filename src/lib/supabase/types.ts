@@ -415,7 +415,7 @@ export type AdminActionTargetType =
 
 export interface AdminActionRow {
   id: string;
-  actor_id: string;
+  actor_id: string | null;
   kind: string;
   target_type: AdminActionTargetType;
   target_id: string | null;
@@ -436,7 +436,7 @@ export type AdminNoteTargetType =
 
 export interface AdminNoteRow {
   id: string;
-  actor_id: string;
+  actor_id: string | null;
   target_type: AdminNoteTargetType;
   target_id: string;
   body: string;

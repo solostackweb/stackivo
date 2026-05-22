@@ -1103,7 +1103,7 @@ export async function listPlatformSettings(): Promise<
 
 export interface AdminNoteLite {
   id: string;
-  actor_id: string;
+  actor_id: string | null;
   body: string;
   pinned: boolean;
   created_at: string;

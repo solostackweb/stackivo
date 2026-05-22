@@ -110,7 +110,7 @@ function AuditRow({ row }: { row: AdminActionRow }) {
         </span>
       </div>
       <div className="mt-1 flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
-        <span>actor {shortenId(row.actor_id)}</span>
+        <span>actor {row.actor_id ? shortenId(row.actor_id) : "deleted user"}</span>
         {row.request_id ? <span>req {shortenId(row.request_id)}</span> : null}
         <span className="font-mono">{formatIstStamp(row.created_at)} IST</span>
       </div>

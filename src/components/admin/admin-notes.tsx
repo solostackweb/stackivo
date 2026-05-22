@@ -31,7 +31,7 @@ export interface AdminNotesPanelProps {
   targetId: string;
   notes: Array<{
     id: string;
-    actor_id: string;
+    actor_id: string | null;
     body: string;
     pinned: boolean;
     created_at: string;
@@ -233,7 +233,9 @@ function NoteCard({
           </p>
           <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
             <span title={note.created_at}>{formatRelative(note.created_at)}</span>
-            <span className="font-mono">actor {shortenId(note.actor_id)}</span>
+            <span className="font-mono">
+              actor {note.actor_id ? shortenId(note.actor_id) : "deleted user"}
+            </span>
             {note.updated_at !== note.created_at ? (
               <span className="italic">edited</span>
             ) : null}
