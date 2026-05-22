@@ -663,6 +663,300 @@ export function renderPortalAccessCodeEmail(
 }
 
 // =============================================================================
+// PORTAL EVENT TEMPLATES
+// =============================================================================
+
+// --- Portal update posted (owner → client) --------------------------------
+
+export interface PortalUpdatePostedInput {
+  portalName: string;
+  clientName: string | null;
+  senderName: string;
+  senderEmail?: string;
+  updateTitle: string;
+  updateType: string;
+  body: string | null;
+  portalUrl: string;
+  brand?: EmailBrand;
+}
+
+export function renderPortalUpdatePostedEmail(
+  input: PortalUpdatePostedInput,
+): EmailRender {
+  const greeting = input.clientName ? `Hi ${input.clientName},` : "Hello,";
+  const typeLabel =
+    input.updateType === "deliverable"
+      ? "deliverable"
+      : input.updateType === "revision"
+        ? "revision"
+        : input.updateType === "milestone"
+          ? "milestone update"
+          : "project update";
+
+  const paragraphs: string[] = [
+    greeting,
+    `${input.senderName} has posted a new ${typeLabel} in your portal: *${input.updateTitle}*`,
+  ];
+  if (input.body?.trim()) paragraphs.push(input.body.trim().slice(0, 300));
+
+  return {
+    subject: `New ${typeLabel}: ${input.updateTitle} — ${input.portalName}`,
+    html: envelope({
+      preheader: `${input.senderName} posted "${input.updateTitle}" in ${input.portalName}`,
+      eyebrow: "Portal Update",
+      heading: input.updateTitle,
+      subheading: `${input.portalName} · ${typeLabel}`,
+      paragraphs,
+      cta: { label: "View in portal", href: input.portalUrl },
+      signature: formatSenderSignature(input.senderName, input.senderEmail),
+      brand: input.brand,
+    }),
+    text: plain(
+      paragraphs,
+      { label: "View in portal", href: input.portalUrl },
+      formatSenderSignature(input.senderName, input.senderEmail),
+    ),
+  };
+}
+
+// --- Portal meeting requested (client → owner) ---------------------------
+
+export interface PortalMeetingRequestedInput {
+  portalName: string;
+  ownerName: string;
+  requesterName: string | null;
+  topic: string;
+  proposedTime: string | null;
+  notes: string | null;
+  portalUrl: string;
+  brand?: EmailBrand;
+}
+
+export function renderPortalMeetingRequestedEmail(
+  input: PortalMeetingRequestedInput,
+): EmailRender {
+  const greeting = `Hi ${input.ownerName},`;
+  const requester = input.requesterName ?? "Your client";
+  const paragraphs: string[] = [
+    greeting,
+    `${requester} has requested a meeting in portal "${input.portalName}".`,
+  ];
+  if (input.notes?.trim()) paragraphs.push(input.notes.trim().slice(0, 300));
+
+  const facts: { label: string; value: string }[] = [
+    { label: "Topic", value: input.topic },
+  ];
+  if (input.proposedTime) facts.push({ label: "Proposed time", value: input.proposedTime });
+
+  return {
+    subject: `Meeting requested: ${input.topic} — ${input.portalName}`,
+    html: envelope({
+      preheader: `${requester} requested a meeting in ${input.portalName}`,
+      eyebrow: "Meeting Request",
+      heading: input.topic,
+      subheading: input.portalName,
+      paragraphs,
+      facts,
+      cta: { label: "View & respond", href: input.portalUrl },
+      brand: input.brand,
+    }),
+    text: plain(
+      paragraphs,
+      { label: "View & respond", href: input.portalUrl },
+      undefined,
+      facts,
+    ),
+  };
+}
+
+// --- Portal meeting confirmed (owner → client) ----------------------------
+
+export interface PortalMeetingConfirmedInput {
+  portalName: string;
+  clientName: string | null;
+  senderName: string;
+  senderEmail?: string;
+  topic: string;
+  proposedTime: string | null;
+  meetLink: string | null;
+  portalUrl: string;
+  brand?: EmailBrand;
+}
+
+export function renderPortalMeetingConfirmedEmail(
+  input: PortalMeetingConfirmedInput,
+): EmailRender {
+  const greeting = input.clientName ? `Hi ${input.clientName},` : "Hello,";
+  const paragraphs: string[] = [
+    greeting,
+    `Your meeting request has been confirmed in portal "${input.portalName}".`,
+  ];
+  if (input.meetLink) {
+    paragraphs.push(`Join via: ${input.meetLink}`);
+  }
+
+  const facts: { label: string; value: string }[] = [
+    { label: "Topic", value: input.topic },
+  ];
+  if (input.proposedTime) facts.push({ label: "Time", value: input.proposedTime });
+  if (input.meetLink) facts.push({ label: "Join link", value: input.meetLink });
+
+  return {
+    subject: `Meeting confirmed: ${input.topic} — ${input.portalName}`,
+    html: envelope({
+      preheader: `Your meeting "${input.topic}" is confirmed`,
+      successBanner: "Meeting confirmed",
+      eyebrow: "Meeting",
+      heading: input.topic,
+      subheading: input.proposedTime ?? input.portalName,
+      paragraphs,
+      facts,
+      cta: input.meetLink
+        ? { label: "Join meeting", href: input.meetLink }
+        : { label: "View in portal", href: input.portalUrl },
+      signature: formatSenderSignature(input.senderName, input.senderEmail),
+      brand: input.brand,
+    }),
+    text: plain(
+      paragraphs,
+      input.meetLink
+        ? { label: "Join meeting", href: input.meetLink }
+        : { label: "View in portal", href: input.portalUrl },
+      formatSenderSignature(input.senderName, input.senderEmail),
+      facts,
+    ),
+  };
+}
+
+// --- Portal update approved (client → owner) ------------------------------
+
+export interface PortalUpdateApprovedInput {
+  portalName: string;
+  ownerName: string;
+  approverName: string | null;
+  updateTitle: string;
+  comment: string | null;
+  portalUrl: string;
+  brand?: EmailBrand;
+}
+
+export function renderPortalUpdateApprovedEmail(
+  input: PortalUpdateApprovedInput,
+): EmailRender {
+  const approver = input.approverName ?? "Your client";
+  const paragraphs: string[] = [
+    `Hi ${input.ownerName},`,
+    `${approver} has approved "${input.updateTitle}" in portal "${input.portalName}".`,
+  ];
+  if (input.comment?.trim()) paragraphs.push(`Their note: "${input.comment.trim()}"`);
+
+  return {
+    subject: `Approved: ${input.updateTitle} — ${input.portalName}`,
+    html: envelope({
+      preheader: `${approver} approved "${input.updateTitle}"`,
+      successBanner: "Approved",
+      eyebrow: "Approval",
+      heading: `"${input.updateTitle}" approved`,
+      subheading: input.portalName,
+      paragraphs,
+      cta: { label: "View in portal", href: input.portalUrl },
+      brand: input.brand,
+    }),
+    text: plain(
+      paragraphs,
+      { label: "View in portal", href: input.portalUrl },
+    ),
+  };
+}
+
+// --- Portal revision requested (client → owner) ---------------------------
+
+export interface PortalRevisionRequestedInput {
+  portalName: string;
+  ownerName: string;
+  requesterName: string | null;
+  updateTitle: string;
+  comment: string | null;
+  portalUrl: string;
+  brand?: EmailBrand;
+}
+
+export function renderPortalRevisionRequestedEmail(
+  input: PortalRevisionRequestedInput,
+): EmailRender {
+  const requester = input.requesterName ?? "Your client";
+  const paragraphs: string[] = [
+    `Hi ${input.ownerName},`,
+    `${requester} has requested revisions for "${input.updateTitle}" in portal "${input.portalName}".`,
+  ];
+  if (input.comment?.trim()) paragraphs.push(`Their feedback: "${input.comment.trim()}"`);
+
+  return {
+    subject: `Revision requested: ${input.updateTitle} — ${input.portalName}`,
+    html: envelope({
+      preheader: `${requester} requested revisions on "${input.updateTitle}"`,
+      eyebrow: "Revision Requested",
+      heading: `Revision requested`,
+      subheading: `"${input.updateTitle}" · ${input.portalName}`,
+      paragraphs,
+      cta: { label: "View feedback", href: input.portalUrl },
+      brand: input.brand,
+    }),
+    text: plain(
+      paragraphs,
+      { label: "View feedback", href: input.portalUrl },
+    ),
+  };
+}
+
+// --- Portal file uploaded (owner → client) --------------------------------
+
+export interface PortalFileUploadedInput {
+  portalName: string;
+  clientName: string | null;
+  senderName: string;
+  senderEmail?: string;
+  fileName: string;
+  fileCount: number;
+  portalUrl: string;
+  brand?: EmailBrand;
+}
+
+export function renderPortalFileUploadedEmail(
+  input: PortalFileUploadedInput,
+): EmailRender {
+  const greeting = input.clientName ? `Hi ${input.clientName},` : "Hello,";
+  const fileDesc =
+    input.fileCount === 1
+      ? `a new file — "${input.fileName}"`
+      : `${input.fileCount} new files`;
+
+  const paragraphs = [
+    greeting,
+    `${input.senderName} has uploaded ${fileDesc} to your portal "${input.portalName}".`,
+  ];
+
+  return {
+    subject: `New file${input.fileCount > 1 ? "s" : ""} in ${input.portalName}`,
+    html: envelope({
+      preheader: `${input.senderName} uploaded ${fileDesc} to ${input.portalName}`,
+      eyebrow: "Files",
+      heading: `New file${input.fileCount > 1 ? "s" : ""} shared`,
+      subheading: input.portalName,
+      paragraphs,
+      cta: { label: "View files", href: input.portalUrl },
+      signature: formatSenderSignature(input.senderName, input.senderEmail),
+      brand: input.brand,
+    }),
+    text: plain(
+      paragraphs,
+      { label: "View files", href: input.portalUrl },
+      formatSenderSignature(input.senderName, input.senderEmail),
+    ),
+  };
+}
+
+// =============================================================================
 // Brand resolver helper for senders
 // =============================================================================
 

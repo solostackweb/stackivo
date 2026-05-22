@@ -10,6 +10,120 @@
 
 export type WaDocumentType = "invoice" | "contract" | "proposal";
 
+// =============================================================================
+// Portal-specific WhatsApp share builders
+// =============================================================================
+
+export interface WaPortalUpdateOptions {
+  phone?: string | null;
+  clientName?: string | null;
+  senderName?: string | null;
+  portalName: string;
+  updateTitle: string;
+  updateType: string;
+  portalUrl: string;
+}
+
+export interface WaPortalMeetingOptions {
+  phone?: string | null;
+  clientName?: string | null;
+  senderName?: string | null;
+  portalName: string;
+  topic: string;
+  proposedTime?: string | null;
+  meetLink?: string | null;
+  portalUrl: string;
+}
+
+export interface WaPortalDeliverableOptions {
+  phone?: string | null;
+  clientName?: string | null;
+  senderName?: string | null;
+  portalName: string;
+  deliverableTitle: string;
+  portalUrl: string;
+}
+
+export interface WaPortalInvoiceOptions {
+  phone?: string | null;
+  clientName?: string | null;
+  senderName?: string | null;
+  portalName: string;
+  invoiceNumber?: string | null;
+  amount?: number | null;
+  currency?: string;
+  portalUrl: string;
+}
+
+/**
+ * Builds a pre-filled WhatsApp message for a portal update notification.
+ */
+export function buildPortalUpdateWaMessage(opts: WaPortalUpdateOptions): string {
+  const { clientName, senderName, portalName, updateTitle, updateType, portalUrl } = opts;
+  const greet = clientName ? `Hi ${clientName},` : "Hi,";
+  const typeLabel = updateType === "deliverable" ? "deliverable" : "update";
+  const closing = senderName ? `\n\nRegards,\n${senderName}` : "";
+  return `${greet}\n\nI've posted a new *${typeLabel}* in your portal *${portalName}*:\n\n📌 *${updateTitle}*\n\nView it here: ${portalUrl}${closing}`;
+}
+
+/**
+ * Builds a pre-filled WhatsApp message for a meeting request or confirmation.
+ */
+export function buildPortalMeetingWaMessage(opts: WaPortalMeetingOptions): string {
+  const { clientName, senderName, portalName, topic, proposedTime, meetLink, portalUrl } = opts;
+  const greet = clientName ? `Hi ${clientName},` : "Hi,";
+  const timeLine = proposedTime ? `\n📅 *When:* ${proposedTime}` : "";
+  const linkLine = meetLink ? `\n🔗 *Join:* ${meetLink}` : "";
+  const closing = senderName ? `\n\nRegards,\n${senderName}` : "";
+  return `${greet}\n\nA meeting has been scheduled in your portal *${portalName}*:\n\n📋 *Topic:* ${topic}${timeLine}${linkLine}\n\nView details: ${portalUrl}${closing}`;
+}
+
+/**
+ * Builds a pre-filled WhatsApp message to share a deliverable for review.
+ */
+export function buildPortalDeliverableWaMessage(opts: WaPortalDeliverableOptions): string {
+  const { clientName, senderName, portalName, deliverableTitle, portalUrl } = opts;
+  const greet = clientName ? `Hi ${clientName},` : "Hi,";
+  const closing = senderName ? `\n\nRegards,\n${senderName}` : "";
+  return `${greet}\n\nYour deliverable is ready for review in *${portalName}*:\n\n✅ *${deliverableTitle}*\n\nPlease take a look and let me know your feedback: ${portalUrl}${closing}`;
+}
+
+/**
+ * Builds a pre-filled WhatsApp message for a portal invoice share.
+ */
+export function buildPortalInvoiceWaMessage(opts: WaPortalInvoiceOptions): string {
+  const { clientName, senderName, portalName, invoiceNumber, amount, currency = "INR", portalUrl } = opts;
+  const greet = clientName ? `Hi ${clientName},` : "Hi,";
+  const refLine = invoiceNumber ? ` *${invoiceNumber}*` : "";
+  const amountLine = amount != null
+    ? ` for *${currency} ${amount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}*`
+    : "";
+  const closing = senderName ? `\n\nRegards,\n${senderName}` : "";
+  return `${greet}\n\nYour invoice${refLine}${amountLine} is available in *${portalName}*:\n\n${portalUrl}${closing}`;
+}
+
+/**
+ * Builds and opens a portal update share link on WhatsApp.
+ */
+export function sharePortalUpdateOnWhatsApp(opts: WaPortalUpdateOptions): void {
+  const message = buildPortalUpdateWaMessage(opts);
+  const phone = normalizePhone(opts.phone);
+  const encoded = encodeURIComponent(message);
+  const url = phone ? `https://wa.me/${phone}?text=${encoded}` : `https://wa.me/?text=${encoded}`;
+  window.open(url, "_blank", "noopener,noreferrer");
+}
+
+/**
+ * Builds and opens a portal meeting share link on WhatsApp.
+ */
+export function sharePortalMeetingOnWhatsApp(opts: WaPortalMeetingOptions): void {
+  const message = buildPortalMeetingWaMessage(opts);
+  const phone = normalizePhone(opts.phone);
+  const encoded = encodeURIComponent(message);
+  const url = phone ? `https://wa.me/${phone}?text=${encoded}` : `https://wa.me/?text=${encoded}`;
+  window.open(url, "_blank", "noopener,noreferrer");
+}
+
 export interface WaShareOptions {
   /**
    * Client's phone number in any common format.

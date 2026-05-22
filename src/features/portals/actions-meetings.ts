@@ -10,6 +10,10 @@ import {
 } from "./server";
 import { portalClientHome, portalDashboardDetail } from "./routes";
 import type { ActionResult } from "@/features/invoices/delivery";
+import {
+  dispatchPortalMeetingRequestedComms,
+  dispatchPortalMeetingConfirmedComms,
+} from "./email";
 
 // =============================================================================
 // REQUEST MEETING  (owner or client can request)
@@ -65,6 +69,17 @@ export async function requestPortalMeetingAction(
     payload: { meetingId, topic: parsed.data.topic },
   });
 
+  // Fire-and-forget comms (email + in-app notification for the owner)
+  void dispatchPortalMeetingRequestedComms({
+    portalId: parsed.data.portalId,
+    actorUserId: access.userId,
+    requesterName: null, // resolved inside email.ts from the profile
+    topic: parsed.data.topic,
+    proposedTime: parsed.data.proposedTime ?? null,
+    notes: parsed.data.notes ?? null,
+    idempotencyKey: `meeting_requested:${meetingId}`,
+  });
+
   revalidatePath(portalClientHome(parsed.data.portalId));
   revalidatePath(portalDashboardDetail(parsed.data.portalId));
   return { ok: true, data: { meetingId } };
@@ -115,6 +130,24 @@ export async function acceptPortalMeetingAction(
     actorId: access.userId,
     type: "meeting.accepted",
     payload: { meetingId: parsed.data.meetingId },
+  });
+
+  // Fetch topic for the notification
+  const admin2 = getAdminSupabase();
+  const { data: meetingRow } = await admin2
+    .from("portal_meetings")
+    .select("topic, proposed_time")
+    .eq("id", parsed.data.meetingId)
+    .maybeSingle();
+  const mr = meetingRow as { topic: string; proposed_time: string | null } | null;
+
+  void dispatchPortalMeetingConfirmedComms({
+    portalId: parsed.data.portalId,
+    actorUserId: access.userId,
+    topic: mr?.topic ?? "Meeting",
+    proposedTime: parsed.data.proposedTime ?? mr?.proposed_time ?? null,
+    meetLink: parsed.data.meetLink || null,
+    idempotencyKey: `meeting_confirmed:${parsed.data.meetingId}`,
   });
 
   revalidatePath(portalClientHome(parsed.data.portalId));
