@@ -35,6 +35,11 @@ const PAGE_SIZE = 25;
 export default async function AdminUsersPage({ searchParams }: Props) {
   const sp = await searchParams;
   const q = typeof sp.q === "string" ? sp.q : undefined;
+  const accountType = parseEnum(sp.account, [
+    "freelancer",
+    "portal_client",
+    "all",
+  ]) as ListUsersInput["accountType"] | undefined;
   const plan = parseEnum(sp.plan, ["free", "pro", "business", "all"]) as
     | ListUsersInput["plan"]
     | undefined;
@@ -51,6 +56,7 @@ export default async function AdminUsersPage({ searchParams }: Props) {
 
   const result = await listUsers({
     q,
+    accountType,
     plan,
     status,
     page,
@@ -65,13 +71,18 @@ export default async function AdminUsersPage({ searchParams }: Props) {
         title="Users"
         subtitle={
           <span>
-            {result.total.toLocaleString("en-IN")} total · page {page} /{" "}
+            {result.total.toLocaleString("en-IN")} accounts · page {page} /{" "}
             {totalPages}
           </span>
         }
       />
 
-      <Filters q={q} plan={plan} status={status} />
+      <Filters
+        q={q}
+        accountType={accountType}
+        plan={plan}
+        status={status}
+      />
 
       {/* Mobile: card list */}
       <ul className="space-y-2 md:hidden">
@@ -91,6 +102,9 @@ export default async function AdminUsersPage({ searchParams }: Props) {
             </Link>
             <div className="mt-0.5 truncate text-xs text-muted-foreground">
               {u.email}
+            </div>
+            <div className="mt-2">
+              <AccountTypeBadge accountType={u.account_type} />
             </div>
             <div className="mt-2 grid grid-cols-3 gap-2 text-[11px] text-muted-foreground tabular-nums">
               <div>
@@ -118,6 +132,7 @@ export default async function AdminUsersPage({ searchParams }: Props) {
           <thead className="bg-muted/40 text-left text-[11px] uppercase tracking-wider text-muted-foreground">
             <tr>
               <th className="px-3 py-2 font-medium">User</th>
+              <th className="px-3 py-2 font-medium">Account</th>
               <th className="px-3 py-2 font-medium">Plan</th>
               <th className="px-3 py-2 font-medium">Status</th>
               <th className="px-3 py-2 font-medium tabular-nums">Paid</th>
@@ -131,7 +146,7 @@ export default async function AdminUsersPage({ searchParams }: Props) {
             {result.rows.length === 0 ? (
               <tr>
                 <td
-                  colSpan={8}
+                  colSpan={9}
                   className="px-3 py-8 text-center text-xs text-muted-foreground"
                 >
                   No users match these filters.
@@ -153,6 +168,9 @@ export default async function AdminUsersPage({ searchParams }: Props) {
                         {u.email}
                       </div>
                     </Link>
+                  </td>
+                  <td className="px-3 py-2">
+                    <AccountTypeBadge accountType={u.account_type} />
                   </td>
                   <td className="px-3 py-2 text-muted-foreground">
                     {u.plan ?? "free"}
@@ -192,6 +210,7 @@ export default async function AdminUsersPage({ searchParams }: Props) {
         page={page}
         totalPages={totalPages}
         q={q}
+        accountType={accountType}
         plan={plan}
         status={status}
       />
@@ -203,10 +222,12 @@ export default async function AdminUsersPage({ searchParams }: Props) {
 
 function Filters({
   q,
+  accountType,
   plan,
   status,
 }: {
   q: string | undefined;
+  accountType: string | undefined;
   plan: string | undefined;
   status: string | undefined;
 }) {
@@ -223,6 +244,15 @@ function Filters({
         placeholder="Search email or name…"
         className="h-8 w-56 rounded border bg-background px-2 text-xs"
       />
+      <select
+        name="account"
+        defaultValue={accountType ?? "all"}
+        className="h-8 rounded border bg-background px-2 text-xs"
+      >
+        <option value="all">All accounts</option>
+        <option value="freelancer">Freelancers</option>
+        <option value="portal_client">Portal clients</option>
+      </select>
       <select
         name="plan"
         defaultValue={plan ?? "all"}
@@ -287,22 +317,45 @@ function StatusBadge({
   );
 }
 
+function AccountTypeBadge({
+  accountType,
+}: {
+  accountType: "freelancer" | "portal_client";
+}) {
+  const isClient = accountType === "portal_client";
+  return (
+    <span
+      className={cn(
+        "inline-block rounded px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider",
+        isClient
+          ? "bg-sky-500/10 text-sky-700 dark:text-sky-400"
+          : "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+      )}
+    >
+      {isClient ? "Portal client" : "Freelancer"}
+    </span>
+  );
+}
+
 function Pagination({
   page,
   totalPages,
   q,
+  accountType,
   plan,
   status,
 }: {
   page: number;
   totalPages: number;
   q?: string;
+  accountType?: string;
   plan?: string;
   status?: string;
 }) {
   if (totalPages <= 1) return null;
   const params = new URLSearchParams();
   if (q) params.set("q", q);
+  if (accountType) params.set("account", accountType);
   if (plan) params.set("plan", plan);
   if (status) params.set("status", status);
 

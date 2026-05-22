@@ -235,6 +235,7 @@ export async function getRecentAdminActivity(
 
 export interface ListUsersInput {
   q?: string; // matches email or full_name
+  accountType?: "freelancer" | "portal_client" | "all";
   plan?: "free" | "pro" | "business" | "all";
   status?: "active" | "trialing" | "past_due" | "canceled" | "paused" | "expired" | "all";
   hasSuppression?: boolean;
@@ -267,6 +268,9 @@ export async function listUsers(
   if (input.q && input.q.trim().length > 0) {
     const term = input.q.trim().replace(/[%_]/g, "");
     q = q.or(`email.ilike.%${term}%,full_name.ilike.%${term}%`);
+  }
+  if (input.accountType && input.accountType !== "all") {
+    q = q.eq("account_type", input.accountType);
   }
   if (input.plan && input.plan !== "all") {
     q = q.eq("plan", input.plan);

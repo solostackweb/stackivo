@@ -410,11 +410,43 @@ export async function activatePortalAccessForUser(input: {
     };
   }
 
+  await markPortalClientAccountIfClientOnly(input.userId);
+
   return { ok: true, data: { portalIds: Array.from(portalIds) } };
 }
 
 function normalisePortalEmail(email: string): string {
   return email.trim().toLowerCase();
+}
+
+async function markPortalClientAccountIfClientOnly(userId: string): Promise<void> {
+  const admin = getAdminSupabase();
+  const ownerChecks = await Promise.all([
+    admin.from("portals").select("id", { count: "exact", head: true }).eq("owner_user_id", userId),
+    admin.from("clients").select("id", { count: "exact", head: true }).eq("user_id", userId),
+    admin.from("projects").select("id", { count: "exact", head: true }).eq("user_id", userId),
+    admin.from("invoices").select("id", { count: "exact", head: true }).eq("user_id", userId),
+    admin.from("contracts").select("id", { count: "exact", head: true }).eq("user_id", userId),
+  ]);
+  const hasOwnerData = ownerChecks.some((result) => (result.count ?? 0) > 0);
+  if (hasOwnerData) return;
+
+  await admin
+    .from("user_profiles")
+    .update({ account_type: "portal_client" } as never)
+    .eq("id", userId);
+
+  const { data } = await admin.auth.admin.getUserById(userId);
+  const appMetadata =
+    data.user?.app_metadata && typeof data.user.app_metadata === "object"
+      ? data.user.app_metadata
+      : {};
+  await admin.auth.admin.updateUserById(userId, {
+    app_metadata: {
+      ...appMetadata,
+      account_type: "portal_client",
+    },
+  });
 }
 
 async function getPortalContextById(portalId: string): Promise<{

@@ -103,10 +103,13 @@ export type OnboardingStep =
   | "first_client"
   | "done";
 
+export type AccountTypeRow = "freelancer" | "portal_client";
+
 export interface UserProfileRow {
   id: string;
   full_name: string;
   email: string;
+  account_type: AccountTypeRow;
   avatar_url: string | null;
   display_name: string | null;
   phone: string | null;
@@ -461,6 +464,7 @@ export interface AdminUserOverviewRow {
   id: string;
   full_name: string;
   email: string;
+  account_type: AccountTypeRow;
   avatar_url: string | null;
   company_name: string | null;
   country: string;

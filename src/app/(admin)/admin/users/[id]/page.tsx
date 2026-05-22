@@ -99,6 +99,7 @@ export default async function AdminUserDetailPage({ params }: Props) {
             <span className="font-mono">{overview.email}</span>
             <span className="text-muted-foreground/60">·</span>
             <span className="font-mono text-[11px]">{shortenId(overview.id)}</span>
+            <AccountTypeBadge accountType={overview.account_type} />
             {isBanned ? (
               <span className="ml-2 rounded bg-red-500/10 px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-red-600">
                 Suspended
@@ -111,7 +112,15 @@ export default async function AdminUserDetailPage({ params }: Props) {
       <UserChurnBadges signals={churn} />
 
       {/* Top stats */}
-      <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        <Tile
+          label="Account"
+          value={
+            overview.account_type === "portal_client"
+              ? "Portal client"
+              : "Freelancer"
+          }
+        />
         <Tile label="Plan" value={overview.plan ?? "free"} />
         <Tile
           label="Status"
@@ -314,6 +323,26 @@ function Tile({ label, value }: { label: string; value: React.ReactNode }) {
       </div>
       <div className="mt-0.5 truncate text-sm font-semibold">{value}</div>
     </div>
+  );
+}
+
+function AccountTypeBadge({
+  accountType,
+}: {
+  accountType: "freelancer" | "portal_client";
+}) {
+  const isClient = accountType === "portal_client";
+  return (
+    <span
+      className={cn(
+        "ml-2 rounded px-1.5 py-0.5 text-[10px] uppercase tracking-wider",
+        isClient
+          ? "bg-sky-500/10 text-sky-700 dark:text-sky-400"
+          : "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+      )}
+    >
+      {isClient ? "Portal client" : "Freelancer"}
+    </span>
   );
 }
 
