@@ -411,7 +411,7 @@ export function EditInvoiceView({
                           onValueChange={(v) =>
                             setValue(
                               "taxMode",
-                              v as "intra" | "inter" | "non_gst",
+                              v as "intra" | "inter",
                               { shouldValidate: true },
                             )
                           }
@@ -426,7 +426,6 @@ export function EditInvoiceView({
                             <SelectItem value="inter">
                               Inter-state (IGST)
                             </SelectItem>
-                            <SelectItem value="non_gst">Non-GST</SelectItem>
                           </SelectContent>
                         </Select>
                       </Field>
