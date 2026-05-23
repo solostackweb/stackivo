@@ -55,10 +55,13 @@ function buildEditDefaults(
   invoice: InvoiceRecord,
   items: InvoiceItemRecord[],
 ): InvoiceFormValues {
+  // Map DB tax_mode values → form taxMode values
   const taxMode =
-    invoice.taxMode === "intra" || invoice.taxMode === "inter"
-      ? invoice.taxMode
-      : "intra";
+    invoice.taxMode === "cgst_sgst"
+      ? "intra"
+      : invoice.taxMode === "igst"
+        ? "inter"
+        : "intra";
   const gstRate = items[0]?.gstRate ?? 0;
   const paymentMethod: PaymentMethod =
     (invoice.paymentMethod as PaymentMethod) ?? "bank";
