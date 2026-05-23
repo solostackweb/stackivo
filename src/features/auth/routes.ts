@@ -27,6 +27,7 @@ export const PUBLIC_EXACT_ROUTES = [
   "/",
   "/login",
   "/signup",
+  "/portal-access",
   "/forgot-password",
   "/reset-password",
   "/auth/callback",
@@ -43,6 +44,7 @@ export const PUBLIC_TOKENISED_PREFIXES = [
 export const AUTH_ONLY_ROUTES = [
   "/login",
   "/signup",
+  "/portal-access",
   "/forgot-password",
   "/reset-password",
 ] as const;

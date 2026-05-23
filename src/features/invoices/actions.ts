@@ -411,3 +411,109 @@ export async function setInvoiceStatusAction(
   revalidatePath(`/dashboard/invoices/${idParse.data}`);
   return { ok: true, message: `Marked ${statusParse.data}.` };
 }
+
+// --- Duplicate ---------------------------------------------------------------
+
+/**
+ * Clone an invoice (and its line items) as a new draft with today's dates.
+ * The invoice number is auto-incremented from the user's running counter so
+ * the duplicate never collides with the original.
+ */
+export async function duplicateInvoiceAction(
+  _prev: ActionResult | undefined,
+  formData: FormData,
+): Promise<ActionResult<{ id: string }>> {
+  const idParse = invoiceIdSchema.safeParse(formData.get("id"));
+  if (!idParse.success) return { ok: false, error: "Invalid invoice id." };
+
+  const userId = await requireUserId();
+  const supabase = await getServerSupabase();
+
+  // Fetch original invoice + items
+  const { data: original, error: fetchErr } = await supabase
+    .from("invoices")
+    .select("*")
+    .eq("id", idParse.data)
+    .single();
+  if (fetchErr || !original) return { ok: false, error: "Invoice not found." };
+
+  const { data: originalItems, error: itemsErr } = await supabase
+    .from("invoice_items")
+    .select("*")
+    .eq("invoice_id", idParse.data)
+    .order("position");
+  if (itemsErr) return { ok: false, error: "Failed to fetch invoice items." };
+
+  // Fetch user's invoice prefix + current counter to derive next number
+  const { nextInvoiceNumber } = await import("./server");
+  const { formatted: newNumber, next: currentNext } = await nextInvoiceNumber(userId);
+
+  const today = new Date().toISOString().slice(0, 10);
+  const orig = original as Record<string, unknown>;
+
+  const { data: newInvoice, error: insertErr } = await supabase
+    .from("invoices")
+    .insert({
+      user_id: userId,
+      client_id: orig.client_id,
+      project_id: orig.project_id,
+      invoice_number: newNumber,
+      issue_date: today,
+      due_date: today,
+      currency: orig.currency,
+      status: "draft",
+      notes: orig.notes,
+      terms: orig.terms,
+      subtotal: orig.subtotal,
+      cgst_amount: orig.cgst_amount,
+      sgst_amount: orig.sgst_amount,
+      igst_amount: orig.igst_amount,
+      gst_amount: orig.gst_amount,
+      total_amount: orig.total_amount,
+      tax_mode: orig.tax_mode,
+      classification: orig.classification,
+      seller_state_code: orig.seller_state_code,
+      client_state_code: orig.client_state_code,
+      footer_note: orig.footer_note,
+    } as never)
+    .select("id")
+    .single();
+
+  if (insertErr || !newInvoice) {
+    return { ok: false, error: insertErr?.message ?? "Failed to duplicate." };
+  }
+
+  const newId = (newInvoice as { id: string }).id;
+
+  // Bump the invoice counter so the next number doesn't collide
+  await supabase
+    .from("user_profiles")
+    .update({ invoice_next_number: currentNext + 1 } as never)
+    .eq("id", userId);
+
+  // Copy line items
+  if (originalItems && originalItems.length > 0) {
+    const newItems = (originalItems as Array<Record<string, unknown>>).map(
+      (item, i) => ({
+        invoice_id: newId,
+        description: item.description,
+        quantity: item.quantity,
+        unit_price: item.unit_price,
+        gst_rate: item.gst_rate,
+        amount: item.amount,
+        position: i,
+      }),
+    );
+    await supabase.from("invoice_items").insert(newItems as never);
+  }
+
+  await recordActivity({
+    kind: "invoice_created",
+    entityType: "invoice",
+    entityId: newId,
+    title: `Invoice ${newNumber} duplicated`,
+  });
+
+  revalidatePath("/dashboard/invoices");
+  return { ok: true, data: { id: newId }, message: "Invoice duplicated." };
+}

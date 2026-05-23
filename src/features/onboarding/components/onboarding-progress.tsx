@@ -9,11 +9,10 @@ import {
 import type { OnboardingStep } from "@/lib/supabase/types";
 
 /**
- * Linear progress rail for the onboarding flow. Renders all five steps,
- * with the current step highlighted and previous steps marked complete.
+ * Minimal 2-step progress indicator for the new-user onboarding flow.
  *
- * Visually echoes the calm, premium Stackivo design system — thin lines,
- * tinted dots, no excessive ornamentation.
+ * New users see: Business setup → GST setup → dashboard.
+ * Legacy mid-flight users see the legacy rail until they complete.
  */
 export function OnboardingProgress({
   currentStep,
@@ -21,60 +20,82 @@ export function OnboardingProgress({
   currentStep: OnboardingStep;
 }) {
   const currentIdx = stepIndex(currentStep);
-  // 2026-05 onboarding rewrite: the canonical new-user flow is now just
-  // `business` → `gst` → /dashboard. Render a short rail for those users.
-  // Legacy users persisted mid-flight at invoice / signature / first_client
-  // still see the full 4-node rail so their progress reads correctly.
-  const isShortFlow =
-    currentStep === "business" || currentStep === "gst";
+  const isShortFlow = currentStep === "business" || currentStep === "gst";
   const visible = isShortFlow
     ? (["business", "gst"] as readonly OnboardingStep[])
     : ONBOARDING_STEPS.slice(0, ONBOARDING_STEPS.length - 1);
 
+  const totalSteps = visible.length;
+  const completedSteps = Math.min(currentIdx, totalSteps);
+  const progressPct = totalSteps > 1
+    ? (completedSteps / (totalSteps - 1)) * 100
+    : 0;
+
   return (
-    <ol className="flex w-full items-center gap-2">
-      {visible.map((step, i) => {
-        const isComplete = i < currentIdx || currentStep === "done";
-        const isCurrent = i === currentIdx && currentStep !== "done";
-        return (
-          <React.Fragment key={step}>
-            <li className="flex flex-1 items-center gap-2">
-              <span
-                className={cn(
-                  "flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-[11px] font-semibold transition-all duration-300",
-                  isComplete &&
-                    "border-primary bg-gradient-to-br from-primary to-indigo-600 text-primary-foreground shadow-md shadow-primary/30",
-                  isCurrent &&
-                    "border-primary bg-primary/10 text-primary shadow-[0_0_0_4px_hsl(var(--primary)/0.12)]",
-                  !isComplete && !isCurrent &&
-                    "border-border bg-background text-muted-foreground",
-                )}
-              >
-                {isComplete ? <Check className="h-3.5 w-3.5" /> : i + 1}
-              </span>
-              <span
-                className={cn(
-                  "hidden text-xs font-medium tracking-tight sm:block",
-                  isCurrent && "text-foreground",
-                  isComplete && "text-foreground",
-                  !isCurrent && !isComplete && "text-muted-foreground",
-                )}
-              >
-                {ONBOARDING_STEP_LABELS[step]}
-              </span>
-            </li>
-            {i < visible.length - 1 ? (
-              <div
-                className={cn(
-                  "h-0.5 flex-1 rounded-full bg-border transition-all duration-500",
-                  i < currentIdx &&
-                    "bg-gradient-to-r from-primary to-indigo-500",
-                )}
-              />
-            ) : null}
-          </React.Fragment>
-        );
-      })}
-    </ol>
+    <div className="space-y-3">
+      {/* Step label + counter */}
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+          Setup
+        </p>
+        <p className="text-xs font-medium text-muted-foreground">
+          {Math.min(currentIdx + 1, totalSteps)} of {totalSteps}
+        </p>
+      </div>
+
+      {/* Node rail */}
+      <ol className="flex w-full items-center" role="list">
+        {visible.map((step, i) => {
+          const isComplete = i < currentIdx || currentStep === "done";
+          const isCurrent = i === currentIdx && currentStep !== "done";
+          return (
+            <React.Fragment key={step}>
+              <li className="flex items-center gap-2">
+                <span
+                  className={cn(
+                    "flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-bold transition-all duration-300",
+                    isComplete &&
+                      "bg-primary text-primary-foreground shadow-sm shadow-primary/30",
+                    isCurrent &&
+                      "border-2 border-primary bg-primary/10 text-primary shadow-[0_0_0_3px_hsl(var(--primary)/0.10)]",
+                    !isComplete && !isCurrent &&
+                      "border border-border bg-background text-muted-foreground",
+                  )}
+                  aria-current={isCurrent ? "step" : undefined}
+                >
+                  {isComplete ? <Check className="h-3 w-3" /> : i + 1}
+                </span>
+                <span
+                  className={cn(
+                    "text-xs font-medium",
+                    isCurrent && "text-foreground",
+                    isComplete && "text-foreground/70",
+                    !isCurrent && !isComplete && "text-muted-foreground",
+                  )}
+                >
+                  {ONBOARDING_STEP_LABELS[step]}
+                </span>
+              </li>
+              {i < visible.length - 1 ? (
+                <div className="mx-3 h-px flex-1 overflow-hidden rounded-full bg-border">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-primary to-indigo-500 transition-all duration-700"
+                    style={{ width: `${i < currentIdx ? 100 : 0}%` }}
+                  />
+                </div>
+              ) : null}
+            </React.Fragment>
+          );
+        })}
+      </ol>
+
+      {/* Thin overall progress bar */}
+      <div className="h-0.5 w-full overflow-hidden rounded-full bg-border">
+        <div
+          className="h-full rounded-full bg-gradient-to-r from-primary to-indigo-500 transition-all duration-700"
+          style={{ width: `${progressPct}%` }}
+        />
+      </div>
+    </div>
   );
 }

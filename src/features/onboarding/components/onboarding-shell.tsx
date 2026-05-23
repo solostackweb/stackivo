@@ -3,10 +3,10 @@ import { OnboardingProgress } from "./onboarding-progress";
 import type { OnboardingStep } from "@/lib/supabase/types";
 
 /**
- * Shared layout for every onboarding step page. Holds:
- *   - Step heading + subtitle
- *   - Progress rail
- *   - Card-style content area (the actual form)
+ * Shared layout for every onboarding step page.
+ *
+ * Two-step flow (business → gst) designed to feel like a premium welcome
+ * experience, not a feature-list form. Clean, calm, focused.
  */
 export function OnboardingShell({
   currentStep,
@@ -20,21 +20,21 @@ export function OnboardingShell({
   children: React.ReactNode;
 }) {
   return (
-    <div className="space-y-8 sm:space-y-10">
+    <div className="space-y-7 sm:space-y-9">
       <OnboardingProgress currentStep={currentStep} />
 
-      <div className="space-y-2">
-        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
+      <div className="space-y-1.5">
+        <h1 className="text-2xl font-bold tracking-tight sm:text-[28px]">
           {title}
         </h1>
         {description ? (
-          <p className="text-sm leading-relaxed text-muted-foreground sm:text-[15px]">
+          <p className="max-w-lg text-[15px] leading-relaxed text-muted-foreground">
             {description}
           </p>
         ) : null}
       </div>
 
-      <div className="rounded-2xl border bg-card p-5 shadow-xl shadow-primary/[0.03] sm:p-8">
+      <div className="rounded-2xl border bg-card/80 p-5 shadow-2xl shadow-primary/[0.04] backdrop-blur-sm sm:p-8">
         {children}
       </div>
     </div>

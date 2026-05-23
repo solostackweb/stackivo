@@ -7,19 +7,14 @@ import { useFormStatus } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  loginAction,
-  requestPortalCodeAction,
-  verifyPortalCodeAction,
-  type ActionResult,
-} from "../actions";
+import { loginAction, type ActionResult } from "../actions";
 import {
   AuthFormError,
-  AuthFormSuccess,
   AuthOrSeparator,
 } from "./auth-form-shell";
 import { FieldError } from "./field-error";
 import { GoogleOAuthButton } from "./google-oauth-button";
+import { ArrowRight } from "lucide-react";
 
 export function LoginForm({
   next,
@@ -32,21 +27,6 @@ export function LoginForm({
     loginAction,
     undefined,
   );
-  const [portalEmail, setPortalEmail] = React.useState("");
-  const [requestState, requestCodeAction] = useActionState<
-    ActionResult<{ email: string }> | undefined,
-    FormData
-  >(requestPortalCodeAction, undefined);
-  const [verifyState, verifyCodeAction] = useActionState<
-    ActionResult | undefined,
-    FormData
-  >(verifyPortalCodeAction, undefined);
-
-  React.useEffect(() => {
-    if (requestState?.ok && requestState.data?.email) {
-      setPortalEmail(requestState.data.email);
-    }
-  }, [requestState]);
 
   return (
     <div className="space-y-6">
@@ -95,7 +75,7 @@ export function LoginForm({
                 href="/forgot-password"
                 className="text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
               >
-                Forgot?
+                Forgot password?
               </Link>
             </div>
             <Input
@@ -103,7 +83,7 @@ export function LoginForm({
               name="password"
               type="password"
               autoComplete="current-password"
-              placeholder="Password"
+              placeholder="Your password"
               required
               className="h-11"
             />
@@ -117,60 +97,17 @@ export function LoginForm({
         </form>
       </div>
 
-      <div className="space-y-3 rounded-lg border bg-muted/25 p-3">
-        <div className="space-y-1">
-          <p className="text-sm font-semibold">Client portal access</p>
-          <p className="text-xs leading-relaxed text-muted-foreground">
-            Invited as a client? Get a one-time code and open your portal.
-          </p>
-        </div>
-
-        <form action={requestCodeAction} className="space-y-3">
-          <AuthFormError
-            message={requestState && !requestState.ok ? requestState.error : null}
-          />
-          <AuthFormSuccess
-            message={requestState && requestState.ok ? requestState.message : null}
-          />
-          <div className="space-y-2">
-            <Label htmlFor="portal-email" className="text-xs font-medium">
-              Client email
-            </Label>
-            <div className="flex gap-2">
-              <Input
-                id="portal-email"
-                name="portalEmail"
-                type="email"
-                autoComplete="email"
-                placeholder="client@example.com"
-                value={portalEmail}
-                onChange={(event) => setPortalEmail(event.target.value)}
-                required
-                className="h-10"
-              />
-              <PortalCodeRequestButton />
-            </div>
-          </div>
-        </form>
-
-        <form action={verifyCodeAction} className="space-y-3">
-          <input type="hidden" name="portalEmail" value={portalEmail} />
-          <AuthFormError
-            message={verifyState && !verifyState.ok ? verifyState.error : null}
-          />
-          <div className="flex gap-2">
-            <Input
-              name="portalCode"
-              inputMode="numeric"
-              pattern="[0-9]{6,8}"
-              maxLength={8}
-              placeholder="Email code"
-              required
-              className="h-10 tracking-widest"
-            />
-            <PortalCodeVerifyButton disabled={!portalEmail} />
-          </div>
-        </form>
+      {/* Client portal access — clean link, not an embedded form */}
+      <div className="border-t pt-5">
+        <p className="text-[13px] text-muted-foreground">
+          Invited as a client?{" "}
+          <Link
+            href="/portal-access"
+            className="inline-flex items-center gap-1 font-medium text-foreground underline-offset-4 hover:underline"
+          >
+            Access your portal <ArrowRight className="h-3 w-3" />
+          </Link>
+        </p>
       </div>
     </div>
   );
@@ -184,34 +121,7 @@ function SubmitButton() {
       className="h-11 w-full text-sm font-semibold shadow-lg shadow-primary/20 transition-shadow hover:shadow-xl hover:shadow-primary/25"
       disabled={pending}
     >
-      {pending ? "Logging in..." : "Log in"}
-    </Button>
-  );
-}
-
-function PortalCodeRequestButton() {
-  const { pending } = useFormStatus();
-  return (
-    <Button
-      type="submit"
-      variant="outline"
-      className="h-10 shrink-0"
-      disabled={pending}
-    >
-      {pending ? "Sending" : "Send code"}
-    </Button>
-  );
-}
-
-function PortalCodeVerifyButton({ disabled }: { disabled?: boolean }) {
-  const { pending } = useFormStatus();
-  return (
-    <Button
-      type="submit"
-      className="h-10 shrink-0"
-      disabled={pending || disabled}
-    >
-      {pending ? "Checking" : "Open"}
+      {pending ? "Logging in…" : "Log in"}
     </Button>
   );
 }

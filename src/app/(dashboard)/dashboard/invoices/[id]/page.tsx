@@ -1,6 +1,7 @@
+import * as React from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Download } from "lucide-react";
+import { ArrowLeft, Download, Pencil, FileText, Send, Eye, CheckCircle2, Clock, Plus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -11,6 +12,8 @@ import { getClientDisplayName } from "@/features/clients/utils";
 import { InvoiceStatusBadge } from "@/features/invoices/components/invoice-status-badge";
 import { MarkPaidManuallyDialog } from "@/features/invoices/components/mark-paid-manually-dialog";
 import { InvoiceShareButtons } from "@/features/invoices/components/invoice-share-buttons";
+import { SendInvoiceButton } from "@/features/invoices/components/send-invoice-button";
+import { listActivity, type ActivityRecord } from "@/features/activity/server";
 
 export const dynamic = "force-dynamic";
 
@@ -33,7 +36,10 @@ export default async function InvoiceDetailPage({
   const result = await getInvoice(id);
   if (!result) notFound();
   const { invoice, items } = result;
-  const client = invoice.clientId ? await getClient(invoice.clientId) : null;
+  const [client, activities] = await Promise.all([
+    invoice.clientId ? getClient(invoice.clientId) : Promise.resolve(null),
+    listActivity({ entityType: "invoice", entityId: id, limit: 20 }),
+  ]);
 
   const fmtDate = (iso: string | null) =>
     iso
@@ -71,6 +77,30 @@ export default async function InvoiceDetailPage({
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
+          {/* Send button — only for draft invoices that haven't been sent yet */}
+          {invoice.status === "draft" && (
+            <SendInvoiceButton
+              invoiceId={invoice.id}
+              invoiceNumber={invoice.invoiceNumber}
+              compact
+            />
+          )}
+
+          {/* Edit button — disabled for paid invoices (receipt integrity) */}
+          {invoice.status !== "paid" && (
+            <Button
+              asChild
+              variant="outline"
+              size="sm"
+              className="flex-1 sm:flex-none"
+            >
+              <Link href={`/dashboard/invoices/${invoice.id}/edit`}>
+                <Pencil className="h-4 w-4" />
+                <span className="hidden sm:inline">Edit</span>
+              </Link>
+            </Button>
+          )}
+
           <InvoiceShareButtons
             invoiceId={invoice.id}
             invoiceNumber={invoice.invoiceNumber}
@@ -280,6 +310,22 @@ export default async function InvoiceDetailPage({
           </dl>
         </CardContent>
       </Card>
+
+      {/* Activity timeline */}
+      {activities.length > 0 && (
+        <Card>
+          <CardContent className="p-4 sm:p-6">
+            <p className="mb-4 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Activity
+            </p>
+            <ol className="relative space-y-0 border-l border-border pl-5">
+              {activities.map((event) => (
+                <ActivityItem key={event.id} event={event} fmtDate={fmtDate} />
+              ))}
+            </ol>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
@@ -307,5 +353,47 @@ function Row({
         {value}
       </dd>
     </>
+  );
+}
+
+const ACTIVITY_ICON: Record<string, React.ComponentType<{ className?: string }>> = {
+  invoice_created: Plus,
+  invoice_sent: Send,
+  invoice_viewed: Eye,
+  invoice_paid: CheckCircle2,
+  invoice_overdue: Clock,
+  invoice_draft: FileText,
+};
+
+function ActivityItem({
+  event,
+  fmtDate,
+}: {
+  event: ActivityRecord;
+  fmtDate: (iso: string | null) => string;
+}) {
+  const Icon = ACTIVITY_ICON[event.kind] ?? FileText;
+  return (
+    <li className="relative pb-4 last:pb-0">
+      {/* Dot on the timeline rail */}
+      <span className="absolute -left-[21px] flex h-5 w-5 items-center justify-center rounded-full border bg-background">
+        <Icon className="h-2.5 w-2.5 text-muted-foreground" />
+      </span>
+      <div className="ml-1">
+        <p className="text-sm font-medium leading-snug">{event.title}</p>
+        {event.message && (
+          <p className="mt-0.5 text-xs text-muted-foreground">{event.message}</p>
+        )}
+        <p className="mt-1 text-[11px] text-muted-foreground/70">
+          {new Date(event.createdAt).toLocaleDateString("en-IN", {
+            day: "2-digit",
+            month: "short",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+          })}
+        </p>
+      </div>
+    </li>
   );
 }

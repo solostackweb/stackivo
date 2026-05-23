@@ -6,6 +6,9 @@ import {
   MoreHorizontal,
   Eye,
   Trash2,
+  Copy,
+  Send,
+  Pencil,
 } from "lucide-react";
 import type { ColumnDef } from "@tanstack/react-table";
 
@@ -35,6 +38,8 @@ export interface InvoiceColumnLookup {
 interface ColumnActions {
   onMarkPaid: (invoice: InvoiceRecord) => void;
   onDelete: (invoice: InvoiceRecord) => void;
+  onDuplicate: (invoice: InvoiceRecord) => void;
+  onResend: (invoice: InvoiceRecord) => void;
   lookup: InvoiceColumnLookup;
 }
 
@@ -82,6 +87,8 @@ function formatDueLabel(invoice: InvoiceRecord) {
 export function buildInvoiceColumns({
   onMarkPaid,
   onDelete,
+  onDuplicate,
+  onResend,
   lookup,
 }: ColumnActions): ColumnDef<InvoiceRecord>[] {
   return [
@@ -250,6 +257,12 @@ export function buildInvoiceColumns({
       cell: ({ row }) => {
         const inv = row.original;
         const canMarkPaid = inv.status !== "paid";
+        const canEdit = inv.status !== "paid";
+        const canResend =
+          inv.status === "sent" ||
+          inv.status === "viewed" ||
+          inv.status === "overdue";
+        const canSend = inv.status === "draft";
         return (
           <div className="flex justify-end" onClick={(e) => e.stopPropagation()}>
             <DropdownMenu>
@@ -259,18 +272,38 @@ export function buildInvoiceColumns({
                   <span className="sr-only">Open actions</span>
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-44">
+              <DropdownMenuContent align="end" className="w-48">
                 <DropdownMenuItem asChild>
                   <Link href={`/dashboard/invoices/${inv.id}`}>
                     <Eye /> View
                   </Link>
                 </DropdownMenuItem>
+                {canEdit && (
+                  <DropdownMenuItem asChild>
+                    <Link href={`/dashboard/invoices/${inv.id}/edit`}>
+                      <Pencil /> Edit
+                    </Link>
+                  </DropdownMenuItem>
+                )}
+                {canSend && (
+                  <DropdownMenuItem onClick={() => onResend(inv)}>
+                    <Send /> Send invoice
+                  </DropdownMenuItem>
+                )}
+                {canResend && (
+                  <DropdownMenuItem onClick={() => onResend(inv)}>
+                    <Send /> Resend reminder
+                  </DropdownMenuItem>
+                )}
                 {canMarkPaid && (
                   <DropdownMenuItem onClick={() => onMarkPaid(inv)}>
                     Mark as paid
                   </DropdownMenuItem>
                 )}
                 <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => onDuplicate(inv)}>
+                  <Copy /> Duplicate
+                </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={() => onDelete(inv)}
                   className="text-destructive focus:text-destructive"

@@ -13,14 +13,14 @@ import { getMarketingAuthState } from "@/features/marketing/auth-state";
 import { siteConfig } from "@/config/site";
 
 export const metadata: Metadata = {
-  title: "Stackivo — The operating system for independent work",
+  title: "Stackivo — Your freelance workflow, all in one place",
   description:
-    "Stackivo helps freelancers, creators, consultants, and small studios manage clients, invoicing, contracts, projects, payments, time tracking, and analytics from one professional workspace. Simple or GST invoices — your call.",
+    "Stackivo brings clients, invoices, contracts, projects, time tracking, and payments into one clean workspace for freelancers, consultants, and small studios. Simple invoices or full GST — you decide.",
   alternates: { canonical: "/" },
   openGraph: {
-    title: "Stackivo — The operating system for independent work",
+    title: "Stackivo — Your freelance workflow, all in one place",
     description:
-      "Clients, invoices, contracts, projects, time tracking, and payments — one workspace, built for every independent professional.",
+      "Clients, invoices, contracts, projects, time tracking — one workspace built for every independent professional. Free for your first 5 clients.",
     url: siteConfig.url,
   },
 };
@@ -39,6 +39,7 @@ export default async function LandingPage() {
             "@type": "SoftwareApplication",
             name: "Stackivo",
             applicationCategory: "BusinessApplication",
+            applicationSubCategory: "FreelanceManagement",
             operatingSystem: "Web",
             description: siteConfig.description,
             url: siteConfig.url,

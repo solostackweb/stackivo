@@ -120,10 +120,9 @@ export function MarketingHeader({
 
 const NAV_LINKS = [
   { href: "/#features", label: "Features" },
-  { href: "/#workflow", label: "Workflow" },
-  { href: "/#gst", label: "GST" },
   { href: "/pricing", label: "Pricing" },
-  { href: "/#faq", label: "FAQ" },
+  { href: "/blog", label: "Blog" },
+  { href: "/tools", label: "Free tools" },
 ];
 
 function HeaderCtas({ authState }: { authState: MarketingAuthState }) {
@@ -135,11 +134,11 @@ function HeaderCtas({ authState }: { authState: MarketingAuthState }) {
             href="/dashboard/settings/billing?upgrade=clients"
             className="text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
           >
-            Need more clients? Upgrade to Pro.
+            Upgrade to Pro
           </Link>
         ) : null}
         <Button asChild size="sm">
-          <Link href="/dashboard" data-cta="header_dashboard">Proceed to Dashboard</Link>
+          <Link href="/dashboard" data-cta="header_dashboard">Dashboard</Link>
         </Button>
       </div>
     );
@@ -147,21 +146,19 @@ function HeaderCtas({ authState }: { authState: MarketingAuthState }) {
 
   return (
     <div className="hidden items-center gap-3 md:flex">
-      {/* Login is intentionally a small text link, not a button. Returning users
-          don't need attention; new visitors do. */}
       <Link
         href="/login"
         data-cta="header_login"
-        className="text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+        className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
       >
         Log in
       </Link>
       <Button
         asChild
         size="sm"
-        className="font-medium shadow-md shadow-primary/15 transition-shadow hover:shadow-lg hover:shadow-primary/25"
+        className="h-8 rounded-full px-4 text-xs font-semibold shadow-md shadow-primary/20 transition-all hover:shadow-lg hover:shadow-primary/30"
       >
-        <Link href="/signup" data-cta="header_primary">Start free</Link>
+        <Link href="/signup" data-cta="header_primary">Start free →</Link>
       </Button>
     </div>
   );
@@ -183,12 +180,12 @@ function MobileCtas({
             onClick={onNavigate}
             className="block rounded-md px-3 py-2 text-xs font-medium text-muted-foreground hover:bg-accent hover:text-foreground"
           >
-            Need more clients? Upgrade to Pro.
+            Upgrade to Pro
           </Link>
         ) : null}
         <Button asChild className="w-full justify-center">
           <Link href="/dashboard" onClick={onNavigate}>
-            Proceed to Dashboard
+            Dashboard
           </Link>
         </Button>
       </div>
@@ -199,14 +196,22 @@ function MobileCtas({
     <div className="grid gap-2">
       <Button asChild>
         <Link href="/signup" onClick={onNavigate} data-cta="mobile_menu_primary">
-          Start Free
+          Start free — it's free
         </Link>
       </Button>
-      <Button asChild variant="ghost" className="justify-start">
+      <Button asChild variant="ghost" className="justify-start text-muted-foreground">
         <Link href="/login" onClick={onNavigate} data-cta="mobile_menu_login">
           Log in
         </Link>
       </Button>
+      <div className="my-1 border-t" />
+      <Link
+        href="/portal-access"
+        onClick={onNavigate}
+        className="px-3 py-2 text-xs text-muted-foreground transition-colors hover:text-foreground"
+      >
+        Client? Access your portal →
+      </Link>
     </div>
   );
 }

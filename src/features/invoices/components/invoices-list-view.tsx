@@ -33,7 +33,9 @@ import { InvoiceMobileCard } from "./invoice-mobile-card";
 import {
   deleteInvoiceAction,
   setInvoiceStatusAction,
+  duplicateInvoiceAction,
 } from "../actions";
+import { sendInvoiceAction } from "../delivery";
 
 interface InvoicesListViewProps {
   invoices: InvoiceRecord[];
@@ -93,9 +95,39 @@ export function InvoicesListView({
 
   const handleMarkPaid = (invoice: InvoiceRecord) =>
     runStatusChange(invoice, "paid");
+
   const handleDelete = (invoice: InvoiceRecord) => {
     setPendingDeleteIds([invoice.id]);
     setBulkDeleteOpen(true);
+  };
+
+  const handleDuplicate = (invoice: InvoiceRecord) => {
+    const fd = new FormData();
+    fd.set("id", invoice.id);
+    startTransition(async () => {
+      const res = await duplicateInvoiceAction(undefined, fd);
+      if (!res.ok) {
+        toast.error(res.error);
+        return;
+      }
+      toast.success(`${invoice.invoiceNumber} duplicated as draft`);
+      router.refresh();
+      if (res.data?.id) {
+        router.push(`/dashboard/invoices/${res.data.id}`);
+      }
+    });
+  };
+
+  const handleResend = (invoice: InvoiceRecord) => {
+    startTransition(async () => {
+      const res = await sendInvoiceAction({ invoiceId: invoice.id });
+      if (!res.ok) {
+        toast.error(res.error ?? "Failed to send");
+        return;
+      }
+      toast.success(`${invoice.invoiceNumber} sent to client`);
+      router.refresh();
+    });
   };
 
   const confirmDelete = () => {
@@ -126,6 +158,8 @@ export function InvoicesListView({
       buildInvoiceColumns({
         onMarkPaid: handleMarkPaid,
         onDelete: handleDelete,
+        onDuplicate: handleDuplicate,
+        onResend: handleResend,
         lookup,
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps

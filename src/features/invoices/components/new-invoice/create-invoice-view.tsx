@@ -180,8 +180,12 @@ export function CreateInvoiceView({
     [projects, watched.clientId],
   );
 
+  // Tracks whether the submit was triggered by "save draft" or "create & send"
+  const submitModeRef = React.useRef<"draft" | "send">("send");
+
   const submit = React.useCallback(
     async (values: InvoiceFormValues) => {
+      const isSendMode = submitModeRef.current === "send";
       const totalsForLines = (values.items ?? []).map((item, index) => ({
         description: item.description,
         quantity: Number(item.quantity) || 0,
@@ -196,9 +200,7 @@ export function CreateInvoiceView({
         issueDate: values.issueDate,
         dueDate: values.dueDate,
         currency: profile?.defaultCurrency ?? "INR",
-        // Start every invoice as a draft. The optional email send below
-        // promotes it to "sent". Payment state (paid / partially_paid)
-        // is owned by the payment flow — never set on creation.
+        // Always create as draft first; the send step below promotes to "sent".
         status: "draft",
         notes: values.notes || undefined,
         terms: values.terms || undefined,
@@ -213,8 +215,14 @@ export function CreateInvoiceView({
       }
       const invoiceId = res.data?.id;
       if (!invoiceId) {
-        toast.success(`Invoice ${values.invoiceNumber} created`);
+        toast.success(`Invoice ${values.invoiceNumber} saved as draft`);
         router.push("/dashboard/invoices");
+        router.refresh();
+        return;
+      }
+      if (!isSendMode) {
+        toast.success(`Invoice ${values.invoiceNumber} saved as draft`);
+        router.push(`/dashboard/invoices/${invoiceId}`);
         router.refresh();
         return;
       }
@@ -231,8 +239,13 @@ export function CreateInvoiceView({
   );
 
   const onSend = handleSubmit(
-    (values) => submit(values),
+    (values) => { submitModeRef.current = "send"; return submit(values); },
     () => toast.error("Please fix the errors before creating the invoice"),
+  );
+
+  const onDraft = handleSubmit(
+    (values) => { submitModeRef.current = "draft"; return submit(values); },
+    () => toast.error("Please fix the errors before saving the invoice"),
   );
 
   return (
@@ -279,8 +292,17 @@ export function CreateInvoiceView({
               {previewOpen ? <EyeOff /> : <Eye />}
               {previewOpen ? "Hide preview" : "Show preview"}
             </Button>
-            {/* Desktop primary action lives in the toolbar. On mobile we hide
-                it here because it's duplicated in the fixed bottom bar below. */}
+            {/* Desktop actions — hidden on mobile (duplicated in fixed bottom bar) */}
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={onDraft}
+              disabled={isSubmitting}
+              className="hidden sm:inline-flex"
+            >
+              Save as draft
+            </Button>
             <Button
               type="button"
               size="sm"
@@ -288,7 +310,7 @@ export function CreateInvoiceView({
               disabled={isSubmitting}
               className="hidden sm:inline-flex"
             >
-              <Send /> Create &amp; send invoice
+              <Send /> Create &amp; send
             </Button>
           </div>
         </div>
@@ -314,7 +336,7 @@ export function CreateInvoiceView({
                   <Field label="Issue date" error={errors.issueDate?.message}>
                     <Input type="date" {...register("issueDate")} />
                   </Field>
-                  <Field label="Payment date" error={errors.dueDate?.message}>
+                  <Field label="Due date" error={errors.dueDate?.message}>
                     <Input type="date" {...register("dueDate")} />
                   </Field>
 
@@ -608,14 +630,25 @@ export function CreateInvoiceView({
             bottom: "calc(var(--mobile-bottom-nav-h, 0px) + env(safe-area-inset-bottom, 0px))",
           }}
         >
-          <Button
-            type="button"
-            onClick={onSend}
-            disabled={isSubmitting}
-            className="h-11 w-full text-[15px]"
-          >
-            <Send /> Create &amp; send invoice
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onDraft}
+              disabled={isSubmitting}
+              className="h-11 flex-1 text-[15px]"
+            >
+              Save draft
+            </Button>
+            <Button
+              type="button"
+              onClick={onSend}
+              disabled={isSubmitting}
+              className="h-11 flex-[2] text-[15px]"
+            >
+              <Send /> Create &amp; send
+            </Button>
+          </div>
         </div>
       </div>
     </FormProvider>

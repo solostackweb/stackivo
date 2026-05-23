@@ -40,7 +40,7 @@ export function MarketingFooter({
 }) {
   const accountLinks = authState.isAuthenticated
     ? [
-        { label: "Proceed to Dashboard", href: "/dashboard" },
+        { label: "Dashboard", href: "/dashboard" },
         ...(authState.showUpgradeNudge
           ? [
               {
@@ -51,9 +51,9 @@ export function MarketingFooter({
           : []),
       ]
     : [
-        { label: "Start Free", href: "/signup" },
-        { label: "Login", href: "/login" },
-        { label: "Signup", href: "/signup" },
+        { label: "Start free", href: "/signup" },
+        { label: "Log in", href: "/login" },
+        { label: "Client portal access", href: "/portal-access" },
         { label: "Reset password", href: "/forgot-password" },
       ];
 
@@ -80,8 +80,8 @@ export function MarketingFooter({
               <span className="text-base">{siteConfig.name}</span>
             </Link>
             <p className="max-w-xs text-sm leading-relaxed text-muted-foreground">
-              The unified business OS for freelancers. One workspace for clients,
-              invoices, contracts, projects and analytics.
+              The freelance workflow built for independent professionals.
+              Clients, invoices, contracts, projects — one clean place.
             </p>
             <div className="space-y-2">
               <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
@@ -122,10 +122,9 @@ export function MarketingFooter({
 
         <div className="mt-10 flex flex-col items-start justify-between gap-3 border-t pt-8 text-xs text-muted-foreground sm:flex-row sm:items-center">
           <p>
-            © {new Date().getFullYear()} {siteConfig.name}. Crafted for
-            independent workers.
+            © {new Date().getFullYear()} {siteConfig.name}. Built for independent professionals.
           </p>
-          <p className="font-medium">Made in India · Built for the world</p>
+          <p className="font-medium">Made in India · For the world</p>
         </div>
       </div>
     </footer>
