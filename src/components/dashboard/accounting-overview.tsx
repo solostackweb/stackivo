@@ -53,7 +53,7 @@ export function AccountingOverview({
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 stagger-children lg:grid-cols-4">
           <Tile
             icon={Wallet}
             label="Collected"
@@ -104,7 +104,7 @@ function Tile({ icon: Icon, label, value, sub, tone }: TileProps) {
   return (
     <div
       className={cn(
-        "flex items-start justify-between gap-3 rounded-lg border p-3",
+        "card-lift animate-slide-up-fade flex items-start justify-between gap-3 rounded-lg border p-3",
         tone === "default" && "bg-card",
         tone === "success" && "border-emerald-500/20 bg-emerald-500/[0.04]",
         tone === "warning" && "border-amber-500/20 bg-amber-500/[0.04]",

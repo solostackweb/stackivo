@@ -28,10 +28,10 @@ export function SidebarNav({ items, collapsed, onNavigate }: SidebarNavProps) {
             href={item.href}
             onClick={onNavigate}
             className={cn(
-              "group relative flex h-10 items-center gap-3 rounded-md px-2.5 text-sm font-medium transition-all duration-150",
+              "group relative flex h-10 items-center gap-3 rounded-md px-2.5 text-sm font-medium",
+              "transition-all duration-200 ease-out",
               "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground",
-              isActive &&
-                "bg-sidebar-accent text-sidebar-foreground shadow-sm",
+              isActive && "bg-sidebar-accent text-sidebar-foreground shadow-sm",
               collapsed && "justify-center px-0",
             )}
             title={collapsed ? item.title : undefined}
@@ -39,15 +39,15 @@ export function SidebarNav({ items, collapsed, onNavigate }: SidebarNavProps) {
             {isActive && !collapsed ? (
               <span
                 aria-hidden
-                className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-r-full bg-gradient-to-b from-primary to-indigo-500"
+                className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-r-full bg-gradient-to-b from-primary to-indigo-500 transition-all duration-200"
               />
             ) : null}
             <Icon
               className={cn(
-                "h-4 w-4 shrink-0 transition-colors",
+                "h-4 w-4 shrink-0 transition-all duration-200",
                 isActive
-                  ? "text-primary"
-                  : "text-sidebar-foreground/60 group-hover:text-sidebar-foreground",
+                  ? "scale-110 text-primary"
+                  : "text-sidebar-foreground/60 group-hover:scale-105 group-hover:text-sidebar-foreground",
               )}
             />
             {!collapsed && <span className="truncate">{item.title}</span>}

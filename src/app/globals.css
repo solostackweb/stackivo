@@ -6,27 +6,26 @@
   :root {
     /* --font-sans and --font-mono are injected on <html> by next/font (see app/layout.tsx). */
 
-    /* Light mode — barely-there cool tint so pure-white cards pop against the bg */
-    --background: 220 16% 97%;
-    --foreground: 222 44% 11%;
+    --background: 0 0% 100%;
+    --foreground: 222 47% 11%;
 
     --card: 0 0% 100%;
-    --card-foreground: 222 44% 11%;
+    --card-foreground: 222 47% 11%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222 44% 11%;
+    --popover-foreground: 222 47% 11%;
 
     --primary: 224 76% 40%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 220 16% 93%;
-    --secondary-foreground: 222 44% 11%;
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 222 47% 11%;
 
-    --muted: 220 16% 93%;
-    --muted-foreground: 220 10% 44%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 16% 47%;
 
-    --accent: 220 16% 93%;
-    --accent-foreground: 222 44% 11%;
+    --accent: 210 40% 96%;
+    --accent-foreground: 222 47% 11%;
 
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 98%;
@@ -40,15 +39,15 @@
     --info: 199 89% 48%;
     --info-foreground: 0 0% 100%;
 
-    --border: 220 13% 87%;
-    --input: 220 13% 87%;
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
     --ring: 224 76% 40%;
 
-    --sidebar: 220 16% 97%;
-    --sidebar-foreground: 222 44% 11%;
-    --sidebar-border: 220 13% 89%;
-    --sidebar-accent: 220 16% 93%;
-    --sidebar-accent-foreground: 222 44% 11%;
+    --sidebar: 0 0% 100%;
+    --sidebar-foreground: 222 47% 11%;
+    --sidebar-border: 214 32% 91%;
+    --sidebar-accent: 210 40% 96%;
+    --sidebar-accent-foreground: 222 47% 11%;
 
     --radius: 0.5rem;
   }
@@ -180,7 +179,8 @@
   }
   @media (max-width: 767px) {
     :root {
-      --mobile-bottom-nav-h: 3.5rem;
+      /* h-16 bar + FAB overflow above */
+      --mobile-bottom-nav-h: 4rem;
     }
   }
 
@@ -333,4 +333,43 @@
   .animate-row {
     animation: row-fade-in 0.2s cubic-bezier(0.22, 1, 0.36, 1) both;
   }
+
+  /*
+   * Card hover lift — apply to interactive cards/tiles you want to feel
+   * "physical". Uses GPU-only properties (transform + box-shadow) so no
+   * layout shifts. Collapsed to instant under prefers-reduced-motion.
+   */
+  .card-lift {
+    transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
+                box-shadow 220ms cubic-bezier(0.22, 1, 0.36, 1),
+                border-color 220ms ease;
+  }
+  .card-lift:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px -4px hsl(222 12% 4% / 0.14),
+                0 3px 8px -2px  hsl(222 12% 4% / 0.10);
+  }
+  .dark .card-lift:hover {
+    box-shadow: 0 8px 28px -4px hsl(222 12% 2% / 0.55),
+                0 3px 10px -2px hsl(222 12% 2% / 0.35);
+    border-color: hsl(var(--border) / 1.4);
+  }
+  .card-lift:active {
+    transform: translateY(0px) scale(0.99);
+    transition-duration: 80ms;
+  }
+
+  /*
+   * Stagger delay helpers — apply to direct children of a staggered list.
+   * Pattern: add `stagger-children` to the parent and each child gets a
+   * delay via nth-child. Supports up to 8 children (covers all common grids).
+   */
+  .stagger-children > *:nth-child(1) { animation-delay: 0ms;   }
+  .stagger-children > *:nth-child(2) { animation-delay: 55ms;  }
+  .stagger-children > *:nth-child(3) { animation-delay: 110ms; }
+  .stagger-children > *:nth-child(4) { animation-delay: 165ms; }
+  .stagger-children > *:nth-child(5) { animation-delay: 220ms; }
+  .stagger-children > *:nth-child(6) { animation-delay: 275ms; }
+  .stagger-children > *:nth-child(7) { animation-delay: 330ms; }
+  .stagger-children > *:nth-child(8) { animation-delay: 385ms; }
 }

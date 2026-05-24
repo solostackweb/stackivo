@@ -69,8 +69,12 @@ export function RecentInvoices({ items }: { items: InvoiceFeedItem[] }) {
           <>
             {/* ── Mobile: stacked cards (hidden on md+) ── */}
             <ul className="divide-y md:hidden">
-              {items.map((inv) => (
-                <li key={inv.id}>
+              {items.map((inv, i) => (
+                <li
+                  key={inv.id}
+                  className="animate-row"
+                  style={{ animationDelay: `${i * 45}ms` }}
+                >
                   <Link
                     href={`/dashboard/invoices/${inv.id}`}
                     className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-accent"
@@ -122,8 +126,12 @@ export function RecentInvoices({ items }: { items: InvoiceFeedItem[] }) {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {items.map((inv) => (
-                    <TableRow key={inv.id} className="transition-colors">
+                  {items.map((inv, i) => (
+                    <TableRow
+                      key={inv.id}
+                      className="animate-row transition-colors"
+                      style={{ animationDelay: `${i * 45}ms` }}
+                    >
                       <TableCell className="pl-6 font-semibold">
                         <Link
                           href={`/dashboard/invoices/${inv.id}`}
