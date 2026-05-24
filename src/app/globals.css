@@ -6,26 +6,27 @@
   :root {
     /* --font-sans and --font-mono are injected on <html> by next/font (see app/layout.tsx). */
 
-    --background: 0 0% 100%;
-    --foreground: 222 47% 11%;
+    /* Light mode — barely-there cool tint so pure-white cards pop against the bg */
+    --background: 220 16% 97%;
+    --foreground: 222 44% 11%;
 
     --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
+    --card-foreground: 222 44% 11%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
+    --popover-foreground: 222 44% 11%;
 
     --primary: 224 76% 40%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 210 40% 96%;
-    --secondary-foreground: 222 47% 11%;
+    --secondary: 220 16% 93%;
+    --secondary-foreground: 222 44% 11%;
 
-    --muted: 210 40% 96%;
-    --muted-foreground: 215 16% 47%;
+    --muted: 220 16% 93%;
+    --muted-foreground: 220 10% 44%;
 
-    --accent: 210 40% 96%;
-    --accent-foreground: 222 47% 11%;
+    --accent: 220 16% 93%;
+    --accent-foreground: 222 44% 11%;
 
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 98%;
@@ -39,62 +40,74 @@
     --info: 199 89% 48%;
     --info-foreground: 0 0% 100%;
 
-    --border: 214 32% 91%;
-    --input: 214 32% 91%;
+    --border: 220 13% 87%;
+    --input: 220 13% 87%;
     --ring: 224 76% 40%;
 
-    --sidebar: 0 0% 100%;
-    --sidebar-foreground: 222 47% 11%;
-    --sidebar-border: 214 32% 91%;
-    --sidebar-accent: 210 40% 96%;
-    --sidebar-accent-foreground: 222 47% 11%;
+    --sidebar: 220 16% 97%;
+    --sidebar-foreground: 222 44% 11%;
+    --sidebar-border: 220 13% 89%;
+    --sidebar-accent: 220 16% 93%;
+    --sidebar-accent-foreground: 222 44% 11%;
 
     --radius: 0.5rem;
   }
 
   .dark {
-    --background: 222 47% 6%;
-    --foreground: 210 40% 98%;
+    /*
+     * Premium dark depth system — 5 elevation layers, all sharing hue 222
+     * but with saturation dropped to 12% (vs the old 47%) so the dark reads
+     * as near-neutral, like Linear / Vercel / Raycast, not generic navy.
+     *
+     * Elevation ladder (lightness):
+     *   sidebar  7%  ← deepest (anchors the page left edge)
+     *   bg       9%  ← page canvas
+     *   card    12%  ← surfaces floating on the canvas
+     *   popover 14%  ← menus / tooltips floating above cards
+     *   border  20%  ← just visible enough to separate regions
+     */
+    --background: 222 12% 9%;
+    --foreground: 215 20% 95%;
 
-    --card: 222 47% 8%;
-    --card-foreground: 210 40% 98%;
+    --card: 222 12% 12%;
+    --card-foreground: 215 20% 95%;
 
-    --popover: 222 47% 8%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 222 12% 14%;
+    --popover-foreground: 215 20% 95%;
 
-    --primary: 217 91% 60%;
-    --primary-foreground: 222 47% 11%;
+    --primary: 221 85% 62%;
+    --primary-foreground: 222 12% 9%;
 
-    --secondary: 217 33% 15%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary: 222 12% 18%;
+    --secondary-foreground: 215 20% 95%;
 
-    --muted: 217 33% 15%;
-    --muted-foreground: 215 20% 65%;
+    --muted: 222 12% 16%;
+    --muted-foreground: 218 10% 55%;
 
-    --accent: 217 33% 15%;
-    --accent-foreground: 210 40% 98%;
+    --accent: 222 12% 20%;
+    --accent-foreground: 215 20% 95%;
 
-    --destructive: 0 63% 50%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 68% 54%;
+    --destructive-foreground: 215 20% 95%;
 
-    --success: 142 70% 45%;
+    --success: 142 68% 46%;
     --success-foreground: 0 0% 100%;
 
-    --warning: 38 92% 55%;
-    --warning-foreground: 0 0% 100%;
+    --warning: 38 88% 57%;
+    --warning-foreground: 222 12% 9%;
 
-    --info: 199 89% 55%;
+    --info: 199 85% 58%;
     --info-foreground: 0 0% 100%;
 
-    --border: 217 33% 18%;
-    --input: 217 33% 18%;
-    --ring: 217 91% 60%;
+    --border: 222 12% 20%;
+    --input: 222 12% 18%;
+    --ring: 221 85% 62%;
 
-    --sidebar: 222 47% 7%;
-    --sidebar-foreground: 210 40% 98%;
-    --sidebar-border: 217 33% 15%;
-    --sidebar-accent: 217 33% 15%;
-    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar: 222 12% 7%;
+    --sidebar-foreground: 215 20% 95%;
+    --sidebar-border: 222 12% 14%;
+    --sidebar-accent: 222 12% 13%;
+    --sidebar-accent-foreground: 215 20% 95%;
   }
 }
 
@@ -108,6 +121,31 @@
     font-variation-settings: "opsz" 32;
     /* Suppress the gray flash on mobile tap; we provide explicit hover/active states */
     -webkit-tap-highlight-color: transparent;
+  }
+  /*
+   * Dark mode ambient glow — a subtle radial highlight at the very top of
+   * the page (like Linear / Vercel). Purely decorative; collapses under
+   * prefers-reduced-motion via the global rule below.
+   */
+  .dark body {
+    background-image: radial-gradient(
+      ellipse 80% 40% at 50% -4%,
+      hsl(221 50% 30% / 0.12),
+      transparent
+    );
+  }
+  /*
+   * Dark mode card elevation — give bordered surfaces a subtle drop shadow
+   * so layers feel physically stacked, not just colour-differentiated.
+   * We target Radix/shadcn card + popover/dialog containers by their
+   * standard class names; using a low-specificity rule keeps overrides easy.
+   */
+  .dark [data-radix-popper-content-wrapper],
+  .dark [role="dialog"],
+  .dark [role="menu"] {
+    --tw-shadow: 0 8px 32px -4px hsl(222 12% 4% / 0.6),
+                 0 2px 8px -2px  hsl(222 12% 4% / 0.4);
+    box-shadow: var(--tw-shadow);
   }
   /* Prevent overscroll bounce only in standalone PWA, so browser-tab users
      keep native pull-to-refresh. */
