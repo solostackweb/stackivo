@@ -17,6 +17,8 @@ import { ClientMobileCard } from "./client-mobile-card";
 
 interface ClientsListViewProps {
   clients: ClientRecord[];
+  /** When true (from ?create=1 URL param), auto-opens the new-client dialog on mount. */
+  autoCreate?: boolean;
 }
 
 /**
@@ -24,12 +26,20 @@ interface ClientsListViewProps {
  * page; mutations go through server actions and a `router.refresh()`
  * re-hydrates this list.
  */
-export function ClientsListView({ clients }: ClientsListViewProps) {
+export function ClientsListView({ clients, autoCreate }: ClientsListViewProps) {
   const router = useRouter();
   const [editingClient, setEditingClient] = React.useState<ClientRecord | null>(
     null,
   );
   const [formOpen, setFormOpen] = React.useState(false);
+
+  // Auto-open the create dialog when navigated from the FAB (?create=1).
+  React.useEffect(() => {
+    if (autoCreate) {
+      setEditingClient(null);
+      setFormOpen(true);
+    }
+  }, [autoCreate]);
   const [deletingClient, setDeletingClient] = React.useState<ClientRecord | null>(
     null,
   );

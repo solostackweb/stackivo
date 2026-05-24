@@ -6,10 +6,15 @@ import { getClientDisplayName } from "@/features/clients/utils";
 export const metadata = { title: "Projects" };
 export const dynamic = "force-dynamic";
 
-export default async function ProjectsPage() {
-  const [projects, clients] = await Promise.all([
+interface Props {
+  searchParams: Promise<{ create?: string }>;
+}
+
+export default async function ProjectsPage({ searchParams }: Props) {
+  const [projects, clients, sp] = await Promise.all([
     listProjects({ limit: 200 }),
     listClients({ limit: 200 }),
+    searchParams,
   ]);
 
   const clientOptions = clients.map((c) => ({
@@ -17,5 +22,11 @@ export default async function ProjectsPage() {
     name: getClientDisplayName(c),
   }));
 
-  return <ProjectsListView projects={projects} clients={clientOptions} />;
+  return (
+    <ProjectsListView
+      projects={projects}
+      clients={clientOptions}
+      autoCreate={sp.create === "1"}
+    />
+  );
 }

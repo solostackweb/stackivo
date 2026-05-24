@@ -40,19 +40,26 @@ const KANBAN_COLUMNS: ProjectStatusRow[] = PROJECT_KANBAN_STATUSES;
 interface ProjectsListViewProps {
   projects: ProjectRecord[];
   clients: Array<{ id: string; name: string }>;
+  /** When true (from ?create=1 URL param), auto-opens the new-project dialog on mount. */
+  autoCreate?: boolean;
 }
 
 /**
  * Top-level Projects view: header + filters + view toggle (grid ↔ kanban).
  * Filtering happens locally on the snapshot passed from the server page.
  */
-export function ProjectsListView({ projects, clients }: ProjectsListViewProps) {
+export function ProjectsListView({ projects, clients, autoCreate }: ProjectsListViewProps) {
   const [view, setView] = React.useState<ViewMode>("grid");
   const [search, setSearch] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState<
     ProjectStatusRow | "all"
   >("all");
   const [createOpen, setCreateOpen] = React.useState(false);
+
+  // Auto-open the create dialog when navigated from the FAB (?create=1).
+  React.useEffect(() => {
+    if (autoCreate) setCreateOpen(true);
+  }, [autoCreate]);
   const [selectedIds, setSelectedIds] = React.useState<Set<string>>(
     () => new Set(),
   );

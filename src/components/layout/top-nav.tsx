@@ -3,7 +3,6 @@
 import * as React from "react";
 import Link from "next/link";
 import { StackivoMark } from "@/components/brand/stackivo-logo";
-import { MobileNavTrigger } from "./mobile-nav";
 import { UserNav } from "./user-nav";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { Breadcrumbs } from "@/components/shared/breadcrumbs";
@@ -17,18 +16,15 @@ export function TopNav() {
       className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b bg-background/70 px-3 shadow-sm backdrop-blur-xl md:gap-3 md:px-6"
       style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}
     >
-      <MobileNavTrigger />
-
-      {/* Mobile: compact brand mark only (no wordmark). The full Stackivo
-          wordmark already lives in the navigation drawer header, so we
-          don't need to repeat it in the always-visible top bar — that
-          gives the page title and notifications room to breathe. */}
+      {/* Mobile brand — mark + wordmark. No hamburger needed; navigation
+          lives entirely in the bottom bar and its sheets. */}
       <Link
         href="/dashboard"
-        className="flex items-center md:hidden"
+        className="flex items-center gap-2 md:hidden"
         aria-label="Stackivo home"
       >
         <StackivoMark className="h-7 w-7" />
+        <span className="text-[15px] font-semibold tracking-tight">Stackivo</span>
       </Link>
 
       {/* Desktop breadcrumbs */}
