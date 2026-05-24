@@ -163,6 +163,11 @@
        container, so position:fixed children (bottom-nav, modals) keep their
        viewport-relative positioning. */
     overflow-x: clip;
+    /* Always reserve space for the vertical scrollbar so the layout never
+       shifts when Radix UI locks body scroll on dropdown/dialog open.
+       This fixes the right-side jitter visible on scroll-heavy pages
+       (dashboard) when the notification or profile menu is opened. */
+    scrollbar-gutter: stable;
   }
   /* iOS Safari zooms on focus when input font-size < 16px. Lift form fields to 16px on mobile. */
   @media (max-width: 767px) {

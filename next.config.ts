@@ -34,6 +34,50 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   outputFileTracingRoot: process.cwd(),
+
+  /**
+   * Keep heavy server-only packages out of the client bundle entirely.
+   * Next.js would otherwise attempt to bundle these into the edge runtime
+   * or client chunks, massively bloating the JS payload.
+   */
+  serverExternalPackages: [
+    "@react-pdf/renderer",
+    "nodemailer",
+    "@aws-sdk/client-s3",
+    "@aws-sdk/s3-request-presigner",
+  ],
+
+  experimental: {
+    /**
+     * Tree-shake barrel-export packages at build time.
+     *
+     * Packages like `lucide-react` re-export hundreds of icons from a
+     * single index — without this flag, Next.js may pull the entire
+     * namespace into every chunk that imports even one symbol. With it,
+     * the compiler rewrites `import { X } from "pkg"` to the deep import
+     * path so only the referenced exports are bundled.
+     *
+     * Similarly, each `@radix-ui/*` package has a barrel index; explicit
+     * optimisation keeps those out of chunks that don't reference them.
+     */
+    optimizePackageImports: [
+      "lucide-react",
+      "recharts",
+      "framer-motion",
+      "@radix-ui/react-alert-dialog",
+      "@radix-ui/react-avatar",
+      "@radix-ui/react-checkbox",
+      "@radix-ui/react-dialog",
+      "@radix-ui/react-dropdown-menu",
+      "@radix-ui/react-label",
+      "@radix-ui/react-select",
+      "@radix-ui/react-separator",
+      "@radix-ui/react-slot",
+      "@radix-ui/react-switch",
+      "@radix-ui/react-tabs",
+      "@radix-ui/react-tooltip",
+    ],
+  },
   async redirects() {
     return [
       {

@@ -215,6 +215,88 @@ export async function getDashboardSnapshot() {
 export type DashboardSnapshot = Awaited<ReturnType<typeof getDashboardSnapshot>>;
 export type { ActivityRecord };
 
+// ─── Focused snapshot functions for Suspense streaming ────────────────────
+
+/**
+ * KPI strip + revenue series — pure DB aggregates, no hydration step.
+ * These are fast parallel queries that populate the above-the-fold tiles.
+ */
+export async function getKpiSnapshot() {
+  const [invoices, projects, overdue, revenueSeries] = await Promise.all([
+    getInvoiceAggregates(),
+    getProjectAggregates(),
+    getOverdueTotal(),
+    getRevenueSeries(6),
+  ]);
+  return {
+    collectedAllTime: invoices.collectedAllTime,
+    outstanding: invoices.outstanding,
+    overdueAmount: overdue,
+    activeProjects: projects.active,
+    revenueSeries,
+  };
+}
+
+/**
+ * Recent invoices (with client-name hydration) + activity timeline.
+ * Runs the hydration waterfall in isolation so the KPI tiles don't wait for it.
+ */
+export async function getRecentFeedSnapshot() {
+  const [invoices, rawActivity] = await Promise.all([
+    getInvoiceAggregates(),
+    listActivity({ limit: 10 }),
+  ]);
+  const recentInvoices = await hydrateInvoiceFeed(invoices.recent);
+  return { recentInvoices, activity: rawActivity };
+}
+
+/**
+ * Recent clients — needs a client-revenue join for lifetime values.
+ * Kept separate so the invoice feed above can stream in first.
+ */
+export async function getRecentClientsSnapshot() {
+  const [clients, topClientsRaw] = await Promise.all([
+    getClientAggregates(),
+    getClientRevenue(5),
+  ]);
+
+  const topClientIds = topClientsRaw
+    .map((r) => r.clientId)
+    .filter((id): id is string => !!id);
+
+  const topClientMap = new Map<string, ClientRecord>();
+  if (topClientIds.length > 0) {
+    const supabase = await getServerSupabase();
+    const { data } = await supabase
+      .from("clients")
+      .select("*")
+      .in("id", topClientIds);
+    for (const row of (data as unknown as ClientRow[]) ?? []) {
+      const mapped = mapClientRow(row);
+      topClientMap.set(mapped.id, mapped);
+    }
+  }
+
+  const topClients: TopClientRow[] = topClientsRaw.map((r) => {
+    const client = r.clientId ? topClientMap.get(r.clientId) : undefined;
+    const name = displayName(client);
+    return { ...r, name, initials: initialsFromName(name) };
+  });
+
+  const recentClients: ClientFeedItem[] = clients.recent.map((c) => {
+    const name = c.businessName ?? c.fullName;
+    return {
+      id: c.id,
+      name,
+      email: c.email,
+      initials: initialsFromName(name),
+      lifetimeValue: topClients.find((t) => t.clientId === c.id)?.totalPaid ?? 0,
+    };
+  });
+
+  return { recentClients };
+}
+
 /**
  * Sidebar counters — small + cheap. Called from the dashboard layout's
  * navigation so the sidebar always reflects current state.

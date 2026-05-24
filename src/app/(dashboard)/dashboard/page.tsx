@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { Plus } from "lucide-react";
 
@@ -13,9 +14,14 @@ import {
 } from "@/components/dashboard/upcoming-reminders";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/shared/page-header";
+import { Skeleton } from "@/components/ui/skeleton";
 import { ProfileCompletenessAlert } from "@/features/onboarding/components/profile-completeness-alert";
 import { DashboardSetupChecklist } from "@/components/dashboard/setup-checklist";
-import { getDashboardSnapshot } from "@/features/dashboard/server";
+import {
+  getKpiSnapshot,
+  getRecentFeedSnapshot,
+  getRecentClientsSnapshot,
+} from "@/features/dashboard/server";
 import { getBusinessProfile } from "@/features/onboarding/server";
 
 export const metadata = { title: "Dashboard" };
@@ -33,39 +39,148 @@ function firstNameOf(
   return source.trim().split(/\s+/)[0] ?? "back";
 }
 
+// ─── Async streaming sections ────────────────────────────────────────────────
+
+async function KpiSection() {
+  const { collectedAllTime, outstanding, overdueAmount, activeProjects, revenueSeries } =
+    await getKpiSnapshot();
+  return (
+    <>
+      <AccountingOverview
+        collectedAllTime={collectedAllTime}
+        outstanding={outstanding}
+        overdueAmount={overdueAmount}
+        activeProjects={activeProjects}
+      />
+      <RevenueChartLazy series={revenueSeries} />
+    </>
+  );
+}
+
+async function FeedSection() {
+  const { recentInvoices, activity } = await getRecentFeedSnapshot();
+  return (
+    <div className="grid items-start gap-4 md:grid-cols-[1fr_280px] lg:grid-cols-3">
+      <div className="lg:col-span-2">
+        <RecentInvoices items={recentInvoices} />
+      </div>
+      <ActivityTimeline items={activity} />
+    </div>
+  );
+}
+
+async function BottomGridSection() {
+  const { recentClients } = await getRecentClientsSnapshot();
+  const reminders = buildReminderFeed();
+  return (
+    <div className="grid items-start gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <RecentClients items={recentClients} />
+      <QuickActions />
+      <UpcomingReminders items={reminders} />
+    </div>
+  );
+}
+
+// ─── Skeleton fallbacks ───────────────────────────────────────────────────────
+
+function KpiSkeleton() {
+  return (
+    <div className="space-y-5">
+      {/* 4-tile KPI strip */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="rounded-xl border bg-card p-5">
+            <Skeleton className="mb-3 h-3.5 w-24" />
+            <Skeleton className="h-7 w-28" />
+          </div>
+        ))}
+      </div>
+      {/* Revenue chart placeholder */}
+      <div className="rounded-xl border bg-card p-6">
+        <Skeleton className="mb-4 h-4 w-32" />
+        <Skeleton className="h-[200px] w-full rounded-lg" />
+      </div>
+    </div>
+  );
+}
+
+function FeedSkeleton() {
+  return (
+    <div className="grid items-start gap-4 md:grid-cols-[1fr_280px] lg:grid-cols-3">
+      {/* Recent invoices */}
+      <div className="rounded-xl border bg-card p-5 lg:col-span-2">
+        <Skeleton className="mb-4 h-4 w-32" />
+        <div className="space-y-3">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="flex items-center gap-3">
+              <Skeleton className="h-8 w-8 shrink-0 rounded-full" />
+              <div className="flex-1 space-y-1.5">
+                <Skeleton className="h-3 w-32" />
+                <Skeleton className="h-2.5 w-20" />
+              </div>
+              <Skeleton className="h-3 w-16" />
+            </div>
+          ))}
+        </div>
+      </div>
+      {/* Activity timeline */}
+      <div className="rounded-xl border bg-card p-5">
+        <Skeleton className="mb-4 h-4 w-24" />
+        <div className="space-y-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="flex gap-3">
+              <Skeleton className="mt-0.5 h-6 w-6 shrink-0 rounded-full" />
+              <div className="flex-1 space-y-1.5">
+                <Skeleton className="h-3 w-full" />
+                <Skeleton className="h-2.5 w-20" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BottomGridSkeleton() {
+  return (
+    <div className="grid items-start gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {Array.from({ length: 3 }).map((_, i) => (
+        <div key={i} className="rounded-xl border bg-card p-5">
+          <Skeleton className="mb-4 h-4 w-28" />
+          <div className="space-y-3">
+            {Array.from({ length: 3 }).map((_, j) => (
+              <div key={j} className="flex items-center gap-3">
+                <Skeleton className="h-7 w-7 shrink-0 rounded-full" />
+                <Skeleton className="h-3 w-28" />
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
 /**
- * Freelancer dashboard.
+ * Freelancer dashboard — streams in three independent sections.
  *
- * Layout decisions:
+ * Render order (fastest to slowest):
+ *   1. PageHeader + profile checklist/alert — resolved immediately from a
+ *      single lightweight `getBusinessProfile()` query.
+ *   2. KPI tiles + revenue chart — fast aggregates, no hydration step.
+ *   3. Recent invoices + activity — requires a client-name hydration pass.
+ *   4. Recent clients + quick actions + reminders — separate client query.
  *
- *   - One primary KPI strip (4 tiles in `<AccountingOverview/>`) — no
- *     secondary KPI rows. Identity + GST status used to live up here;
- *     they're now scoped to the Settings/Profile page where they're
- *     actually actionable.
- *
- *   - Single top-level CTA ("New invoice"). Quick actions live below in
- *     a dedicated card, not the header.
- *
- *   - Activity timeline is height-capped with its own scrollbar (see the
- *     component), so adding more activity rows never stretches the
- *     surrounding grid.
+ * Each section is wrapped in <Suspense> so React can flush it to the browser
+ * as soon as its data arrives, without waiting for the sections below it.
  */
 export default async function DashboardPage() {
-  const [snapshot, profile] = await Promise.all([
-    getDashboardSnapshot(),
-    getBusinessProfile(),
-  ]);
-
-  const {
-    invoices,
-    projects,
-    activity,
-    recentInvoices,
-    recentClients,
-    pulse,
-  } = snapshot;
-
-  const reminders = buildReminderFeed();
+  // Profile is needed synchronously for the page header greeting and the
+  // setup checklist — it's a single cheap query so we don't defer it.
+  const profile = await getBusinessProfile();
   const greetingName = firstNameOf(profile);
 
   return (
@@ -99,27 +214,20 @@ export default async function DashboardPage() {
 
       {profile ? <ProfileCompletenessAlert profile={profile} /> : null}
 
-      <AccountingOverview
-        collectedAllTime={invoices.collectedAllTime}
-        outstanding={invoices.outstanding}
-        overdueAmount={invoices.overdueAmount}
-        activeProjects={projects.active}
-      />
+      {/* KPI tiles + revenue chart — fast DB aggregates */}
+      <Suspense fallback={<KpiSkeleton />}>
+        <KpiSection />
+      </Suspense>
 
-      <RevenueChartLazy series={pulse.revenueSeries} />
+      {/* Recent invoices + activity — hydration waterfall */}
+      <Suspense fallback={<FeedSkeleton />}>
+        <FeedSection />
+      </Suspense>
 
-      <div className="grid items-start gap-4 md:grid-cols-[1fr_280px] lg:grid-cols-3">
-        <div className="lg:col-span-2">
-          <RecentInvoices items={recentInvoices} />
-        </div>
-        <ActivityTimeline items={activity} />
-      </div>
-
-      <div className="grid items-start gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <RecentClients items={recentClients} />
-        <QuickActions />
-        <UpcomingReminders items={reminders} />
-      </div>
+      {/* Recent clients + quick actions + reminders */}
+      <Suspense fallback={<BottomGridSkeleton />}>
+        <BottomGridSection />
+      </Suspense>
     </div>
   );
 }
