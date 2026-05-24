@@ -6,6 +6,7 @@ import {
   getClient,
   getClientInvoiceMetrics,
 } from "@/features/clients/server";
+import { listInvoices } from "@/features/invoices/server";
 import { getClientDisplayName } from "@/features/clients/utils";
 
 interface PageProps {
@@ -25,7 +26,16 @@ export default async function ClientProfilePage({ params }: PageProps) {
   const client = await getClient(id);
   if (!client) notFound();
 
-  const metrics = await getClientInvoiceMetrics(client.id);
+  const [metrics, recentInvoices] = await Promise.all([
+    getClientInvoiceMetrics(client.id),
+    listInvoices({ clientId: client.id, limit: 6 }),
+  ]);
 
-  return <ClientProfileView client={client} metrics={metrics} />;
+  return (
+    <ClientProfileView
+      client={client}
+      metrics={metrics}
+      recentInvoices={recentInvoices}
+    />
+  );
 }

@@ -8,10 +8,7 @@ import { QuickActions } from "@/components/dashboard/quick-actions";
 import { RecentClients } from "@/components/dashboard/recent-clients";
 import { RecentInvoices } from "@/components/dashboard/recent-invoices";
 import { RevenueChartLazy } from "@/components/dashboard/revenue-chart-lazy";
-import {
-  UpcomingReminders,
-  type ReminderItem,
-} from "@/components/dashboard/upcoming-reminders";
+import { UpcomingReminders } from "@/components/dashboard/upcoming-reminders";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/shared/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -21,15 +18,13 @@ import {
   getKpiSnapshot,
   getRecentFeedSnapshot,
   getRecentClientsSnapshot,
+  getRemindersSnapshot,
 } from "@/features/dashboard/server";
 import { getBusinessProfile } from "@/features/onboarding/server";
 
 export const metadata = { title: "Dashboard" };
 export const dynamic = "force-dynamic";
 
-function buildReminderFeed(): ReminderItem[] {
-  return [];
-}
 
 function firstNameOf(
   profile: { fullName: string; displayName?: string | null } | null,
@@ -70,8 +65,10 @@ async function FeedSection() {
 }
 
 async function BottomGridSection() {
-  const { recentClients } = await getRecentClientsSnapshot();
-  const reminders = buildReminderFeed();
+  const [{ recentClients }, { reminders }] = await Promise.all([
+    getRecentClientsSnapshot(),
+    getRemindersSnapshot(),
+  ]);
   return (
     <div className="grid items-start gap-4 sm:grid-cols-2 lg:grid-cols-3">
       <RecentClients items={recentClients} />

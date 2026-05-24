@@ -4,6 +4,7 @@ import * as React from "react";
 import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
 interface SettingsSectionProps {
@@ -24,6 +25,8 @@ interface SettingsSectionProps {
   isSubmitting?: boolean;
   /** Render a danger accent along the top — used by the Delete account card. */
   tone?: "default" | "danger";
+  /** Optional badge rendered next to the title — e.g. "Coming soon". */
+  badge?: string;
 }
 
 /**
@@ -43,6 +46,7 @@ export function SettingsSection({
   isDirty,
   isSubmitting,
   tone = "default",
+  badge,
 }: SettingsSectionProps) {
   return (
     <Card
@@ -61,6 +65,11 @@ export function SettingsSection({
             )}
           >
             {title}
+            {badge && (
+              <Badge variant="secondary" className="ml-2 align-middle text-[10px]">
+                {badge}
+              </Badge>
+            )}
           </h3>
           {description && (
             <p className="mt-0.5 text-sm text-muted-foreground">

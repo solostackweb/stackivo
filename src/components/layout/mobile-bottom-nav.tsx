@@ -93,7 +93,7 @@ const MORE_ITEMS: MoreItem[] = [
   { title: "Time",         href: "/dashboard/time",       icon: Clock },
   { title: "Pulse",        href: "/dashboard/pulse",      icon: Activity },
   { title: "Portal",       href: "/dashboard/portal",     icon: Share2 },
-  { title: "Welcome",      href: "/dashboard/welcome",    icon: Sparkles },
+  { title: "Welcome Docs", href: "/dashboard/welcome",    icon: Sparkles },
   { title: "Settings",     href: "/dashboard/settings",   icon: Settings },
   { title: "Help & support", href: "/help",               icon: LifeBuoy },
 ];

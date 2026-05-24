@@ -339,7 +339,6 @@ function UpdateCard({
 
       {/* Action row */}
       <div className="flex flex-wrap items-center gap-2">
-        {/* Acknowledge (client, not yet done) */}
         {!isOwner && !hasAcknowledged && update.approval_status !== "approved" && (
           <Button
             size="sm"

@@ -24,7 +24,7 @@ import {
   markNotificationReadAction,
 } from "../actions";
 
-type FilterKey = "all" | "unread" | "mentions";
+type FilterKey = "all" | "unread" | "activity";
 
 interface NotificationsViewProps {
   initial: NotificationRecord[];
@@ -52,7 +52,7 @@ export function NotificationsView({ initial }: NotificationsViewProps) {
 
   const filtered = React.useMemo(() => {
     if (filter === "unread") return items.filter((n) => !n.read);
-    if (filter === "mentions")
+    if (filter === "activity")
       return items.filter(
         (n) => n.type.startsWith("client") || n.type.startsWith("contract"),
       );
@@ -134,7 +134,7 @@ export function NotificationsView({ initial }: NotificationsViewProps) {
             <TabsTrigger value="unread">
               Unread <Count value={unreadCount} />
             </TabsTrigger>
-            <TabsTrigger value="mentions">Clients & contracts</TabsTrigger>
+            <TabsTrigger value="activity">Clients & contracts</TabsTrigger>
           </TabsList>
         </div>
       </Tabs>

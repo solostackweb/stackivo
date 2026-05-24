@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -38,6 +39,7 @@ import { formatINR } from "@/lib/format";
 import { getStateName } from "@/features/gst/state-codes";
 
 import type { ClientRecord } from "../server";
+import type { InvoiceRecord } from "@/features/invoices/server";
 import { ClientFormDialog } from "./client-form-dialog";
 import { DeleteClientDialog } from "./delete-client-dialog";
 import { getClientDisplayName, getClientInitials } from "../utils";
@@ -49,13 +51,15 @@ interface ClientProfileViewProps {
     invoiceCount: number;
     paidTotal: number;
   };
+  /** Recent invoices for this client — drives the activity feed. */
+  recentInvoices?: InvoiceRecord[];
 }
 
 /**
  * Read-only profile view for a single client. Edit + delete dialogs are
  * mounted here and route off to server actions.
  */
-export function ClientProfileView({ client, metrics }: ClientProfileViewProps) {
+export function ClientProfileView({ client, metrics, recentInvoices = [] }: ClientProfileViewProps) {
   const router = useRouter();
   const [editOpen, setEditOpen] = React.useState(false);
   const [deleteOpen, setDeleteOpen] = React.useState(false);
@@ -181,16 +185,50 @@ export function ClientProfileView({ client, metrics }: ClientProfileViewProps) {
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
           <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Activity</CardTitle>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+              <CardTitle className="text-base">Recent invoices</CardTitle>
+              <Button variant="ghost" size="sm" asChild>
+                <Link href={`/dashboard/invoices?client=${client.id}`}>
+                  View all
+                </Link>
+              </Button>
             </CardHeader>
-            <CardContent>
-              <EmptyState
-                icon={Activity}
-                title="Activity timeline coming soon"
-                description="Recent invoices, payments, and notes for this client will show up here."
-                className="min-h-[180px]"
-              />
+            <CardContent className="pt-0">
+              {recentInvoices.length === 0 ? (
+                <EmptyState
+                  icon={Receipt}
+                  title="No invoices yet"
+                  description="Invoices you create for this client will appear here."
+                  className="min-h-[140px]"
+                  action={{
+                    label: "New invoice",
+                    href: `/dashboard/invoices/new?client=${client.id}`,
+                  }}
+                />
+              ) : (
+                <div className="-mx-1 divide-y">
+                  {recentInvoices.map((inv) => (
+                    <Link
+                      key={inv.id}
+                      href={`/dashboard/invoices/${inv.id}`}
+                      className="flex items-center gap-3 rounded-md px-1 py-3 text-sm transition-colors hover:bg-muted/50"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-medium">{inv.invoiceNumber}</p>
+                        <p className="text-xs text-muted-foreground">
+                          Due {new Date(inv.dueDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="text-sm font-medium tabular-nums">
+                          {formatINR(inv.totalAmount)}
+                        </span>
+                        <InvoiceStatusBadge status={inv.status} />
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -305,6 +343,23 @@ function StatTile({
         {value}
       </p>
     </div>
+  );
+}
+
+function InvoiceStatusBadge({ status }: { status: InvoiceRecord["status"] }) {
+  const map: Record<InvoiceRecord["status"], { label: string; className: string }> = {
+    paid:     { label: "Paid",     className: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" },
+    sent:     { label: "Sent",     className: "bg-blue-500/10 text-blue-600 dark:text-blue-400" },
+    overdue:  { label: "Overdue",  className: "bg-red-500/10 text-red-600 dark:text-red-400" },
+    draft:    { label: "Draft",    className: "bg-muted text-muted-foreground" },
+    void:     { label: "Void",     className: "bg-muted text-muted-foreground line-through" },
+    partial:  { label: "Partial",  className: "bg-amber-500/10 text-amber-600 dark:text-amber-400" },
+  };
+  const { label, className } = map[status] ?? { label: status, className: "bg-muted text-muted-foreground" };
+  return (
+    <Badge variant="outline" className={`h-5 px-1.5 text-[10px] font-semibold border-0 ${className}`}>
+      {label}
+    </Badge>
   );
 }
 

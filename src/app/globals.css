@@ -189,6 +189,20 @@
     }
   }
 
+  /* ── Density ──────────────────────────────────────────────────────────
+     data-density="compact" is toggled on <html> by the Appearance settings.
+     Tables, lists, and cards respond to tighter row + cell padding.
+     ------------------------------------------------------------------- */
+  [data-density="compact"] table td,
+  [data-density="compact"] table th {
+    padding-top: 0.375rem;    /* py-1.5 */
+    padding-bottom: 0.375rem;
+  }
+  [data-density="compact"] [data-density-row] {
+    padding-top: 0.5rem;      /* py-2 */
+    padding-bottom: 0.5rem;
+  }
+
   /* Respect prefers-reduced-motion globally. Disables Framer Motion's
      while-hover translations, the hero "Floating" loop, the badge ping,
      and any decorative `animate-*` utilities. CSS smooth-scroll also
@@ -377,4 +391,45 @@
   .stagger-children > *:nth-child(6) { animation-delay: 275ms; }
   .stagger-children > *:nth-child(7) { animation-delay: 330ms; }
   .stagger-children > *:nth-child(8) { animation-delay: 385ms; }
+
+  /*
+   * Reduced-motion override — set via Appearance settings or auto-seeded from
+   * the OS `prefers-reduced-motion` media query. Takes precedence over the
+   * `@media (prefers-reduced-motion)` block above so users can opt-in without
+   * changing their OS setting.
+   */
+  [data-reduced-motion="true"] *,
+  [data-reduced-motion="true"] *::before,
+  [data-reduced-motion="true"] *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  /*
+   * Tooltip visibility — when the user disables tooltips in Appearance
+   * settings we set data-tooltips="false" on <html>, which hides native
+   * title-attribute tooltips via pointer-events (no-op for screen-readers).
+   * Radix/shadcn Tooltip components should check this attribute and skip
+   * rendering when false.
+   */
+  [data-tooltips="false"] [title] {
+    /* Prevent the browser's native tooltip from showing */
+    pointer-events: none;
+  }
+  [data-tooltips="false"] [title]:not([href]) {
+    pointer-events: auto; /* restore interactivity for non-link elements */
+  }
+
+  /* Compact density overrides */
+  [data-density="compact"] table td,
+  [data-density="compact"] table th {
+    padding-top: 0.375rem;
+    padding-bottom: 0.375rem;
+  }
+  [data-density="compact"] [data-density-row] {
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+  }
 }

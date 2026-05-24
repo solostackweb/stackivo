@@ -255,11 +255,44 @@ export function InvoicesListView({
                   router.refresh();
                 });
               }}
-              onExport={() =>
-                toast(
-                  `Export coming soon (${count} selected)`,
-                )
-              }
+              onExport={() => {
+                const rows = selected.map((r) => r.original);
+                const headers = [
+                  "Invoice #",
+                  "Status",
+                  "Issue Date",
+                  "Due Date",
+                  "Currency",
+                  "Subtotal",
+                  "Tax",
+                  "Total",
+                  "Paid At",
+                ];
+                const csvRows = rows.map((inv) =>
+                  [
+                    inv.invoiceNumber,
+                    inv.status,
+                    inv.issueDate,
+                    inv.dueDate,
+                    inv.currency,
+                    inv.subtotal.toFixed(2),
+                    inv.taxTotal.toFixed(2),
+                    inv.totalAmount.toFixed(2),
+                    inv.paidAt ?? "",
+                  ]
+                    .map((v) => `"${String(v).replace(/"/g, '""')}"`)
+                    .join(","),
+                );
+                const csv = [headers.join(","), ...csvRows].join("\n");
+                const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `invoices-${new Date().toISOString().slice(0, 10)}.csv`;
+                a.click();
+                URL.revokeObjectURL(url);
+                toast.success(`Exported ${rows.length} invoice${rows.length === 1 ? "" : "s"}`);
+              }}
               onDelete={() => {
                 setPendingDeleteIds(selected.map((r) => r.original.id));
                 setBulkDeleteOpen(true);

@@ -107,25 +107,25 @@ export function presentNotification(
     // href uses a generic portal dashboard path; callers can override by
     // embedding a portalId in the notification metadata if needed.
     case "portal_update_posted":
-      return { icon: TrendingUp, tone: "info", href: "/dashboard/portals", dateKey };
+      return { icon: TrendingUp, tone: "info", href: "/dashboard/portal", dateKey };
     case "portal_deliverable_posted":
-      return { icon: TrendingUp, tone: "info", href: "/dashboard/portals", dateKey };
+      return { icon: TrendingUp, tone: "info", href: "/dashboard/portal", dateKey };
     case "portal_update_approved":
-      return { icon: CheckCircle2, tone: "success", href: "/dashboard/portals", dateKey };
+      return { icon: CheckCircle2, tone: "success", href: "/dashboard/portal", dateKey };
     case "portal_revision_requested":
-      return { icon: RotateCcw, tone: "warning", href: "/dashboard/portals", dateKey };
+      return { icon: RotateCcw, tone: "warning", href: "/dashboard/portal", dateKey };
     case "portal_update_acknowledged":
-      return { icon: Eye, tone: "info", href: "/dashboard/portals", dateKey };
+      return { icon: Eye, tone: "info", href: "/dashboard/portal", dateKey };
     case "portal_meeting_requested":
-      return { icon: Video, tone: "info", href: "/dashboard/portals", dateKey };
+      return { icon: Video, tone: "info", href: "/dashboard/portal", dateKey };
     case "portal_meeting_confirmed":
-      return { icon: Video, tone: "success", href: "/dashboard/portals", dateKey };
+      return { icon: Video, tone: "success", href: "/dashboard/portal", dateKey };
     case "portal_meeting_declined":
-      return { icon: Video, tone: "warning", href: "/dashboard/portals", dateKey };
+      return { icon: Video, tone: "warning", href: "/dashboard/portal", dateKey };
     case "portal_file_uploaded":
-      return { icon: Upload, tone: "info", href: "/dashboard/portals", dateKey };
+      return { icon: Upload, tone: "info", href: "/dashboard/portal", dateKey };
     case "portal_comment_posted":
-      return { icon: MessageSquare, tone: "default", href: "/dashboard/portals", dateKey };
+      return { icon: MessageSquare, tone: "default", href: "/dashboard/portal", dateKey };
 
     default:
       return { icon: Bell, tone: "default", href: null, dateKey };

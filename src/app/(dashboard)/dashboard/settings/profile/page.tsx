@@ -245,9 +245,6 @@ export default function ProfileSettingsPage() {
               </SelectContent>
             </Select>
           </SettingsField>
-          <SettingsField label="Date format" hint="Date formatting is coming soon.">
-            <div className="text-sm text-muted-foreground">Based on locale</div>
-          </SettingsField>
         </div>
       </SettingsSection>
 

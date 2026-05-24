@@ -298,6 +298,82 @@ export async function getRecentClientsSnapshot() {
 }
 
 /**
+ * Reminders feed — overdue invoices + contracts expiring within 14 days.
+ * Kept as a separate snapshot so it can stream in alongside `getRecentClientsSnapshot`
+ * without blocking the KPI tiles or invoice feed above.
+ */
+export async function getRemindersSnapshot(): Promise<{
+  reminders: import("@/components/dashboard/upcoming-reminders").ReminderItem[];
+}> {
+  const supabase = await getServerSupabase();
+  const now = new Date();
+  const todayIso = now.toISOString().slice(0, 10);
+  const in14 = new Date(now.getTime() + 14 * 86_400_000).toISOString();
+
+  // Overdue: sent or viewed invoices whose due date is today or earlier
+  const { data: overdueRows } = await supabase
+    .from("invoices")
+    .select("id, invoice_number, due_date, total_amount")
+    .in("status", ["sent", "viewed"])
+    .lte("due_date", todayIso)
+    .order("due_date", { ascending: true })
+    .limit(4);
+
+  // Expiring: sent/viewed contracts whose expires_at falls within the next 14 days
+  const { data: expiringRows } = await supabase
+    .from("contracts")
+    .select("id, title, expires_at")
+    .in("status", ["sent", "viewed"])
+    .not("expires_at", "is", null)
+    .lte("expires_at", in14)
+    .gte("expires_at", now.toISOString())
+    .order("expires_at", { ascending: true })
+    .limit(3);
+
+  type OverdueRow = { id: string; invoice_number: string; due_date: string; total_amount: number };
+  type ExpiringRow = { id: string; title: string; expires_at: string };
+
+  const reminders: import("@/components/dashboard/upcoming-reminders").ReminderItem[] = [];
+
+  for (const row of (overdueRows ?? []) as OverdueRow[]) {
+    const daysOverdue = Math.floor(
+      (now.getTime() - new Date(row.due_date).getTime()) / 86_400_000,
+    );
+    const amt = new Intl.NumberFormat("en-IN", {
+      style: "currency",
+      currency: "INR",
+      maximumFractionDigits: 0,
+    }).format(Number(row.total_amount));
+    reminders.push({
+      id: `inv-${row.id}`,
+      kind: "invoice",
+      title: row.invoice_number,
+      description: amt,
+      dueLabel: daysOverdue === 0 ? "Due today" : `${daysOverdue}d overdue`,
+      tone: daysOverdue > 7 ? "destructive" : "warning",
+      href: `/dashboard/invoices/${row.id}`,
+    });
+  }
+
+  for (const row of (expiringRows ?? []) as ExpiringRow[]) {
+    const daysLeft = Math.ceil(
+      (new Date(row.expires_at).getTime() - now.getTime()) / 86_400_000,
+    );
+    reminders.push({
+      id: `con-${row.id}`,
+      kind: "contract",
+      title: row.title,
+      description: "Awaiting signature",
+      dueLabel: daysLeft <= 1 ? "Expires today" : `Expires in ${daysLeft}d`,
+      tone: daysLeft <= 3 ? "warning" : "info",
+      href: `/dashboard/contracts/${row.id}`,
+    });
+  }
+
+  return { reminders };
+}
+
+/**
  * Sidebar counters — small + cheap. Called from the dashboard layout's
  * navigation so the sidebar always reflects current state.
  */

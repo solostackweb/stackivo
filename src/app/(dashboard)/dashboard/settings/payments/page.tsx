@@ -7,6 +7,7 @@ import {
   getUserPaymentMethodSummary,
 } from "@/features/billing/payment-methods";
 import { PaymentMethodPicker } from "@/features/billing/components/payment-method-picker";
+import { SettingsPageHeader } from "@/features/settings/components/settings-section";
 
 export const metadata = {
   title: "Payments — Stackivo",
@@ -65,13 +66,12 @@ export default async function PaymentsSettingsPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="space-y-1">
-        <h2 className="text-lg font-semibold tracking-tight">Payments</h2>
-        <p className="text-sm text-muted-foreground">
-          Pick how clients pay your invoices. You can switch at any time.
-        </p>
-      </div>
+    <>
+      <SettingsPageHeader
+        title="Payments"
+        description="Pick how clients pay your invoices. You can switch at any time."
+      />
+      <div className="space-y-6">
 
       {showLegacyHint ? (
         <div className="rounded-lg border border-amber-500/30 bg-amber-500/[0.04] p-4 text-xs leading-relaxed text-amber-800 dark:text-amber-400">
@@ -109,5 +109,6 @@ export default async function PaymentsSettingsPage() {
         </ul>
       </div>
     </div>
+    </>
   );
 }

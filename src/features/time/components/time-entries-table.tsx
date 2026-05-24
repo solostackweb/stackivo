@@ -116,7 +116,8 @@ function EntryRow({
   };
 
   return (
-    <li className="flex items-center justify-between gap-4 px-5 py-3 hover:bg-muted/20">
+    <li className="flex flex-col gap-1 px-4 py-3 hover:bg-muted/20 sm:flex-row sm:items-center sm:gap-4 sm:px-5">
+      {/* Description + metadata */}
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium">
           {entry.description ?? "Untitled entry"}
@@ -141,32 +142,35 @@ function EntryRow({
           {!entry.billable && (
             <>
               <span>·</span>
-              <span className="text-muted-foreground">Non-billable</span>
+              <span>Non-billable</span>
             </>
           )}
         </div>
       </div>
 
-      <div className="flex items-center gap-4">
-        <span
-          className={cn(
-            "font-mono text-sm tabular-nums",
-            entry.billable ? "text-foreground" : "text-muted-foreground",
-          )}
-        >
-          {formatDuration(entry.durationSeconds)}
-        </span>
-        {entry.billable && (
-          <span className="hidden w-20 text-right text-sm tabular-nums text-muted-foreground sm:inline">
-            {formatINR(Number(entry.amount) || 0)}
+      {/* Duration + amount + actions — row on mobile, inline on sm+ */}
+      <div className="flex items-center justify-between gap-3 sm:justify-end sm:gap-4">
+        <div className="flex items-center gap-3">
+          <span
+            className={cn(
+              "font-mono text-sm tabular-nums",
+              entry.billable ? "text-foreground" : "text-muted-foreground",
+            )}
+          >
+            {formatDuration(entry.durationSeconds)}
           </span>
-        )}
+          {entry.billable && (
+            <span className="hidden w-20 text-right text-sm tabular-nums text-muted-foreground sm:inline">
+              {formatINR(Number(entry.amount) || 0)}
+            </span>
+          )}
+        </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 text-muted-foreground"
+              className="h-8 w-8 shrink-0 text-muted-foreground"
               aria-label="Entry actions"
             >
               <MoreHorizontal className="h-4 w-4" />

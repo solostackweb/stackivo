@@ -26,7 +26,7 @@ export const primaryNav: NavItem[] = [
   { title: "Projects", href: "/dashboard/projects", icon: FolderKanban },
   { title: "Invoices", href: "/dashboard/invoices", icon: FileText },
   { title: "Contracts", href: "/dashboard/contracts", icon: FileSignature },
-  { title: "Welcome", href: "/dashboard/welcome", icon: Sparkles },
+  { title: "Welcome Docs", href: "/dashboard/welcome", icon: Sparkles },
   { title: "Portal", href: "/dashboard/portal", icon: Share2 },
   { title: "Time", href: "/dashboard/time", icon: Clock },
   { title: "Pulse", href: "/dashboard/pulse", icon: Activity },

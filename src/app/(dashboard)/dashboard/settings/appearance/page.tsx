@@ -16,9 +16,9 @@ import {
   SettingsField,
   SettingsPageHeader,
   SettingsToggleRow,
-  useStubSaveHandler,
 } from "@/features/settings/components/settings-section";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 const THEMES = [
   { value: "light", label: "Light", icon: Sun },
@@ -26,12 +26,92 @@ const THEMES = [
   { value: "system", label: "System", icon: Monitor },
 ] as const;
 
+type SidebarPref = "auto" | "expanded" | "collapsed";
+
+/** Read a boolean flag from localStorage, with a fallback. */
+function readBool(key: string, fallback: boolean): boolean {
+  if (typeof window === "undefined") return fallback;
+  const v = localStorage.getItem(key);
+  if (v === "true") return true;
+  if (v === "false") return false;
+  return fallback;
+}
+
 export default function AppearanceSettingsPage() {
   const { theme, setTheme } = useTheme();
-  const [density, setDensity] = React.useState<"compact" | "comfortable">(
-    "comfortable",
-  );
-  const onSaveWorkspace = useStubSaveHandler("Workspace preferences");
+
+  // ── Density ───────────────────────────────────────────────────────────────
+  const [density, setDensity] = React.useState<"compact" | "comfortable">("comfortable");
+
+  // ── Sidebar behaviour ─────────────────────────────────────────────────────
+  const [sidebarPref, setSidebarPref] = React.useState<SidebarPref>("auto");
+
+  // ── Tooltips ──────────────────────────────────────────────────────────────
+  const [tooltips, setTooltips] = React.useState(true);
+
+  // ── Reduced motion ────────────────────────────────────────────────────────
+  const [reducedMotion, setReducedMotion] = React.useState(false);
+
+  // Hydrate all prefs from localStorage on mount
+  React.useEffect(() => {
+    const storedDensity = localStorage.getItem("stackivo:density");
+    if (storedDensity === "compact" || storedDensity === "comfortable") {
+      setDensity(storedDensity);
+      document.documentElement.setAttribute("data-density", storedDensity);
+    }
+
+    const storedSidebar = localStorage.getItem("stackivo:sidebar-behaviour") as SidebarPref | null;
+    if (storedSidebar === "auto" || storedSidebar === "expanded" || storedSidebar === "collapsed") {
+      setSidebarPref(storedSidebar);
+    }
+
+    const storedTooltips = readBool("stackivo:tooltips", true);
+    setTooltips(storedTooltips);
+    document.documentElement.setAttribute("data-tooltips", String(storedTooltips));
+
+    // Seed from OS preference if no override is stored
+    const storedReduced = localStorage.getItem("stackivo:reduced-motion");
+    const osReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const effectiveReduced = storedReduced !== null ? storedReduced === "true" : osReduced;
+    setReducedMotion(effectiveReduced);
+    document.documentElement.setAttribute("data-reduced-motion", String(effectiveReduced));
+  }, []);
+
+  // ── Handlers ──────────────────────────────────────────────────────────────
+  const handleDensityChange = React.useCallback((value: "compact" | "comfortable") => {
+    setDensity(value);
+    localStorage.setItem("stackivo:density", value);
+    document.documentElement.setAttribute("data-density", value);
+  }, []);
+
+  const handleSidebarChange = React.useCallback((value: SidebarPref) => {
+    setSidebarPref(value);
+    localStorage.setItem("stackivo:sidebar-behaviour", value);
+    // Apply immediately for the current session
+    // The sidebar reads this key on mount; a full page refresh will pick it up.
+    // For immediate effect without a refresh, dispatch a storage event.
+    window.dispatchEvent(new StorageEvent("storage", {
+      key: "stackivo:sidebar-behaviour",
+      newValue: value,
+    }));
+  }, []);
+
+  const handleTooltipsChange = React.useCallback((checked: boolean) => {
+    setTooltips(checked);
+    localStorage.setItem("stackivo:tooltips", String(checked));
+    document.documentElement.setAttribute("data-tooltips", String(checked));
+  }, []);
+
+  const handleReducedMotionChange = React.useCallback((checked: boolean) => {
+    setReducedMotion(checked);
+    localStorage.setItem("stackivo:reduced-motion", String(checked));
+    document.documentElement.setAttribute("data-reduced-motion", String(checked));
+  }, []);
+
+  const handleSaveWorkspace = React.useCallback(() => {
+    // All values already persisted on change; this just acknowledges the save.
+    toast.success("Workspace preferences saved");
+  }, []);
 
   return (
     <>
@@ -99,7 +179,7 @@ export default function AppearanceSettingsPage() {
               <button
                 key={opt.value}
                 type="button"
-                onClick={() => setDensity(opt.value)}
+                onClick={() => handleDensityChange(opt.value)}
                 aria-pressed={active}
                 className={cn(
                   "rounded-lg border p-4 text-left transition-colors",
@@ -124,24 +204,24 @@ export default function AppearanceSettingsPage() {
       <SettingsSection
         title="Workspace preferences"
         description="Smaller toggles that change how Stackivo behaves day-to-day."
-        onSave={onSaveWorkspace}
+        onSave={handleSaveWorkspace}
       >
         <div className="grid gap-5 sm:grid-cols-2">
           <SettingsField label="Interface language">
-            <Select defaultValue="en">
+            <Select value="en" disabled>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="en">English</SelectItem>
-                <SelectItem value="hi">हिन्दी</SelectItem>
-                <SelectItem value="es">Español</SelectItem>
-                <SelectItem value="fr">Français</SelectItem>
               </SelectContent>
             </Select>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              More languages coming soon.
+            </p>
           </SettingsField>
           <SettingsField label="Sidebar behaviour">
-            <Select defaultValue="auto">
+            <Select value={sidebarPref} onValueChange={(v) => handleSidebarChange(v as SidebarPref)}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
@@ -158,13 +238,13 @@ export default function AppearanceSettingsPage() {
           label="Show tooltips on hover"
           description="Helpful hints for keyboard shortcuts and icon-only buttons."
         >
-          <Switch defaultChecked />
+          <Switch checked={tooltips} onCheckedChange={handleTooltipsChange} />
         </SettingsToggleRow>
         <SettingsToggleRow
           label="Enable reduced motion"
-          description="Respect your OS setting and minimize animations."
+          description="Minimise animations — overrides your OS setting within Stackivo."
         >
-          <Switch />
+          <Switch checked={reducedMotion} onCheckedChange={handleReducedMotionChange} />
         </SettingsToggleRow>
       </SettingsSection>
     </>

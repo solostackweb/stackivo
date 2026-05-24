@@ -94,7 +94,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
           </CommandItem>
           <CommandItem
             value="new client"
-            onSelect={() => run(() => router.push("/dashboard/clients"))}
+            onSelect={() => run(() => router.push("/dashboard/clients?create=1"))}
           >
             <UserPlus />
             <span>Add client</span>
@@ -102,7 +102,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
           </CommandItem>
           <CommandItem
             value="new project"
-            onSelect={() => run(() => router.push("/dashboard/projects"))}
+            onSelect={() => run(() => router.push("/dashboard/projects?create=1"))}
           >
             <FolderPlus />
             <span>New project</span>

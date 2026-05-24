@@ -15,8 +15,25 @@ import { getDisplayName, getInitials } from "@/features/profile/utils";
 export function AppSidebar() {
   // Collapsed state self-managed; survives navigations because the sidebar
   // is rendered by the persistent dashboard layout, not by any page.
-  const [collapsed, setCollapsed] = React.useState(false);
+  // Seed from the workspace preference stored in localStorage.
+  const [collapsed, setCollapsed] = React.useState(() => {
+    if (typeof window === "undefined") return false;
+    const pref = localStorage.getItem("stackivo:sidebar-behaviour");
+    return pref === "collapsed";
+  });
   const onToggle = React.useCallback(() => setCollapsed((v) => !v), []);
+
+  // Live-react to preference changes made from the Appearance settings page.
+  React.useEffect(() => {
+    function onStorage(e: StorageEvent) {
+      if (e.key !== "stackivo:sidebar-behaviour") return;
+      if (e.newValue === "collapsed") setCollapsed(true);
+      else if (e.newValue === "expanded") setCollapsed(false);
+      // "auto" → leave user's current toggle state untouched
+    }
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
 
   const { profile, subscription } = useProfile();
   const workspaceName =

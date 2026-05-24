@@ -7,17 +7,18 @@
  */
 
 export function formatINR(value: number, opts?: { compact?: boolean }) {
+  const safe = Number.isFinite(value) ? value : 0;
   if (opts?.compact) {
-    if (value >= 10_000_000) return `₹${(value / 10_000_000).toFixed(1)}Cr`;
-    if (value >= 100_000) return `₹${(value / 100_000).toFixed(1)}L`;
-    if (value >= 1000) return `₹${(value / 1000).toFixed(1)}k`;
-    return `₹${value}`;
+    if (safe >= 10_000_000) return `₹${(safe / 10_000_000).toFixed(1)}Cr`;
+    if (safe >= 100_000) return `₹${(safe / 100_000).toFixed(1)}L`;
+    if (safe >= 1000) return `₹${(safe / 1000).toFixed(1)}k`;
+    return `₹${safe}`;
   }
   return new Intl.NumberFormat("en-IN", {
     style: "currency",
     currency: "INR",
     maximumFractionDigits: 0,
-  }).format(value);
+  }).format(safe);
 }
 
 export function formatNumber(value: number) {

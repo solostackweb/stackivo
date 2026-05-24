@@ -18,9 +18,14 @@ function titleCase(segment: string) {
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+/** Matches standard UUID v1–v5 format. */
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 /**
  * Derives breadcrumbs from the current pathname. Uses the nav constants to
  * resolve known labels (e.g., "pulse" → "Pulse") and title-cases the rest.
+ * UUID segments are skipped — the parent route name gives sufficient context.
  */
 function buildCrumbs(pathname: string): Crumb[] {
   const segments = pathname.split("/").filter(Boolean);
@@ -32,8 +37,11 @@ function buildCrumbs(pathname: string): Crumb[] {
   for (const seg of segments) {
     acc += `/${seg}`;
 
-    // Skip the route-group prefix if it ever leaks through
+    // Skip route-group prefixes if they ever leak through
     if (seg.startsWith("(") && seg.endsWith(")")) continue;
+
+    // Skip UUID segments — showing the parent route name is sufficient context
+    if (UUID_RE.test(seg)) continue;
 
     const known = allNavItems.find((item) => item.href === acc);
     const label = known ? known.title : titleCase(decodeURIComponent(seg));
