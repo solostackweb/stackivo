@@ -4,15 +4,9 @@ import { Section, SectionHeading } from "./section";
 import { Reveal } from "./motion";
 
 /**
- * Testimonials section.
- *
- * Honest placeholder until we have real freelancer quotes with photos +
- * verifiable links (LinkedIn / Twitter). Fake testimonials hurt trust
- * more than no testimonials, so we lean into the build-in-public
- * narrative until we can replace this block with the real thing.
- *
- * When you add real testimonials, the structure to drop in is:
- *   { quote, name, role, photoUrl, linkedInUrl?, twitterUrl? }
+ * Social proof section — build-in-public positioning until we have
+ * real freelancer quotes. Replace TESTIMONIALS array with real entries
+ * as they come in: { quote, name, role, photoUrl, linkedInUrl?, twitterUrl? }
  */
 export function TestimonialsSection() {
   return (

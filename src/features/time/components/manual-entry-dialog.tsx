@@ -24,6 +24,8 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { manualTimeEntryAction } from "../actions";
+import { useSubscription } from "@/features/subscription/hooks/use-subscription";
+import { Sparkles } from "lucide-react";
 import type { TimerProjectOption } from "./active-timer-widget";
 
 interface ManualEntryDialogProps {
@@ -206,38 +208,12 @@ export function ManualEntryDialog({
             </Field>
           </div>
 
-          <div className="flex items-center justify-between rounded-md border px-3 py-2.5">
-            <div>
-              <p className="text-sm font-medium">Billable</p>
-              <p className="text-xs text-muted-foreground">
-                Count this time toward your client&apos;s budget
-              </p>
-            </div>
-            <Switch
-              checked={values.billable}
-              onCheckedChange={(v) =>
-                setValues((prev) => ({ ...prev, billable: v }))
-              }
-            />
-          </div>
-
-          {values.billable && (
-            <Field label="Hourly rate (₹)">
-              <Input
-                type="number"
-                min="0"
-                step="50"
-                value={values.hourlyRate}
-                onChange={(e) =>
-                  setValues((v) => ({
-                    ...v,
-                    hourlyRate: Math.max(0, Number(e.target.value) || 0),
-                  }))
-                }
-                className="tabular-nums"
-              />
-            </Field>
-          )}
+          <BillableField
+            billable={values.billable}
+            hourlyRate={values.hourlyRate}
+            onBillableChange={(v) => setValues((prev) => ({ ...prev, billable: v }))}
+            onRateChange={(v) => setValues((prev) => ({ ...prev, hourlyRate: v }))}
+          />
         </div>
 
         <DialogFooter>
@@ -271,5 +247,69 @@ function Field({
       </label>
       {children}
     </div>
+  );
+}
+
+function BillableField({
+  billable,
+  hourlyRate,
+  onBillableChange,
+  onRateChange,
+}: {
+  billable: boolean;
+  hourlyRate: number;
+  onBillableChange: (v: boolean) => void;
+  onRateChange: (v: number) => void;
+}) {
+  const { canUse } = useSubscription();
+  const canUseBillable = canUse("time.billable_rates");
+
+  if (!canUseBillable) {
+    return (
+      <div className="flex items-center justify-between rounded-md border border-primary/15 bg-primary/[0.03] px-3 py-2.5">
+        <div className="min-w-0">
+          <p className="flex items-center gap-1.5 text-sm font-medium">
+            Billable
+            <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
+              <Sparkles className="h-2.5 w-2.5" />
+              Pro
+            </span>
+          </p>
+          <p className="text-xs text-muted-foreground">
+            <a href="/dashboard/settings/billing" className="underline underline-offset-2 hover:text-foreground">
+              Upgrade to Pro
+            </a>{" "}
+            to mark entries as billable and set hourly rates.
+          </p>
+        </div>
+        <Switch checked={false} disabled />
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div className="flex items-center justify-between rounded-md border px-3 py-2.5">
+        <div>
+          <p className="text-sm font-medium">Billable</p>
+          <p className="text-xs text-muted-foreground">
+            Count this time toward your client&apos;s budget
+          </p>
+        </div>
+        <Switch checked={billable} onCheckedChange={onBillableChange} />
+      </div>
+      {billable && (
+        <Field label="Hourly rate (₹)">
+          <Input
+            type="number"
+            min="0"
+            step="50"
+            value={hourlyRate}
+            onChange={(e) => onRateChange(Math.max(0, Number(e.target.value) || 0))}
+            className="tabular-nums"
+          />
+        </Field>
+      )}
+    </>
   );
 }
