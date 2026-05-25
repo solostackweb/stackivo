@@ -347,13 +347,13 @@ function StatTile({
 }
 
 function InvoiceStatusBadge({ status }: { status: InvoiceRecord["status"] }) {
-  const map: Record<InvoiceRecord["status"], { label: string; className: string }> = {
-    paid:     { label: "Paid",     className: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" },
-    sent:     { label: "Sent",     className: "bg-blue-500/10 text-blue-600 dark:text-blue-400" },
-    overdue:  { label: "Overdue",  className: "bg-red-500/10 text-red-600 dark:text-red-400" },
-    draft:    { label: "Draft",    className: "bg-muted text-muted-foreground" },
-    void:     { label: "Void",     className: "bg-muted text-muted-foreground line-through" },
-    partial:  { label: "Partial",  className: "bg-amber-500/10 text-amber-600 dark:text-amber-400" },
+  const map: Partial<Record<InvoiceRecord["status"], { label: string; className: string }>> = {
+    paid:          { label: "Paid",          className: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" },
+    sent:          { label: "Sent",          className: "bg-blue-500/10 text-blue-600 dark:text-blue-400" },
+    viewed:        { label: "Viewed",        className: "bg-blue-500/10 text-blue-600 dark:text-blue-400" },
+    overdue:       { label: "Overdue",       className: "bg-red-500/10 text-red-600 dark:text-red-400" },
+    draft:         { label: "Draft",         className: "bg-muted text-muted-foreground" },
+    partially_paid:{ label: "Partial",       className: "bg-amber-500/10 text-amber-600 dark:text-amber-400" },
   };
   const { label, className } = map[status] ?? { label: status, className: "bg-muted text-muted-foreground" };
   return (
