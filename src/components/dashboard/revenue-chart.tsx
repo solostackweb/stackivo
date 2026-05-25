@@ -64,20 +64,20 @@ export function RevenueChart({ series }: RevenueChartProps) {
         : "text-muted-foreground";
 
   return (
-    <Card>
+    <Card className="border-border/60 shadow-sm shadow-primary/[0.03]">
       <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-3">
         <div className="space-y-1">
-          <CardTitle className="text-base">Revenue overview</CardTitle>
-          <CardDescription className="text-xs">
+          <CardTitle className="text-[15px] font-semibold tracking-tight">Revenue overview</CardTitle>
+          <CardDescription className="text-[12px]">
             Paid invoice revenue over the last {series.length} months
           </CardDescription>
           <div className="flex items-baseline gap-2 pt-2">
-            <span className="text-2xl font-semibold tabular-nums tracking-tight">
+            <span className="font-mono text-2xl font-bold tabular-nums tracking-tight">
               {formatINR(totalPaid, { compact: true })}
             </span>
             {delta && (
               <span
-                className={`inline-flex items-center gap-0.5 text-xs font-medium ${trendClass}`}
+                className={`inline-flex items-center gap-0.5 text-[12px] font-semibold ${trendClass}`}
               >
                 <TrendIcon className="h-3.5 w-3.5" />
                 {formatPercent(delta.value)}
@@ -97,23 +97,20 @@ export function RevenueChart({ series }: RevenueChartProps) {
               >
                 <defs>
                   <linearGradient id="paid-fill" x1="0" y1="0" x2="0" y2="1">
-                    <stop
-                      offset="0%"
-                      stopColor="hsl(var(--primary))"
-                      stopOpacity={0.3}
-                    />
-                    <stop
-                      offset="100%"
-                      stopColor="hsl(var(--primary))"
-                      stopOpacity={0}
-                    />
+                    <stop offset="0%" stopColor="hsl(243 75% 58%)" stopOpacity={0.35} />
+                    <stop offset="60%" stopColor="hsl(262 83% 62%)" stopOpacity={0.12} />
+                    <stop offset="100%" stopColor="hsl(262 83% 62%)" stopOpacity={0} />
+                  </linearGradient>
+                  <linearGradient id="paid-stroke" x1="0" y1="0" x2="1" y2="0">
+                    <stop offset="0%" stopColor="hsl(243 75% 58%)" />
+                    <stop offset="100%" stopColor="hsl(262 83% 62%)" />
                   </linearGradient>
                 </defs>
                 <CartesianGrid
                   strokeDasharray="3 3"
                   vertical={false}
                   stroke="hsl(var(--border))"
-                  opacity={0.6}
+                  opacity={0.4}
                 />
                 <XAxis
                   dataKey="month"
@@ -132,9 +129,9 @@ export function RevenueChart({ series }: RevenueChartProps) {
                 />
                 <Tooltip
                   cursor={{
-                    stroke: "hsl(var(--border))",
+                    stroke: "hsl(var(--primary) / 0.25)",
                     strokeWidth: 1,
-                    strokeDasharray: "3 3",
+                    strokeDasharray: "4 4",
                   }}
                   content={({ active, payload, label }) => {
                     if (!active || !payload?.length) return null;
@@ -142,13 +139,13 @@ export function RevenueChart({ series }: RevenueChartProps) {
                       | number
                       | undefined;
                     return (
-                      <div className="rounded-md border bg-popover px-3 py-2 text-xs shadow-md">
-                        <p className="font-medium text-popover-foreground">
+                      <div className="rounded-xl border border-border/60 bg-popover px-3.5 py-2.5 text-xs shadow-xl shadow-primary/10">
+                        <p className="font-semibold text-popover-foreground">
                           {formatMonthLabel(label as string)}
                         </p>
-                        <p className="mt-1 tabular-nums text-muted-foreground">
+                        <p className="mt-1.5 tabular-nums text-muted-foreground">
                           Paid:{" "}
-                          <span className="font-semibold text-foreground">
+                          <span className="font-mono font-bold text-foreground">
                             {formatINR(paid ?? 0)}
                           </span>
                         </p>
@@ -159,10 +156,10 @@ export function RevenueChart({ series }: RevenueChartProps) {
                 <Area
                   type="monotone"
                   dataKey="paid"
-                  stroke="hsl(var(--primary))"
-                  strokeWidth={2}
+                  stroke="url(#paid-stroke)"
+                  strokeWidth={2.5}
                   fill="url(#paid-fill)"
-                  activeDot={{ r: 4 }}
+                  activeDot={{ r: 4, fill: "hsl(243 75% 58%)", strokeWidth: 0 }}
                 />
               </AreaChart>
             </ResponsiveContainer>

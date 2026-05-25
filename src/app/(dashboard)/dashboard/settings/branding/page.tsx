@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
-import { Check } from "lucide-react";
+import { Check, Paintbrush } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -17,6 +17,8 @@ import { useProfile } from "@/features/profile/context";
 import { updateBranding } from "@/features/profile/actions";
 import type { BrandingInput } from "@/features/profile/schemas";
 import { getBrowserSupabase } from "@/lib/supabase/client";
+import { useSubscription } from "@/features/subscription/hooks/use-subscription";
+import { UpgradeCard } from "@/components/shared/upgrade-card";
 import {
   removeProfileAsset,
   uploadProfileAsset,
@@ -36,6 +38,8 @@ const BRAND_COLORS = [
 export default function BrandingSettingsPage() {
   const { profile, setProfile, refreshProfile } = useProfile();
   const supabase = getBrowserSupabase();
+  const { canUse } = useSubscription();
+  const canRemoveBranding = canUse("platform.remove_branding");
 
   const form = useForm<BrandingInput>({
     defaultValues: {
@@ -137,6 +141,22 @@ export default function BrandingSettingsPage() {
         title="Branding"
         description="Your logo and color scheme appear on invoices, emails, and the client portal."
       />
+
+      {!canRemoveBranding && (
+        <UpgradeCard
+          icon={Paintbrush}
+          title="Remove the 'Powered by Stackivo' watermark"
+          description="Your clients see your brand, not ours. Upgrade Pro to apply your logo, colors, and tagline to every invoice and email."
+          features={[
+            "Your logo on invoices, PDFs, and the client portal",
+            "Custom brand color used for buttons and accents",
+            "No 'Powered by Stackivo' watermark",
+            "Custom email signature and intro copy",
+          ]}
+          requiredPlan="Pro"
+          className="mb-2"
+        />
+      )}
 
       <SettingsSection
         title="Brand assets"

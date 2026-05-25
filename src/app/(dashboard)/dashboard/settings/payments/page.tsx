@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { CreditCard } from "lucide-react";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getAdminSupabase } from "@/lib/supabase/admin";
 import { AUTH_LOGIN_ROUTE } from "@/features/auth/routes";
@@ -8,6 +9,8 @@ import {
 } from "@/features/billing/payment-methods";
 import { PaymentMethodPicker } from "@/features/billing/components/payment-method-picker";
 import { SettingsPageHeader } from "@/features/settings/components/settings-section";
+import { canUseFeature } from "@/features/subscription/server";
+import { UpgradeCard } from "@/components/shared/upgrade-card";
 
 export const metadata = {
   title: "Payments — Stackivo",
@@ -21,6 +24,30 @@ export default async function PaymentsSettingsPage() {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect(AUTH_LOGIN_ROUTE);
+
+  const allowed = await canUseFeature("invoices.payment_gateway");
+  if (!allowed) {
+    return (
+      <>
+        <SettingsPageHeader
+          title="Payments"
+          description="Pick how clients pay your invoices."
+        />
+        <UpgradeCard
+          icon={CreditCard}
+          title="Payment gateway is a Pro feature"
+          description="Connect Razorpay or set up UPI so clients can pay directly from their invoice — no chasing required."
+          features={[
+            "Accept Razorpay Checkout (cards, UPI, net banking)",
+            "UPI manual with auto-generated QR code",
+            "Invoices auto-mark as paid on collection",
+            "Receipt sent to client automatically",
+          ]}
+          requiredPlan="Pro"
+        />
+      </>
+    );
+  }
 
   // Pull the summary (safe-to-render shape) plus the raw config so we can
   // pre-fill the active method's form when the user re-opens it. Bank

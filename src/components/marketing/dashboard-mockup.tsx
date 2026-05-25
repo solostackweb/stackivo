@@ -17,16 +17,17 @@ import {
 export function DashboardMockup() {
   return (
     <div className="relative">
-      <div className="overflow-hidden rounded-2xl border bg-card shadow-[0_24px_60px_-20px_hsl(var(--primary)/0.25),0_8px_24px_-12px_rgba(0,0,0,0.2)] ring-1 ring-border/40">
+      <div className="overflow-hidden rounded-2xl border border-primary/10 bg-card shadow-[0_32px_80px_-16px_hsl(var(--primary)/0.30),0_8px_32px_-12px_rgba(0,0,0,0.25)] ring-1 ring-primary/10">
         <BrowserChrome />
 
         <div className="grid grid-cols-1 md:grid-cols-[220px_1fr] lg:grid-cols-[240px_1fr]">
-          <aside className="hidden border-r bg-muted/30 p-4 md:block">
+          {/* Sidebar — deep violet-black like the real app */}
+          <aside className="hidden border-r border-sidebar-border bg-sidebar p-4 md:block">
             <div className="mb-4 flex items-center gap-2 px-2">
-              <span className="flex h-6 w-6 items-center justify-center rounded-md bg-primary text-primary-foreground">
-                <Zap className="h-3 w-3" />
+              <span className="flex h-6 w-6 items-center justify-center rounded-md btn-gradient">
+                <Zap className="h-3 w-3 text-white" />
               </span>
-              <span className="text-xs font-semibold tracking-tight">
+              <span className="text-xs font-semibold tracking-tight text-sidebar-foreground">
                 Stackivo
               </span>
             </div>
@@ -34,12 +35,15 @@ export function DashboardMockup() {
               {NAV.map((item, i) => (
                 <div
                   key={item.label}
-                  className={`flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-xs ${
+                  className={`relative flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-xs ${
                     i === 0
-                      ? "bg-primary/10 font-medium text-primary"
-                      : "text-muted-foreground"
+                      ? "bg-sidebar-accent font-medium text-primary"
+                      : "text-sidebar-foreground/55 hover:text-sidebar-foreground"
                   }`}
                 >
+                  {i === 0 && (
+                    <span className="absolute left-0 top-1/2 h-4 w-[3px] -translate-y-1/2 rounded-r-full bg-gradient-to-b from-indigo-400 to-violet-500" />
+                  )}
                   <item.icon className="h-3.5 w-3.5" />
                   {item.label}
                 </div>
@@ -76,29 +80,27 @@ export function DashboardMockup() {
         </div>
       </div>
 
-      {/* Floating cards — visible on xl+ only where the hero column is wide
-          enough to carry the bleed. Below xl the hero wrapper clips and we
-          hide these to keep the section overflow-clean. */}
-      <div className="pointer-events-none absolute -bottom-8 -left-4 hidden w-64 rotate-[-3deg] rounded-xl border bg-card p-3 shadow-xl ring-1 ring-border/40 xl:block xl:-bottom-10 xl:-left-10 xl:w-72">
+      {/* Floating cards — Stripe-style, visible on xl+ */}
+      <div className="pointer-events-none absolute -bottom-8 -left-4 hidden w-64 rotate-[-3deg] rounded-xl border border-success/20 bg-card/98 p-3 shadow-xl shadow-success/10 backdrop-blur-sm ring-1 ring-success/15 xl:block xl:-bottom-10 xl:-left-10 xl:w-72">
         <div className="flex items-center gap-2">
-          <span className="flex h-7 w-7 items-center justify-center rounded-md bg-success/10 text-success">
+          <span className="flex h-7 w-7 items-center justify-center rounded-md bg-success/10 text-success ring-1 ring-success/20">
             <CheckCircle2 className="h-3.5 w-3.5" />
           </span>
           <div className="flex-1">
             <p className="text-[11px] text-muted-foreground">Payment received</p>
-            <p className="text-xs font-medium">₹84,000 · Pixel & Co.</p>
+            <p className="text-xs font-semibold">₹84,000 · Pixel &amp; Co.</p>
           </div>
         </div>
       </div>
 
-      <div className="pointer-events-none absolute -right-4 -top-6 hidden w-60 rotate-[3deg] rounded-xl border bg-card p-3 shadow-xl ring-1 ring-border/40 xl:block xl:-right-10 xl:w-72">
+      <div className="pointer-events-none absolute -right-4 -top-6 hidden w-60 rotate-[3deg] rounded-xl border border-primary/20 bg-card/98 p-3 shadow-xl shadow-primary/10 backdrop-blur-sm ring-1 ring-primary/15 xl:block xl:-right-10 xl:w-72">
         <div className="flex items-center gap-2">
-          <span className="flex h-7 w-7 items-center justify-center rounded-md bg-primary/10 text-primary">
+          <span className="flex h-7 w-7 items-center justify-center rounded-md bg-primary/10 text-primary ring-1 ring-primary/20">
             <Bell className="h-3.5 w-3.5" />
           </span>
           <div className="flex-1">
             <p className="text-[11px] text-muted-foreground">Contract signed</p>
-            <p className="text-xs font-medium">Lumen Studio · Q4 retainer</p>
+            <p className="text-xs font-semibold">Lumen Studio · Q4 retainer</p>
           </div>
         </div>
       </div>
@@ -147,12 +149,12 @@ function Stat({
     info: "text-info",
   }[tone];
   return (
-    <div className="rounded-lg border bg-background p-3">
+    <div className="rounded-lg border border-border/60 bg-background/80 p-3 ring-1 ring-border/30 transition-colors">
       <p className="text-[11px] text-muted-foreground">{label}</p>
       <p className="mt-1 text-base font-semibold tracking-tight sm:text-lg">
         {value}
       </p>
-      <p className={`mt-0.5 inline-flex items-center gap-0.5 text-[11px] ${toneClass}`}>
+      <p className={`mt-0.5 inline-flex items-center gap-0.5 text-[11px] font-medium ${toneClass}`}>
         <ArrowUpRight className="h-3 w-3" />
         {delta}
       </p>
@@ -181,17 +183,20 @@ function RevenueChart() {
           </span>
         </div>
       </div>
-      <div className="flex h-28 items-end gap-2">
+      <div className="flex h-28 items-end gap-1.5">
         {data.map((d, i) => (
           <div key={months[i]} className="flex flex-1 flex-col items-center gap-1">
             <div className="flex w-full flex-col items-center gap-0.5">
               <div
-                className="w-full rounded-t bg-primary/30"
+                className="w-full rounded-t bg-violet-400/30"
                 style={{ height: `${d.collected}%` }}
               />
               <div
-                className="w-full rounded-t bg-primary"
-                style={{ height: `${d.paid}%` }}
+                className="w-full rounded-t"
+                style={{
+                  height: `${d.paid}%`,
+                  background: "linear-gradient(to top, hsl(262 83% 58%), hsl(243 75% 62%))",
+                }}
               />
             </div>
             <span className="text-[10px] text-muted-foreground">{months[i]}</span>

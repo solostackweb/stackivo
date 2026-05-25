@@ -21,6 +21,8 @@ import {
   getRemindersSnapshot,
 } from "@/features/dashboard/server";
 import { getBusinessProfile } from "@/features/onboarding/server";
+import { getCurrentSubscription } from "@/features/subscription/server";
+import { FreePlanBanner } from "@/components/dashboard/free-plan-banner";
 
 export const metadata = { title: "Dashboard" };
 export const dynamic = "force-dynamic";
@@ -177,7 +179,10 @@ function BottomGridSkeleton() {
 export default async function DashboardPage() {
   // Profile is needed synchronously for the page header greeting and the
   // setup checklist — it's a single cheap query so we don't defer it.
-  const profile = await getBusinessProfile();
+  const [profile, sub] = await Promise.all([
+    getBusinessProfile(),
+    getCurrentSubscription(),
+  ]);
   const greetingName = firstNameOf(profile);
 
   return (
@@ -197,6 +202,11 @@ export default async function DashboardPage() {
           </Button>
         }
       />
+
+      {/* Free plan upgrade nudge — only shown to free-tier users */}
+      {(!sub || sub.plan === "free") && (
+        <FreePlanBanner clientsUsed={profile?.lifetimeClientsCreated ?? 0} />
+      )}
 
       {profile ? (
         <DashboardSetupChecklist

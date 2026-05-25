@@ -128,36 +128,35 @@ function FeatureTile({ feature }: { feature: Feature }) {
   return (
     <div
       className={cn(
-        "group relative flex h-full flex-col gap-4 overflow-hidden rounded-xl border bg-card p-5 transition-all duration-300 ease-out hover:-translate-y-1 hover:border-primary/30 hover:shadow-xl hover:shadow-primary/[0.04] sm:p-6",
-        accent && "bg-gradient-to-br from-primary/[0.04] via-card to-card",
+        "group relative flex h-full flex-col gap-4 overflow-hidden rounded-2xl border bg-card p-5 sm:p-6",
+        "transition-all duration-250 ease-out",
+        "hover:-translate-y-1 hover:border-primary/30 hover:shadow-xl hover:shadow-primary/[0.07]",
+        accent
+          ? "border-primary/20 bg-gradient-to-br from-primary/[0.06] via-card to-card glow-ring"
+          : "hover:bg-gradient-to-br hover:from-primary/[0.02] hover:to-transparent",
       )}
     >
       {accent ? (
         <>
-          <div
-            aria-hidden
-            className="pointer-events-none absolute -right-12 -top-12 h-48 w-48 rounded-full bg-primary/10 blur-3xl"
-          />
-          <div
-            aria-hidden
-            className="pointer-events-none absolute -left-8 -bottom-8 h-32 w-32 rounded-full bg-indigo-500/[0.08] blur-2xl"
-          />
+          <div aria-hidden className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-indigo-500/[0.14] blur-3xl" />
+          <div aria-hidden className="pointer-events-none absolute -bottom-10 -left-10 h-40 w-40 rounded-full bg-violet-500/[0.10] blur-2xl" />
         </>
       ) : null}
       <span
         className={cn(
-          "inline-flex h-10 w-10 items-center justify-center rounded-lg border bg-background text-primary shadow-sm transition-all duration-300 group-hover:scale-110 group-hover:shadow-md",
-          accent &&
-            "border-primary bg-gradient-to-br from-primary to-indigo-600 text-primary-foreground shadow-md shadow-primary/20",
+          "inline-flex h-10 w-10 items-center justify-center rounded-xl ring-1 transition-all duration-250 group-hover:scale-105",
+          accent
+            ? "btn-gradient border-0 text-white shadow-lg shadow-primary/25 ring-0"
+            : "border-0 bg-gradient-to-br from-primary/12 to-violet-500/8 text-primary ring-primary/15 group-hover:from-primary/18 group-hover:shadow-md group-hover:shadow-primary/10",
         )}
       >
         <Icon className="h-[18px] w-[18px]" strokeWidth={2} />
       </span>
-      <div className="space-y-2">
-        <h3 className="text-base font-semibold tracking-tight lg:text-lg">
+      <div className="space-y-1.5">
+        <h3 className="text-base font-semibold tracking-tight lg:text-[17px]">
           {title}
         </h3>
-        <p className="text-sm leading-relaxed text-muted-foreground lg:text-[15px]">
+        <p className="text-sm leading-relaxed text-muted-foreground lg:text-[14.5px]">
           {description}
         </p>
       </div>

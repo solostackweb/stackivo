@@ -37,7 +37,7 @@ export function MarketingHeader({
       className={cn(
         "sticky top-0 z-40 w-full transition-all duration-300",
         scrolled
-          ? "border-b bg-background/70 shadow-sm backdrop-blur-xl"
+          ? "border-b border-border/60 bg-background/75 shadow-sm shadow-primary/[0.04] backdrop-blur-xl"
           : "border-b border-transparent bg-transparent",
       )}
     >
@@ -56,15 +56,15 @@ export function MarketingHeader({
               key={l.href}
               href={l.href}
               className={cn(
-                "relative rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground",
+                "relative rounded-lg px-3.5 py-1.5 text-[13.5px] font-medium text-muted-foreground transition-colors duration-150 hover:text-foreground",
                 pathname === l.href && "text-foreground",
               )}
             >
               {pathname === l.href ? (
                 <motion.span
                   layoutId="headerNavPill"
-                  className="absolute inset-0 -z-10 rounded-md bg-accent"
-                  transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                  className="absolute inset-0 -z-10 rounded-lg bg-primary/8"
+                  transition={{ type: "spring", bounce: 0.2, duration: 0.55 }}
                 />
               ) : null}
               {l.label}
@@ -85,7 +85,7 @@ export function MarketingHeader({
               {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </Button>
           </SheetTrigger>
-          <SheetContent side="right" className="w-72 p-0">
+          <SheetContent side="right" className="w-72 bg-sidebar p-0 text-sidebar-foreground">
             <SheetTitle className="sr-only">Navigation</SheetTitle>
             <div className="flex h-14 items-center border-b px-5 font-semibold">
               <Link
@@ -156,7 +156,7 @@ function HeaderCtas({ authState }: { authState: MarketingAuthState }) {
       <Button
         asChild
         size="sm"
-        className="h-8 rounded-full px-4 text-xs font-semibold shadow-md shadow-primary/20 transition-all hover:shadow-lg hover:shadow-primary/30"
+        className="btn-gradient h-8 rounded-full border-0 px-4 text-xs font-semibold"
       >
         <Link href="/signup" data-cta="header_primary">Start free →</Link>
       </Button>

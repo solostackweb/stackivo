@@ -68,8 +68,8 @@ export function Section({
 
 export function SectionEyebrow({ children }: { children: React.ReactNode }) {
   return (
-    <p className="inline-flex items-center gap-2 rounded-full border bg-card/80 px-3 py-1 text-xs font-medium text-muted-foreground backdrop-blur-sm">
-      <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+    <p className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-gradient-to-r from-primary/8 to-violet-500/6 px-3.5 py-1.5 text-[11px] font-semibold uppercase tracking-widest text-primary shadow-sm shadow-primary/10 backdrop-blur-sm">
+      <span className="h-1 w-1 rounded-full bg-primary/80" />
       {children}
     </p>
   );
@@ -101,16 +101,16 @@ export function SectionHeading({
       {eyebrow ? <SectionEyebrow>{eyebrow}</SectionEyebrow> : null}
       <h2
         className={cn(
-          "text-balance font-semibold tracking-tight",
+          "text-balance font-bold tracking-tight",
           size === "large"
-            ? "text-4xl sm:text-5xl lg:text-[56px]"
-            : "text-3xl sm:text-4xl lg:text-[44px]",
+            ? "text-4xl sm:text-5xl lg:text-[58px] lg:tracking-[-0.03em]"
+            : "text-3xl sm:text-[40px] lg:text-[46px] lg:tracking-[-0.025em]",
         )}
       >
         {title}
       </h2>
       {subtitle ? (
-        <p className="text-pretty text-base leading-7 text-muted-foreground sm:text-lg">
+        <p className="text-pretty text-base leading-[1.75] text-muted-foreground sm:text-[17px]">
           {subtitle}
         </p>
       ) : null}

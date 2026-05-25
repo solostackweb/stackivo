@@ -35,6 +35,7 @@ export type FeatureKey =
   // Invoices
   | "invoices.custom_branding"
   | "invoices.payment_links"
+  | "invoices.payment_gateway"
   | "invoices.recurring"
   | "invoices.advanced_templates"
   // Clients

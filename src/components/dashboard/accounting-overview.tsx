@@ -44,16 +44,16 @@ export function AccountingOverview({
     outstanding > 0 ? Math.min(100, (overdueAmount / outstanding) * 100) : 0;
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">Business overview</CardTitle>
-        <CardDescription>
-          Issued invoices are <span className="font-medium">receivables</span>,
+    <Card className="border-border/60 shadow-sm shadow-primary/[0.03]">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-[15px] font-semibold tracking-tight">Business overview</CardTitle>
+        <CardDescription className="text-[13px]">
+          Issued invoices are <span className="font-medium text-foreground/70">receivables</span>,
           not revenue — cash collected is what actually moved into your bank.
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-2 gap-3 stagger-children lg:grid-cols-4">
+        <div className="stagger-children grid grid-cols-2 gap-3 lg:grid-cols-4">
           <Tile
             icon={Wallet}
             label="Collected"
@@ -104,32 +104,29 @@ function Tile({ icon: Icon, label, value, sub, tone }: TileProps) {
   return (
     <div
       className={cn(
-        "card-lift animate-slide-up-fade flex items-start justify-between gap-3 rounded-lg border p-3",
-        tone === "default" && "bg-card",
-        tone === "success" && "border-emerald-500/20 bg-emerald-500/[0.04]",
-        tone === "warning" && "border-amber-500/20 bg-amber-500/[0.04]",
-        tone === "danger" && "border-destructive/20 bg-destructive/[0.04]",
+        "card-lift flex items-start justify-between gap-3 rounded-xl border p-4 transition-all",
+        tone === "default" && "border-border/60 bg-card",
+        tone === "success" && "border-emerald-500/15 bg-emerald-500/[0.03]",
+        tone === "warning" && "border-amber-500/15 bg-amber-500/[0.03]",
+        tone === "danger" && "border-destructive/15 bg-destructive/[0.03]",
       )}
     >
       <div className="min-w-0 space-y-1">
-        <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+        <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/70">
           {label}
         </p>
-        <p className="text-lg font-bold tabular-nums tracking-tight sm:text-xl">
+        <p className="font-mono text-lg font-bold tabular-nums tracking-tight sm:text-[22px]">
           {value}
         </p>
-        <p className="text-[11px] text-muted-foreground">{sub}</p>
+        <p className="text-[11px] text-muted-foreground/70">{sub}</p>
       </div>
       <div
         className={cn(
-          "flex h-8 w-8 shrink-0 items-center justify-center rounded-md ring-1",
-          tone === "default" && "bg-primary/10 text-primary ring-primary/15",
-          tone === "success" &&
-            "bg-emerald-500/15 text-emerald-700 ring-emerald-500/20 dark:text-emerald-400",
-          tone === "warning" &&
-            "bg-amber-500/15 text-amber-700 ring-amber-500/20 dark:text-amber-400",
-          tone === "danger" &&
-            "bg-destructive/15 text-destructive ring-destructive/20",
+          "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ring-1",
+          tone === "default" && "bg-gradient-to-br from-primary/12 to-violet-500/8 text-primary ring-primary/15",
+          tone === "success" && "bg-emerald-500/12 text-emerald-600 ring-emerald-500/18 dark:text-emerald-400",
+          tone === "warning" && "bg-amber-500/12 text-amber-600 ring-amber-500/18 dark:text-amber-400",
+          tone === "danger" && "bg-destructive/12 text-destructive ring-destructive/18",
         )}
       >
         <Icon className="h-4 w-4" />

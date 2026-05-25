@@ -44,6 +44,18 @@ const ALL_MODULES: ModuleKey[] = [
   "settings",
 ];
 
+/** Free plan only gets basic modules — contracts and portal are Pro+ */
+const FREE_MODULES: ModuleKey[] = [
+  "dashboard",
+  "clients",
+  "projects",
+  "invoices",
+  "time",
+  "pulse",
+  "notifications",
+  "settings",
+];
+
 // --- Plan catalogue ---------------------------------------------------------
 export const PLANS: Record<PlanId, PlanDefinition> = {
   free: {
@@ -55,30 +67,32 @@ export const PLANS: Record<PlanId, PlanDefinition> = {
     currency: "INR",
     selfServe: true,
     features: {
+      // Free plan: basic invoice share link only (no payment gateway)
       "invoices.payment_links": true,
     },
     limits: {
-      // Free plan per BRD: full platform access; only LIFETIME client count
-      // is capped (5). Deletes do NOT decrement the counter.
+      // Free plan: LIFETIME client count capped at 5. Deletes do NOT
+      // decrement. All other usage is unlimited on the free tier.
       invoices_created: Infinity,
       clients_created: 5,
       projects_created: Infinity,
-      contracts_sent: Infinity,
+      contracts_sent: 0,
       storage_bytes: 100 * 1024 * 1024, // 100 MB
     },
-    modules: ALL_MODULES,
+    modules: FREE_MODULES,
   },
   pro: {
     id: "pro",
     name: "Pro",
     description: "Unlock contracts, the client portal, and custom branding.",
-    priceMonthlyPaise: 49900, // ₹499
-    priceYearlyPaise: 499000, // ₹4,990
+    priceMonthlyPaise: 49900,  // ₹499/mo
+    priceYearlyPaise: 478800,  // ₹399/mo × 12 = ₹4,788/yr (2 months free)
     currency: "INR",
     selfServe: true,
     features: {
       "invoices.custom_branding": true,
       "invoices.payment_links": true,
+      "invoices.payment_gateway": true,
       "invoices.recurring": true,
       "invoices.advanced_templates": true,
       "clients.portal": true,
@@ -95,7 +109,7 @@ export const PLANS: Record<PlanId, PlanDefinition> = {
       invoices_created: Infinity,
       clients_created: Infinity,
       projects_created: Infinity,
-      contracts_sent: 50,
+      contracts_sent: Infinity,
       storage_bytes: 5 * 1024 * 1024 * 1024, // 5 GB
     },
     modules: ALL_MODULES,
@@ -105,13 +119,14 @@ export const PLANS: Record<PlanId, PlanDefinition> = {
     name: "Business",
     description:
       "Everything in Pro, plus API access, collaborators, and priority support.",
-    priceMonthlyPaise: 149900, // ₹1,499
-    priceYearlyPaise: 1499000,
+    priceMonthlyPaise: 149900,  // ₹1,499/mo
+    priceYearlyPaise: 1438800,  // ₹1,199/mo × 12 = ₹14,388/yr (2 months free)
     currency: "INR",
     selfServe: true,
     features: {
       "invoices.custom_branding": true,
       "invoices.payment_links": true,
+      "invoices.payment_gateway": true,
       "invoices.recurring": true,
       "invoices.advanced_templates": true,
       "clients.portal": true,

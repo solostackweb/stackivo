@@ -75,18 +75,18 @@ export function AppSidebar() {
       {/* Primary nav */}
       <div className="flex-1 overflow-y-auto scrollbar-thin px-2 pb-2 pt-1">
         {!collapsed && (
-          <p className="mb-1.5 px-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70">
+          <p className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-widest text-sidebar-foreground/30">
             Workspace
           </p>
         )}
-        <SidebarNav items={primaryNav} collapsed={collapsed} />
+        <SidebarNav items={primaryNav} collapsed={collapsed} isFreePlan={plan === "free"} />
       </div>
 
       {/* Secondary nav */}
       <div className="px-2 pb-2">
-        <Separator className="mb-2 bg-sidebar-border" />
+        <Separator className="mb-2 bg-sidebar-border/60" />
         {!collapsed && (
-          <p className="mb-1.5 px-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70">
+          <p className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-widest text-sidebar-foreground/30">
             Account
           </p>
         )}
@@ -94,15 +94,15 @@ export function AppSidebar() {
       </div>
 
       {/* Workspace identity */}
-      <div className="border-t border-sidebar-border p-2">
+      <div className="border-t border-sidebar-border/60 p-2">
         {!collapsed ? (
           <Link
             href="/dashboard/settings/company"
-            className="group flex items-center gap-2.5 rounded-md p-2 transition-colors hover:bg-sidebar-accent"
+            className="group flex items-center gap-2.5 rounded-lg p-2 transition-colors hover:bg-sidebar-accent"
           >
             <div
               aria-hidden
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-gradient-to-br from-primary/15 to-indigo-500/15 text-[11px] font-bold text-primary ring-1 ring-primary/15"
+              className="avatar-gradient flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[11px] font-bold"
             >
               {workspaceInitials}
             </div>
@@ -119,7 +119,7 @@ export function AppSidebar() {
           <Link
             href="/dashboard/settings/company"
             aria-label={`${workspaceName} · ${plan} plan`}
-            className="mx-auto flex h-8 w-8 items-center justify-center rounded-md bg-gradient-to-br from-primary/15 to-indigo-500/15 text-[11px] font-bold text-primary ring-1 ring-primary/15 transition-colors hover:from-primary/20 hover:to-indigo-500/20"
+            className="avatar-gradient mx-auto flex h-8 w-8 items-center justify-center rounded-lg text-[11px] font-bold transition-opacity hover:opacity-80"
           >
             {workspaceInitials}
           </Link>
@@ -127,12 +127,12 @@ export function AppSidebar() {
       </div>
 
       {/* Collapse toggle */}
-      <div className="border-t border-sidebar-border p-2">
+      <div className="border-t border-sidebar-border/60 p-2">
         <Button
           variant="ghost"
           size="icon"
           onClick={onToggle}
-          className="h-8 w-full text-muted-foreground hover:text-foreground"
+          className="h-8 w-full text-sidebar-foreground/40 hover:bg-sidebar-accent hover:text-sidebar-foreground"
           aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
           {collapsed ? (

@@ -39,17 +39,17 @@ function formatDateShort(iso: string) {
 
 export function RecentInvoices({ items }: { items: InvoiceFeedItem[] }) {
   return (
-    <Card>
+    <Card className="border-border/60 shadow-sm shadow-primary/[0.03]">
       <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-3">
         <div>
-          <CardTitle className="text-base font-bold tracking-tight">Recent invoices</CardTitle>
-          <CardDescription className="text-xs">
+          <CardTitle className="text-[15px] font-semibold tracking-tight">Recent invoices</CardTitle>
+          <CardDescription className="text-[12px]">
             Latest activity across your invoices
           </CardDescription>
         </div>
         <Link
           href="/dashboard/invoices"
-          className="shrink-0 text-xs font-semibold text-primary transition-colors hover:text-primary/80"
+          className="shrink-0 text-[12px] font-semibold text-primary transition-colors hover:text-primary/70"
         >
           View all →
         </Link>
@@ -77,23 +77,23 @@ export function RecentInvoices({ items }: { items: InvoiceFeedItem[] }) {
                 >
                   <Link
                     href={`/dashboard/invoices/${inv.id}`}
-                    className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-accent"
+                    className="flex items-center gap-3 px-4 py-3 transition-colors duration-100 hover:bg-accent/50"
                   >
-                    <Avatar className="h-8 w-8 shrink-0 ring-1 ring-border">
-                      <AvatarFallback className="bg-gradient-to-br from-primary/10 to-indigo-500/10 text-[10px] font-bold text-primary">
+                    <Avatar className="h-8 w-8 shrink-0 ring-1 ring-primary/15">
+                      <AvatarFallback className="avatar-gradient text-[10px] font-bold">
                         {inv.clientInitials}
                       </AvatarFallback>
                     </Avatar>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-semibold leading-tight">
+                      <p className="truncate text-[13px] font-semibold leading-tight">
                         {inv.clientName}
                       </p>
-                      <p className="text-[11px] text-muted-foreground">
+                      <p className="font-mono text-[11px] text-muted-foreground">
                         {inv.number} · {formatDateShort(inv.issueDate)}
                       </p>
                     </div>
                     <div className="flex shrink-0 flex-col items-end gap-1">
-                      <span className="text-sm font-semibold tabular-nums">
+                      <span className="font-mono text-[13px] font-semibold tabular-nums">
                         {formatINR(inv.amount)}
                       </span>
                       <StatusBadge status={inv.status} />

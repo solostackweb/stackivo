@@ -14,12 +14,12 @@ export function PageHeader({ title, description, actions, className }: PageHeade
       className={cn(
         // Tighter bottom padding on mobile so the header doesn't eat as
         // much of the visible viewport.
-        "flex flex-col gap-3 border-b pb-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:pb-6",
+        "flex flex-col gap-3 border-b border-border/60 pb-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:pb-6",
         className,
       )}
     >
       <div className="min-w-0 space-y-1 sm:space-y-1.5">
-        <h1 className="text-xl font-bold tracking-tight sm:text-[28px] sm:leading-tight">
+        <h1 className="text-xl font-bold tracking-tight sm:text-[26px] sm:leading-tight sm:tracking-[-0.02em]">
           {title}
         </h1>
         {description ? (
