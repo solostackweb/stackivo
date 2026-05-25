@@ -401,4 +401,5 @@ export async function getSidebarCounters() {
     projectsActive: projects.active,
     contractsAwaitingSignature: contracts.awaitingSignature,
     notificationsUnread: unread,
- 
+   };
+}
