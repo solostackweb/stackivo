@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Zap } from "lucide-react";
+import { StackivoMark } from "@/components/brand/stackivo-logo";
 import { siteConfig } from "@/config/site";
 import type { MarketingAuthState } from "@/features/marketing/types";
 import { NewsletterForm } from "./newsletter-form";
@@ -74,9 +74,7 @@ export function MarketingFooter({
         <div className="grid gap-12 md:grid-cols-2 lg:grid-cols-[1.6fr_repeat(4,1fr)]">
           <div className="space-y-4">
             <Link href="/" className="flex items-center gap-2.5 font-bold tracking-tight">
-              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-indigo-600 text-primary-foreground shadow-md shadow-primary/20">
-                <Zap className="h-4 w-4" />
-              </span>
+              <StackivoMark className="h-8 w-8" />
               <span className="text-base">{siteConfig.name}</span>
             </Link>
             <p className="max-w-xs text-sm leading-relaxed text-muted-foreground">
