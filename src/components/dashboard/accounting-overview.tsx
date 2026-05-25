@@ -3,6 +3,7 @@ import {
   CircleAlert,
   FolderKanban,
   Wallet,
+  Clock,
 } from "lucide-react";
 import {
   Card,
@@ -14,24 +15,21 @@ import {
 import { formatINR } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
-/**
- * Accounting overview — explicit separation of invoice-issued vs.
- * cash-collected, plus an operational counterweight (active projects).
- *
- * Four tiles, deliberately chosen:
- *   1. Collected revenue (paid invoices — real money in bank).
- *   2. Outstanding (issued but unpaid — receivables / accrued income).
- *   3. Overdue (subset of outstanding that's past due).
- *   4. Active projects (operational state, not money).
- *
- * Anything beyond these belongs on a feature-specific page, not the
- * dashboard.
- */
 export interface AccountingOverviewProps {
   collectedAllTime: number;
   outstanding: number;
   overdueAmount: number;
   activeProjects: number;
+  weeklyBillableSeconds?: number;
+  weeklyBillableAmount?: number;
+}
+
+function formatHours(totalSeconds: number): string {
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  if (h === 0) return `${m}m`;
+  if (m === 0) return `${h}h`;
+  return `${h}h ${m}m`;
 }
 
 export function AccountingOverview({
@@ -39,6 +37,8 @@ export function AccountingOverview({
   outstanding,
   overdueAmount,
   activeProjects,
+  weeklyBillableSeconds = 0,
+  weeklyBillableAmount = 0,
 }: AccountingOverviewProps) {
   const overdueShare =
     outstanding > 0 ? Math.min(100, (overdueAmount / outstanding) * 100) : 0;
@@ -46,14 +46,17 @@ export function AccountingOverview({
   return (
     <Card className="border-border/60 shadow-sm shadow-primary/[0.03]">
       <CardHeader className="pb-3">
-        <CardTitle className="text-[15px] font-semibold tracking-tight">Business overview</CardTitle>
+        <CardTitle className="text-[15px] font-semibold tracking-tight">
+          Business overview
+        </CardTitle>
         <CardDescription className="text-[13px]">
-          Issued invoices are <span className="font-medium text-foreground/70">receivables</span>,
+          Issued invoices are{" "}
+          <span className="font-medium text-foreground/70">receivables</span>,
           not revenue — cash collected is what actually moved into your bank.
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="stagger-children grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <div className="stagger-children grid grid-cols-2 gap-3 lg:grid-cols-5">
           <Tile
             icon={Wallet}
             label="Collected"
@@ -86,6 +89,17 @@ export function AccountingOverview({
             sub={activeProjects === 1 ? "1 in flight" : "Currently in flight"}
             tone="default"
           />
+          <Tile
+            icon={Clock}
+            label="This week"
+            value={weeklyBillableSeconds > 0 ? formatHours(weeklyBillableSeconds) : "0h"}
+            sub={
+              weeklyBillableAmount > 0
+                ? `${formatINR(weeklyBillableAmount, { compact: true })} billable`
+                : "No time logged yet"
+            }
+            tone="time"
+          />
         </div>
       </CardContent>
     </Card>
@@ -97,7 +111,7 @@ interface TileProps {
   label: string;
   value: string;
   sub: string;
-  tone: "default" | "success" | "warning" | "danger";
+  tone: "default" | "success" | "warning" | "danger" | "time";
 }
 
 function Tile({ icon: Icon, label, value, sub, tone }: TileProps) {
@@ -108,14 +122,15 @@ function Tile({ icon: Icon, label, value, sub, tone }: TileProps) {
         tone === "default" && "border-border/60 bg-card",
         tone === "success" && "border-emerald-500/15 bg-emerald-500/[0.03]",
         tone === "warning" && "border-amber-500/15 bg-amber-500/[0.03]",
-        tone === "danger" && "border-destructive/15 bg-destructive/[0.03]",
+        tone === "danger"  && "border-destructive/15 bg-destructive/[0.03]",
+        tone === "time"    && "border-blue-500/15 bg-blue-500/[0.03]",
       )}
     >
       <div className="min-w-0 space-y-1">
         <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/70">
           {label}
         </p>
-        <p className="font-mono text-lg font-bold tabular-nums tracking-tight sm:text-[22px]">
+        <p className="text-xl font-semibold tabular-nums tracking-tight sm:text-2xl">
           {value}
         </p>
         <p className="text-[11px] text-muted-foreground/70">{sub}</p>
@@ -126,7 +141,8 @@ function Tile({ icon: Icon, label, value, sub, tone }: TileProps) {
           tone === "default" && "bg-gradient-to-br from-primary/12 to-violet-500/8 text-primary ring-primary/15",
           tone === "success" && "bg-emerald-500/12 text-emerald-600 ring-emerald-500/18 dark:text-emerald-400",
           tone === "warning" && "bg-amber-500/12 text-amber-600 ring-amber-500/18 dark:text-amber-400",
-          tone === "danger" && "bg-destructive/12 text-destructive ring-destructive/18",
+          tone === "danger"  && "bg-destructive/12 text-destructive ring-destructive/18",
+          tone === "time"    && "bg-blue-500/12 text-blue-600 ring-blue-500/18 dark:text-blue-400",
         )}
       >
         <Icon className="h-4 w-4" />

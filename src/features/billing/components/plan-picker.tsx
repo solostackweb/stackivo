@@ -8,6 +8,7 @@ import { listPlans } from "@/features/subscription/plans";
 import type { PlanDefinition, PlanId } from "@/features/subscription/types";
 import type { BillingCycle } from "../types";
 import { CheckoutButton } from "./checkout-button";
+import { publicRazorpayKeyId } from "@/config/env";
 
 interface Props {
   currentPlan: PlanId;
@@ -166,14 +167,20 @@ function PlanTile({
             Current plan
           </Badge>
         ) : isPaid ? (
-          <CheckoutButton
-            plan={plan.id as "pro" | "business"}
-            cycle={cycle}
-            variant={popular ? "default" : "outline"}
-            size="sm"
-            className="w-full"
-            label={`Switch to ${plan.name}`}
-          />
+          publicRazorpayKeyId ? (
+            <CheckoutButton
+              plan={plan.id as "pro" | "business"}
+              cycle={cycle}
+              variant={popular ? "default" : "outline"}
+              size="sm"
+              className="w-full"
+              label={`Switch to ${plan.name}`}
+            />
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              Billing is not configured yet. Check back soon.
+            </p>
+          )
         ) : (
           <span className="text-xs text-muted-foreground">
             Cancel any paid plan to return to Free.

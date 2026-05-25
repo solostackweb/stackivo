@@ -222,17 +222,28 @@ export type { ActivityRecord };
  * These are fast parallel queries that populate the above-the-fold tiles.
  */
 export async function getKpiSnapshot() {
-  const [invoices, projects, overdue, revenueSeries] = await Promise.all([
+  // Start of current week (Monday) for time-tracking summary tile.
+  const now = new Date();
+  const dayOfWeek = now.getDay(); // 0 = Sunday
+  const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+  const weekStart = new Date(now);
+  weekStart.setDate(now.getDate() - daysToMonday);
+  weekStart.setHours(0, 0, 0, 0);
+
+  const [invoices, projects, overdue, revenueSeries, time] = await Promise.all([
     getInvoiceAggregates(),
     getProjectAggregates(),
     getOverdueTotal(),
     getRevenueSeries(6),
+    getTimeAggregates({ from: weekStart.toISOString() }),
   ]);
   return {
     collectedAllTime: invoices.collectedAllTime,
     outstanding: invoices.outstanding,
     overdueAmount: overdue.total,
     activeProjects: projects.active,
+    weeklyBillableSeconds: time.billableSeconds + time.nonBillableSeconds,
+    weeklyBillableAmount: time.billableAmount,
     revenueSeries,
   };
 }
@@ -390,5 +401,4 @@ export async function getSidebarCounters() {
     projectsActive: projects.active,
     contractsAwaitingSignature: contracts.awaitingSignature,
     notificationsUnread: unread,
-  };
-}
+ 

@@ -39,8 +39,15 @@ function firstNameOf(
 // ─── Async streaming sections ────────────────────────────────────────────────
 
 async function KpiSection() {
-  const { collectedAllTime, outstanding, overdueAmount, activeProjects, revenueSeries } =
-    await getKpiSnapshot();
+  const {
+    collectedAllTime,
+    outstanding,
+    overdueAmount,
+    activeProjects,
+    weeklyBillableSeconds,
+    weeklyBillableAmount,
+    revenueSeries,
+  } = await getKpiSnapshot();
   return (
     <>
       <AccountingOverview
@@ -48,6 +55,8 @@ async function KpiSection() {
         outstanding={outstanding}
         overdueAmount={overdueAmount}
         activeProjects={activeProjects}
+        weeklyBillableSeconds={weeklyBillableSeconds}
+        weeklyBillableAmount={weeklyBillableAmount}
       />
       <RevenueChartLazy series={revenueSeries} />
     </>
@@ -222,19 +231,4 @@ export default async function DashboardPage() {
       {profile ? <ProfileCompletenessAlert profile={profile} /> : null}
 
       {/* KPI tiles + revenue chart — fast DB aggregates */}
-      <Suspense fallback={<KpiSkeleton />}>
-        <KpiSection />
-      </Suspense>
-
-      {/* Recent invoices + activity — hydration waterfall */}
-      <Suspense fallback={<FeedSkeleton />}>
-        <FeedSection />
-      </Suspense>
-
-      {/* Recent clients + quick actions + reminders */}
-      <Suspense fallback={<BottomGridSkeleton />}>
-        <BottomGridSection />
-      </Suspense>
-    </div>
-  );
-}
+   
