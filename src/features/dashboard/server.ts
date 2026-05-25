@@ -231,7 +231,7 @@ export async function getKpiSnapshot() {
   return {
     collectedAllTime: invoices.collectedAllTime,
     outstanding: invoices.outstanding,
-    overdueAmount: overdue,
+    overdueAmount: overdue.total,
     activeProjects: projects.active,
     revenueSeries,
   };
