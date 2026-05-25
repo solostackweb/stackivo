@@ -94,16 +94,14 @@ async function BottomGridSection() {
 function KpiSkeleton() {
   return (
     <div className="space-y-5">
-      {/* 4-tile KPI strip */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {Array.from({ length: 4 }).map((_, i) => (
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+        {Array.from({ length: 5 }).map((_, i) => (
           <div key={i} className="rounded-xl border bg-card p-5">
             <Skeleton className="mb-3 h-3.5 w-24" />
             <Skeleton className="h-7 w-28" />
           </div>
         ))}
       </div>
-      {/* Revenue chart placeholder */}
       <div className="rounded-xl border bg-card p-6">
         <Skeleton className="mb-4 h-4 w-32" />
         <Skeleton className="h-[200px] w-full rounded-lg" />
@@ -115,7 +113,6 @@ function KpiSkeleton() {
 function FeedSkeleton() {
   return (
     <div className="grid items-start gap-4 md:grid-cols-[1fr_280px] lg:grid-cols-3">
-      {/* Recent invoices */}
       <div className="rounded-xl border bg-card p-5 lg:col-span-2">
         <Skeleton className="mb-4 h-4 w-32" />
         <div className="space-y-3">
@@ -131,7 +128,6 @@ function FeedSkeleton() {
           ))}
         </div>
       </div>
-      {/* Activity timeline */}
       <div className="rounded-xl border bg-card p-5">
         <Skeleton className="mb-4 h-4 w-24" />
         <div className="space-y-4">
@@ -172,22 +168,7 @@ function BottomGridSkeleton() {
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-/**
- * Freelancer dashboard — streams in three independent sections.
- *
- * Render order (fastest to slowest):
- *   1. PageHeader + profile checklist/alert — resolved immediately from a
- *      single lightweight `getBusinessProfile()` query.
- *   2. KPI tiles + revenue chart — fast aggregates, no hydration step.
- *   3. Recent invoices + activity — requires a client-name hydration pass.
- *   4. Recent clients + quick actions + reminders — separate client query.
- *
- * Each section is wrapped in <Suspense> so React can flush it to the browser
- * as soon as its data arrives, without waiting for the sections below it.
- */
 export default async function DashboardPage() {
-  // Profile is needed synchronously for the page header greeting and the
-  // setup checklist — it's a single cheap query so we don't defer it.
   const [profile, sub] = await Promise.all([
     getBusinessProfile(),
     getCurrentSubscription(),
@@ -212,7 +193,7 @@ export default async function DashboardPage() {
         }
       />
 
-      {/* Free plan upgrade nudge — only shown to free-tier users */}
+      {/* Free plan upgrade nudge */}
       {(!sub || sub.plan === "free") && (
         <FreePlanBanner clientsUsed={profile?.lifetimeClientsCreated ?? 0} />
       )}
@@ -231,4 +212,19 @@ export default async function DashboardPage() {
       {profile ? <ProfileCompletenessAlert profile={profile} /> : null}
 
       {/* KPI tiles + revenue chart — fast DB aggregates */}
-   
+      <Suspense fallback={<KpiSkeleton />}>
+        <KpiSection />
+      </Suspense>
+
+      {/* Recent invoices + activity — hydration waterfall */}
+      <Suspense fallback={<FeedSkeleton />}>
+        <FeedSection />
+      </Suspense>
+
+      {/* Recent clients + quick actions + reminders */}
+      <Suspense fallback={<BottomGridSkeleton />}>
+        <BottomGridSection />
+      </Suspense>
+    </div>
+  );
+}
