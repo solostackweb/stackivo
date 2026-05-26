@@ -31,13 +31,12 @@ export async function createSignedStorageUrl(
  *     ships with the logo silently missing.
  *   - Signed URLs have a TTL. If the PDF render is queued behind other
  *     work the URL can expire mid-render.
- *   - The `<Image>` primitive only reliably supports PNG / JPEG / WebP
- *     bytes. Converting upfront lets us detect and skip SVG (which
- *     React-PDF cannot consume via `<Image>` at all).
+ *   - Inlining keeps supported image formats (PNG / JPEG / WebP / SVG)
+ *     available to React-PDF without a network round-trip.
  *
  * Returns null when the path is empty, the file is missing, or the file
- * is SVG. Callers should treat null as "no logo" and fall through to
- * the text-only header block.
+ * is not a supported image. Callers should treat null as "no logo" and
+ * fall through to the text-only header block.
  */
 export async function fetchStorageAsDataUrl(
   bucket: "profile-images" | "branding-assets",
@@ -54,10 +53,7 @@ export async function fetchStorageAsDataUrl(
   if (!mime || mime === "application/octet-stream") {
     mime = guessMimeFromPath(path);
   }
-  // React-PDF's <Image> does not support SVG. Skip cleanly — the
-  // template's null-logo branch will render the brand text block alone.
-  if (mime.includes("svg")) return null;
-  if (!isSupportedRasterMime(mime)) return null;
+  if (!isSupportedPdfImageMime(mime)) return null;
 
   const arrayBuffer = await data.arrayBuffer();
   const base64 = Buffer.from(arrayBuffer).toString("base64");
@@ -85,7 +81,7 @@ export async function normalizeImageForPdf(
       const res = await fetch(value);
       if (!res.ok) return null;
       const mime = res.headers.get("content-type")?.split(";")[0] || "image/png";
-      if (mime.includes("svg") || !isSupportedRasterMime(mime)) return null;
+      if (!isSupportedPdfImageMime(mime)) return null;
       const buf = Buffer.from(await res.arrayBuffer());
       return `data:${mime};base64,${buf.toString("base64")}`;
     } catch {
@@ -115,12 +111,13 @@ function guessMimeFromPath(path: string): string {
   }
 }
 
-function isSupportedRasterMime(mime: string): boolean {
+function isSupportedPdfImageMime(mime: string): boolean {
   return (
     mime === "image/png" ||
     mime === "image/jpeg" ||
     mime === "image/jpg" ||
     mime === "image/webp" ||
-    mime === "image/gif"
+    mime === "image/gif" ||
+    mime === "image/svg+xml"
   );
 }

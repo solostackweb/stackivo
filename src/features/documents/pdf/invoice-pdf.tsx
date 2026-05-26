@@ -159,13 +159,14 @@ const s = StyleSheet.create({
   headerLeft: {
     flexDirection: "row",
     alignItems: "flex-start",
-    maxWidth: "58%",
+    maxWidth: "62%",
   },
   logo: {
-    width: 40,
-    height: 40,
+    width: 72,
+    maxWidth: 96,
+    height: 44,
     objectFit: "contain",
-    marginRight: 10,
+    marginRight: 12,
     borderRadius: pdfRadii.sm,
   },
   businessName: {
@@ -225,7 +226,18 @@ const s = StyleSheet.create({
     marginTop: 5,
   },
   dateGrid: {
-    alignItems: "flex-end",
+    flexDirection: "row",
+    width: 250,
+    borderWidth: 0.5,
+    borderColor: pdfColors.borderStrong,
+    backgroundColor: pdfColors.surfaceMuted,
+  },
+  dateCell: {
+    flex: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+    borderLeftWidth: 0.5,
+    borderLeftColor: pdfColors.border,
   },
   dateLabel: {
     fontFamily: pdfFonts.bold,
@@ -233,28 +245,31 @@ const s = StyleSheet.create({
     color: pdfColors.mutedForeground,
     textTransform: "uppercase",
     letterSpacing: pdfTracking.wider,
-    marginBottom: 2,
+    marginBottom: 4,
   },
   dateValue: {
     fontFamily: pdfFonts.bold,
     fontSize: pdfSizes.sm,
     color: pdfColors.foreground,
-    marginBottom: 8,
+    lineHeight: pdfLineHeights.tight,
   },
 
   // ── parties ─────────────────────────────────────────────────────────────
   parties: {
     flexDirection: "row",
+    borderWidth: 0.5,
+    borderColor: pdfColors.borderStrong,
+    backgroundColor: pdfColors.surface,
   },
   partyCol: {
     flex: 1,
+    padding: pdfSpacing.md,
   },
   partyColRight: {
     flex: 1,
-    paddingLeft: 20,
+    padding: pdfSpacing.md,
     borderLeftWidth: 0.5,
     borderLeftColor: pdfColors.border,
-    marginLeft: 20,
   },
   partyEyebrow: {
     fontFamily: pdfFonts.bold,
@@ -399,19 +414,25 @@ export function InvoicePdf({
 
           {/* Dates grid */}
           <View style={s.dateGrid}>
-            <Text style={s.dateLabel}>Issue date</Text>
-            <Text style={s.dateValue}>{formatDate(data.issueDate)}</Text>
-            <Text style={s.dateLabel}>Due date</Text>
-            <Text
-              style={[
-                s.dateValue,
-                { color: isOverdue ? pdfColors.danger : pdfColors.foreground },
-              ]}
-            >
-              {formatDate(data.dueDate)}
-            </Text>
-            <Text style={s.dateLabel}>Type</Text>
-            <Text style={[s.dateValue, { marginBottom: 0 }]}>{docLabel}</Text>
+            <View style={[s.dateCell, { borderLeftWidth: 0 }]}>
+              <Text style={s.dateLabel}>Issue date</Text>
+              <Text style={s.dateValue}>{formatDate(data.issueDate)}</Text>
+            </View>
+            <View style={s.dateCell}>
+              <Text style={s.dateLabel}>Due date</Text>
+              <Text
+                style={[
+                  s.dateValue,
+                  { color: isOverdue ? pdfColors.danger : pdfColors.foreground },
+                ]}
+              >
+                {formatDate(data.dueDate)}
+              </Text>
+            </View>
+            <View style={s.dateCell}>
+              <Text style={s.dateLabel}>Type</Text>
+              <Text style={s.dateValue}>{docLabel}</Text>
+            </View>
           </View>
         </View>
 

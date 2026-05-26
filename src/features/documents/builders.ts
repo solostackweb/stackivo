@@ -69,11 +69,7 @@ export async function buildInvoicePdfData(
     fetchSellerProfile(user.id),
     invoice.client_id ? fetchClient(invoice.client_id) : null,
   ]);
-  const logoUrl = await fetchStorageAsDataUrl(
-    "branding-assets",
-    seller?.logo_url,
-    supabase,
-  );
+  const logoUrl = await fetchBrandMarkDataUrl(seller, supabase);
 
   return assembleInvoicePdfData({
     invoice,
@@ -109,11 +105,7 @@ export async function buildInvoicePdfDataByToken(
     fetchSellerProfile(inv.user_id, admin),
     inv.client_id ? fetchClient(inv.client_id, admin) : null,
   ]);
-  const logoUrl = await fetchStorageAsDataUrl(
-    "branding-assets",
-    seller?.logo_url,
-    admin,
-  );
+  const logoUrl = await fetchBrandMarkDataUrl(seller, admin);
 
   return assembleInvoicePdfData({
     invoice: inv,
@@ -145,11 +137,7 @@ export async function buildContractPdfData(
     contract.client_id ? fetchClient(contract.client_id) : null,
   ]);
   const signature = await fetchLatestContractSignature(contract.id);
-  const logoUrl = await fetchStorageAsDataUrl(
-    "branding-assets",
-    seller?.logo_url,
-    supabase,
-  );
+  const logoUrl = await fetchBrandMarkDataUrl(seller, supabase);
   return assembleContractPdfData({
     contract,
     seller,
@@ -177,11 +165,7 @@ export async function buildContractPdfDataByToken(
     contract.client_id ? fetchClient(contract.client_id, admin) : null,
     fetchLatestContractSignature(contract.id, admin),
   ]);
-  const logoUrl = await fetchStorageAsDataUrl(
-    "branding-assets",
-    seller?.logo_url,
-    admin,
-  );
+  const logoUrl = await fetchBrandMarkDataUrl(seller, admin);
   return assembleContractPdfData({
     contract,
     seller,
@@ -234,6 +218,19 @@ async function fetchLatestContractSignature(
     .order("signed_at", { ascending: false })
     .limit(1);
   return ((data?.[0] as unknown as ContractSignatureRow | undefined) ?? null);
+}
+
+async function fetchBrandMarkDataUrl(
+  seller: UserProfileRow | null,
+  client: AnySupabase,
+): Promise<string | null> {
+  const logo = await fetchStorageAsDataUrl(
+    "branding-assets",
+    seller?.logo_url,
+    client,
+  );
+  if (logo) return logo;
+  return fetchStorageAsDataUrl("branding-assets", seller?.brand_icon_url, client);
 }
 
 // --- Internal: assemblers -------------------------------------------------
@@ -494,11 +491,7 @@ export async function buildWelcomeDocumentPdfData(
     fetchSellerProfile(user.id),
     doc.client_id ? fetchClient(doc.client_id) : null,
   ]);
-  const logoUrl = await fetchStorageAsDataUrl(
-    "branding-assets",
-    seller?.logo_url,
-    supabase,
-  );
+  const logoUrl = await fetchBrandMarkDataUrl(seller, supabase);
   return assembleWelcomePdfData({ doc, seller, client, logoUrl });
 }
 
@@ -519,11 +512,7 @@ export async function buildWelcomeDocumentPdfDataByToken(
     fetchSellerProfile(doc.user_id, admin),
     doc.client_id ? fetchClient(doc.client_id, admin) : null,
   ]);
-  const logoUrl = await fetchStorageAsDataUrl(
-    "branding-assets",
-    seller?.logo_url,
-    admin,
-  );
+  const logoUrl = await fetchBrandMarkDataUrl(seller, admin);
   return assembleWelcomePdfData({ doc, seller, client, logoUrl });
 }
 
@@ -628,11 +617,7 @@ export async function buildReceiptPdfData(
     fetchSellerProfile(invoice.user_id),
     invoice.client_id ? fetchClient(invoice.client_id) : null,
   ]);
-  const logoUrl = await fetchStorageAsDataUrl(
-    "branding-assets",
-    seller?.logo_url,
-    supabase,
-  );
+  const logoUrl = await fetchBrandMarkDataUrl(seller, supabase);
   return assembleReceiptPdfData({ receipt, invoice, seller, client, logoUrl });
 }
 
@@ -654,10 +639,6 @@ export async function buildReceiptPdfDataByToken(
     fetchSellerProfile(invoice.user_id, admin),
     invoice.client_id ? fetchClient(invoice.client_id, admin) : null,
   ]);
-  const logoUrl = await fetchStorageAsDataUrl(
-    "branding-assets",
-    seller?.logo_url,
-    admin,
-  );
+  const logoUrl = await fetchBrandMarkDataUrl(seller, admin);
   return assembleReceiptPdfData({ receipt, invoice, seller, client, logoUrl });
 }

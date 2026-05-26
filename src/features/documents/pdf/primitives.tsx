@@ -84,12 +84,11 @@ const headerStyles = StyleSheet.create({
   },
   left: { flexDirection: "row", alignItems: "flex-start", maxWidth: "62%" },
   logo: {
-    // Slightly larger logo so freelancers' brands actually read at A4.
-    // Width is bounded to keep wider wordmark logos in proportion;
-    // `objectFit: contain` preserves the original aspect ratio.
-    width: 80,
+    // Large enough for icon-only brands to read, while still allowing
+    // wordmarks to sit naturally beside the business name.
+    width: 72,
     maxWidth: 96,
-    height: 48,
+    height: 44,
     objectFit: "contain",
     marginRight: pdfSpacing.md,
   },
@@ -300,8 +299,9 @@ const badgeStyles = StyleSheet.create({
   base: {
     alignSelf: "flex-start",
     borderWidth: 0.5,
-    paddingVertical: 3,
-    paddingHorizontal: 7,
+    borderRadius: pdfRadii.sm,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
   },
   text: {
     fontFamily: pdfFonts.bold,
@@ -333,8 +333,9 @@ export function Badge({
   label: string;
 }) {
   const color = badgeForeground(tone);
+  const backgroundColor = badgeBackground(tone);
   return (
-    <View style={[badgeStyles.base, { borderColor: color }]}>
+    <View style={[badgeStyles.base, { borderColor: color, backgroundColor }]}>
       <Text style={[badgeStyles.text, { color }]}>{label}</Text>
     </View>
   );
@@ -352,6 +353,21 @@ function badgeForeground(tone: BadgeTone): string {
     case "neutral":
     default:
       return pdfColors.mutedForeground;
+  }
+}
+
+function badgeBackground(tone: BadgeTone): string {
+  switch (tone) {
+    case "success":
+      return pdfColors.successSoft;
+    case "danger":
+      return pdfColors.dangerSoft;
+    case "warning":
+      return pdfColors.warningSoft;
+    case "brand":
+    case "neutral":
+    default:
+      return pdfColors.surfaceMuted;
   }
 }
 
@@ -541,17 +557,17 @@ const partyStyles = StyleSheet.create({
   pair: {
     flexDirection: "row",
     marginBottom: pdfSpacing.sectionGap,
-    borderTopWidth: 0.5,
-    borderTopColor: pdfColors.border,
-    paddingTop: pdfSpacing.md,
+    borderWidth: 0.5,
+    borderColor: pdfColors.borderStrong,
+    backgroundColor: pdfColors.surface,
   },
   colLeft: {
     flex: 1,
-    paddingRight: pdfSpacing.lg,
+    padding: pdfSpacing.md,
   },
   colRight: {
     flex: 1,
-    paddingLeft: pdfSpacing.lg,
+    padding: pdfSpacing.md,
     borderLeftWidth: 0.5,
     borderLeftColor: pdfColors.border,
   },
@@ -623,21 +639,24 @@ export function PartyCard({ data }: { data: PartyCardData }) {
 
 const tableStyles = StyleSheet.create({
   wrap: {
-    borderTopWidth: 0.5,
-    borderBottomWidth: 0.5,
+    borderWidth: 0.5,
     borderColor: pdfColors.borderStrong,
     marginBottom: pdfSpacing.sectionGap,
   },
   headerRow: {
     flexDirection: "row",
-    paddingVertical: pdfSpacing.sm + 2,
-    paddingHorizontal: pdfSpacing.md,
     borderBottomWidth: 0.5,
     borderBottomColor: pdfColors.borderStrong,
     // Neutral header. Brand colour intentionally suppressed here — a
     // tinted header band reads more "branded marketing" than the
     // accounting-document convention freelancers' clients are used to.
-    backgroundColor: pdfColors.surface,
+    backgroundColor: pdfColors.surfaceMuted,
+  },
+  headerCellWrap: {
+    paddingVertical: pdfSpacing.sm,
+    paddingHorizontal: pdfSpacing.md,
+    borderLeftWidth: 0.5,
+    borderLeftColor: pdfColors.border,
   },
   headerCell: {
     fontFamily: pdfFonts.bold,
@@ -648,10 +667,14 @@ const tableStyles = StyleSheet.create({
   },
   row: {
     flexDirection: "row",
-    paddingVertical: pdfSpacing.sm + 2,
-    paddingHorizontal: pdfSpacing.md,
     borderTopWidth: 0.5,
     borderTopColor: pdfColors.border,
+  },
+  bodyCell: {
+    paddingVertical: pdfSpacing.sm + 2,
+    paddingHorizontal: pdfSpacing.md,
+    borderLeftWidth: 0.5,
+    borderLeftColor: pdfColors.border,
   },
   cellTxt: {
     fontSize: pdfSizes.sm,
@@ -696,30 +719,41 @@ export function LineItemsTable<T>({
   return (
     <View style={tableStyles.wrap}>
       <View style={tableStyles.headerRow}>
-        {columns.map((col) => (
-          <Text
+        {columns.map((col, idx) => (
+          <View
             key={col.key}
             style={[
-              tableStyles.headerCell,
+              tableStyles.headerCellWrap,
               {
                 flex: col.flex,
-                textAlign: col.align ?? "left",
+                borderLeftWidth: idx === 0 ? 0 : 0.5,
               },
             ]}
           >
-            {col.header}
-          </Text>
+            <Text
+              style={[
+                tableStyles.headerCell,
+                { textAlign: col.align ?? "left" },
+              ]}
+            >
+              {col.header}
+            </Text>
+          </View>
         ))}
       </View>
       {rows.map((row, idx) => (
         <View key={idx} style={tableStyles.row} wrap={false}>
-          {columns.map((col) => (
+          {columns.map((col, colIdx) => (
             <View
               key={col.key}
-              style={{
-                flex: col.flex,
-                alignItems: col.align === "right" ? "flex-end" : "flex-start",
-              }}
+              style={[
+                tableStyles.bodyCell,
+                {
+                  flex: col.flex,
+                  alignItems: col.align === "right" ? "flex-end" : "flex-start",
+                  borderLeftWidth: colIdx === 0 ? 0 : 0.5,
+                },
+              ]}
             >
               {col.render(row)}
             </View>
@@ -763,9 +797,12 @@ const totalsStyles = StyleSheet.create({
   wrap: {
     width: 240,
     paddingHorizontal: pdfSpacing.md,
-    paddingTop: pdfSpacing.sm,
+    paddingVertical: pdfSpacing.sm,
     alignSelf: "flex-end",
     marginBottom: pdfSpacing.sectionGap,
+    borderWidth: 0.5,
+    borderColor: pdfColors.borderStrong,
+    backgroundColor: pdfColors.surfaceMuted,
   },
   row: {
     flexDirection: "row",
@@ -788,6 +825,7 @@ const totalsStyles = StyleSheet.create({
     borderTopColor: pdfColors.borderStrong,
     marginTop: pdfSpacing.sm,
     paddingTop: pdfSpacing.sm,
+    backgroundColor: pdfColors.surface,
   },
   grandLabel: {
     fontFamily: pdfFonts.bold,

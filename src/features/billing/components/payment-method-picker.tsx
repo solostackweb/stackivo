@@ -25,6 +25,7 @@ import {
   IndianRupee,
   ArrowRight,
   CheckCircle2,
+  Lock,
 } from "lucide-react";
 import {
   setBankPaymentMethodAction,
@@ -54,26 +55,18 @@ const METHODS: {
   description: string;
   fee: string;
   feeColor: string;
+  locked?: boolean;
+  lockedReason?: string;
 }[] = [
   {
     id: "stackivo_managed",
     icon: <CreditCard className="h-5 w-5" />,
     title: "Route Checkout",
-    tag: "",
-    tagColor: "",
-    description: "Cards, UPI, net banking & international payments.",
-    fee: "~2–3% fee",
-    feeColor: "text-slate-500",
-  },
-  {
-    id: "upi_smart",
-    icon: <Zap className="h-5 w-5" />,
-    title: "Smart Collect",
     tag: "Recommended",
     tagColor:
-      "bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950 dark:text-emerald-400 dark:border-emerald-800",
-    description: "Auto virtual UPI per invoice. Marks paid instantly.",
-    fee: "~1.77% fee",
+      "bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-950 dark:text-blue-400 dark:border-blue-800",
+    description: "Cards, UPI, net banking & international payments.",
+    fee: "~2–3% fee",
     feeColor: "text-slate-500",
   },
   {
@@ -82,10 +75,23 @@ const METHODS: {
     title: "UPI Direct",
     tag: "Zero fee",
     tagColor:
-      "bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-950 dark:text-blue-400 dark:border-blue-800",
+      "bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950 dark:text-emerald-400 dark:border-emerald-800",
     description: "Client pays your UPI directly. You confirm manually.",
     fee: "Free",
     feeColor: "text-emerald-600 dark:text-emerald-400 font-medium",
+  },
+  {
+    id: "upi_smart",
+    icon: <Zap className="h-5 w-5" />,
+    title: "Smart Collect",
+    tag: "Coming soon",
+    tagColor:
+      "bg-muted text-muted-foreground border border-border",
+    description: "Auto virtual UPI per invoice. Marks paid instantly.",
+    fee: "~1.77% fee",
+    feeColor: "text-slate-500",
+    locked: true,
+    lockedReason: "Requires Proprietorship or Company account on Razorpay.",
   },
 ];
 
@@ -113,14 +119,14 @@ export function PaymentMethodPicker({ summary, initialBank, initialUpiVpa }: Pro
               method={m}
               isActive={summary.type === m.id}
               isSelected={selected === m.id}
-              onSelect={() => setSelected(m.id)}
+              onSelect={() => !m.locked && setSelected(m.id)}
             />
           ))}
         </div>
       </div>
 
-      {/* form panel */}
-      {selected && (
+      {/* form panel — never shown for locked methods */}
+      {selected && !METHODS.find((m) => m.id === selected)?.locked && (
         <FormPanel
           selected={selected}
           summary={summary}
@@ -227,16 +233,20 @@ function MethodCard({
   onSelect: () => void;
 }) {
   const highlighted = isSelected || isActive;
+  const locked = method.locked;
 
   return (
     <button
       type="button"
       onClick={onSelect}
+      disabled={locked}
       className={[
         "group relative flex w-full flex-col items-start gap-2 rounded-xl border p-4 text-left transition-all duration-150",
-        highlighted
-          ? "border-primary/40 bg-primary/[0.03] ring-1 ring-primary/20"
-          : "border-border bg-card hover:border-border/80 hover:bg-muted/30",
+        locked
+          ? "cursor-not-allowed border-border/50 bg-muted/20 opacity-60"
+          : highlighted
+            ? "border-primary/40 bg-primary/[0.03] ring-1 ring-primary/20"
+            : "border-border bg-card hover:border-border/80 hover:bg-muted/30",
       ].join(" ")}
     >
       {/* top row: icon + badges */}
@@ -244,9 +254,11 @@ function MethodCard({
         <span
           className={[
             "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors",
-            highlighted
-              ? "bg-primary/10 text-primary"
-              : "bg-muted text-muted-foreground group-hover:bg-muted/80",
+            locked
+              ? "bg-muted text-muted-foreground/50"
+              : highlighted
+                ? "bg-primary/10 text-primary"
+                : "bg-muted text-muted-foreground group-hover:bg-muted/80",
           ].join(" ")}
         >
           {method.icon}
@@ -262,6 +274,9 @@ function MethodCard({
               {method.tag}
             </span>
           )}
+          {locked && (
+            <Lock className="h-3.5 w-3.5 text-muted-foreground/60" />
+          )}
         </div>
       </div>
 
@@ -269,7 +284,7 @@ function MethodCard({
       <div>
         <p className="text-sm font-semibold leading-none">{method.title}</p>
         <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-          {method.description}
+          {locked ? method.lockedReason : method.description}
         </p>
       </div>
 
@@ -280,7 +295,7 @@ function MethodCard({
       </div>
 
       {/* selected indicator */}
-      {isSelected && (
+      {isSelected && !locked && (
         <span className="absolute right-3 top-3">
           <CircleCheckBig className="h-4 w-4 text-primary" />
         </span>
