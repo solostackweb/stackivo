@@ -81,33 +81,30 @@ export default async function PaymentsSettingsPage() {
           initialUpiVpa={initialUpiVpa}
         />
 
-        <div className="rounded-lg border border-dashed bg-muted/20 p-4 text-xs leading-relaxed text-muted-foreground">
-          <p className="mb-2 font-semibold text-foreground">How each method works</p>
-          <div className="space-y-2">
-            <p>
-              <strong>Route Checkout</strong> — Client opens the invoice link
-              and pays via Razorpay Checkout (cards, UPI, net banking, wallets,
-              international). Invoice auto-marks paid. Stackivo ops processes a
-              payout to your bank within 1–2 business days. ~2–3% Razorpay fee.
-            </p>
-            <p>
-              <strong>Smart Collect UPI</strong> — A unique virtual UPI ID is
-              generated per invoice. Client pays it via any UPI app. Invoice
-              auto-marks paid the moment the transfer arrives. India only.
-              ~1.77% Razorpay fee. Payout T+2.
-            </p>
-            <p>
-              <strong>UPI Direct</strong> — Client scans a static QR code tied
-              to your UPI ID and pays you directly. Money lands instantly with
-              zero fee. You confirm each payment manually from the invoice page
-              and Stackivo generates the receipt.
-            </p>
-          </div>
-          <p className="mt-3">
-            Both Route Checkout and Smart Collect require Razorpay to verify
-            your bank account. IFSC is validated live and PAN is stored for
-            regulatory compliance — this is a one-time step per bank account.
-          </p>
+        <div className="grid gap-3 sm:grid-cols-3">
+          {[
+            {
+              title: "Route Checkout",
+              body: "Client pays via Razorpay — cards, UPI, net banking, or international. Invoice auto-marks paid. Payout to your bank within 1–2 business days.",
+              note: "~2–3% fee",
+            },
+            {
+              title: "Smart Collect",
+              body: "A unique virtual UPI ID is created for each invoice. Client pays it via any UPI app. Invoice auto-marks paid the moment the transfer lands.",
+              note: "~1.77% fee · India only",
+            },
+            {
+              title: "UPI Direct",
+              body: "Client scans a QR code for your UPI ID and pays directly. Instant, zero-fee. You confirm each payment manually and Stackivo issues the receipt.",
+              note: "Free · Manual confirmation",
+            },
+          ].map(({ title, body, note }) => (
+            <div key={title} className="rounded-xl border bg-muted/20 p-4">
+              <p className="mb-1.5 text-xs font-semibold text-foreground">{title}</p>
+              <p className="text-xs leading-relaxed text-muted-foreground">{body}</p>
+              <p className="mt-2 text-[11px] font-medium text-muted-foreground/70">{note}</p>
+            </div>
+          ))}
         </div>
       </div>
     </>
