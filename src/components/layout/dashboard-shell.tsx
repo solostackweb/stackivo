@@ -33,7 +33,7 @@ export function DashboardShell({
 }) {
   return (
     <DashboardShellProviders profile={profile} subscription={subscription}>
-      <div className="flex min-h-screen w-full bg-background">
+      <div className="flex min-h-[100dvh] w-full bg-background">
         <AppSidebar />
         <MobileNav />
         <div className="flex min-w-0 flex-1 flex-col">

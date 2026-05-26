@@ -32,7 +32,7 @@ export function UserNav() {
         >
           <Avatar className="h-8 w-8 ring-1 ring-border">
             <AvatarImage src={profile?.avatarUrl ?? undefined} alt={displayName} />
-            <AvatarFallback className="bg-gradient-to-br from-primary/15 to-indigo-500/15 text-xs font-bold text-primary">
+            <AvatarFallback className="bg-gradient-to-br from-primary/15 to-blue-500/15 text-xs font-bold text-primary">
               {initials}
             </AvatarFallback>
           </Avatar>
@@ -43,7 +43,7 @@ export function UserNav() {
           <div className="flex items-center gap-3 px-1 py-1">
             <Avatar className="h-10 w-10 shrink-0 ring-1 ring-border">
               <AvatarImage src={profile?.avatarUrl ?? undefined} alt={displayName} />
-              <AvatarFallback className="bg-gradient-to-br from-primary/15 to-indigo-500/15 text-sm font-bold text-primary">
+              <AvatarFallback className="bg-gradient-to-br from-primary/15 to-blue-500/15 text-sm font-bold text-primary">
                 {initials}
               </AvatarFallback>
             </Avatar>

@@ -247,7 +247,7 @@ export function MobileBottomNav() {
               onClick={() => (createOpen ? setCreateOpen(false) : openCreate())}
               className={cn(
                 "-mt-5 flex h-14 w-14 items-center justify-center rounded-full",
-                "bg-gradient-to-br from-primary to-indigo-600 text-white",
+                "bg-gradient-to-br from-primary to-blue-700 text-white",
                 "shadow-lg shadow-primary/30 transition-all duration-200 ease-out",
                 "hover:scale-105 hover:shadow-xl hover:shadow-primary/40",
                 "active:scale-95",

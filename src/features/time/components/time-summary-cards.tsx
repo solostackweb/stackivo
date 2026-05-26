@@ -41,13 +41,14 @@ export function TimeSummaryCards({
   );
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
       <SummaryCard
         icon={Clock}
         label="Logged this week"
         value={formatDuration(stats.total, { compact: true }) || "0m"}
         helper={`${weeklyGoalHours}h weekly goal`}
         progress={weeklyProgress}
+        featured
       />
       <SummaryCard
         icon={Target}
@@ -83,6 +84,7 @@ function SummaryCard({
   helper,
   tone = "default",
   progress,
+  featured,
 }: {
   icon: typeof Clock;
   label: string;
@@ -90,10 +92,14 @@ function SummaryCard({
   helper?: string;
   tone?: "default" | "primary" | "success";
   progress?: number;
+  featured?: boolean;
 }) {
   return (
-    <Card className="group transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/20 hover:shadow-lg hover:shadow-primary/[0.05]">
-      <CardContent className="space-y-3 p-5">
+    <Card className={cn(
+      "group transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/20 hover:shadow-lg hover:shadow-primary/[0.05]",
+      featured && "col-span-2 lg:col-span-1",
+    )}>
+      <CardContent className="min-h-36 space-y-3 p-4 sm:p-5">
         <div className="flex items-center justify-between">
           <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
             {label}
@@ -102,11 +108,11 @@ function SummaryCard({
             className={cn(
               "flex h-8 w-8 items-center justify-center rounded-lg ring-1",
               tone === "primary" &&
-                "bg-gradient-to-br from-primary/10 to-indigo-500/10 text-primary ring-primary/15",
+                "bg-gradient-to-br from-primary/10 to-blue-500/10 text-primary ring-primary/15",
               tone === "success" &&
                 "bg-gradient-to-br from-emerald-500/10 to-teal-500/10 text-emerald-600 ring-emerald-500/15 dark:text-emerald-400",
               tone === "default" &&
-                "bg-gradient-to-br from-primary/10 to-indigo-500/10 text-primary ring-primary/15",
+                "bg-gradient-to-br from-primary/10 to-blue-500/10 text-primary ring-primary/15",
             )}
           >
             <Icon className="h-4 w-4" />
@@ -121,7 +127,7 @@ function SummaryCard({
         {typeof progress === "number" && (
           <div className="h-1.5 overflow-hidden rounded-full bg-muted">
             <div
-              className="h-full rounded-full bg-gradient-to-r from-primary to-indigo-500 transition-[width] duration-500"
+              className="h-full rounded-full bg-gradient-to-r from-primary to-blue-600 transition-[width] duration-500"
               style={{ width: `${progress}%` }}
             />
           </div>

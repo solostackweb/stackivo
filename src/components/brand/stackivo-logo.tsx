@@ -50,7 +50,7 @@ export function StackivoMark({
         !bare && "rounded-[22%] shadow-sm",
         !bare &&
           variant === "color" &&
-          "bg-gradient-to-br from-primary via-primary to-indigo-600",
+          "bg-gradient-to-br from-primary via-primary to-blue-700",
         !bare && variant === "mono" && "bg-current text-primary",
         !bare && variant === "white" && "bg-transparent",
         !bare &&

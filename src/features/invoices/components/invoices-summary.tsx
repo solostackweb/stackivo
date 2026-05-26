@@ -69,13 +69,14 @@ export function InvoicesSummary({
   const stats = React.useMemo(() => computeInvoiceStats(invoices), [invoices]);
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
       <SummaryCard
         label="Paid this month"
         value={formatINR(stats.paidThisMonthAmount)}
         helper={`${stats.paidThisMonthCount} collected`}
         icon={CheckCircle2}
         tone="success"
+        featured
       />
       <SummaryCard
         label="Paid invoices"
@@ -108,6 +109,7 @@ interface SummaryCardProps {
   helper: string;
   icon: React.ComponentType<{ className?: string }>;
   tone: "default" | "success";
+  featured?: boolean;
 }
 
 function SummaryCard({
@@ -116,10 +118,14 @@ function SummaryCard({
   helper,
   icon: Icon,
   tone,
+  featured,
 }: SummaryCardProps) {
   return (
-    <Card className="group transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/20 hover:shadow-lg hover:shadow-primary/[0.05]">
-      <CardContent className="flex items-start justify-between gap-3 p-5">
+    <Card className={cn(
+      "group transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/20 hover:shadow-lg hover:shadow-primary/[0.05]",
+      featured && "col-span-2 lg:col-span-1",
+    )}>
+      <CardContent className="flex min-h-32 items-start justify-between gap-3 p-4 sm:p-5">
         <div className="min-w-0 space-y-1">
           <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
             {label}
@@ -135,7 +141,7 @@ function SummaryCard({
             tone === "success" &&
               "bg-gradient-to-br from-emerald-500/10 to-teal-500/10 text-emerald-600 ring-emerald-500/15 dark:text-emerald-400",
             tone === "default" &&
-              "bg-gradient-to-br from-primary/10 to-indigo-500/10 text-primary ring-primary/15",
+              "bg-gradient-to-br from-primary/10 to-blue-500/10 text-primary ring-primary/15",
           )}
         >
           <Icon className="h-4 w-4" />

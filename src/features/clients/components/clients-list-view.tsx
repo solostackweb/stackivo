@@ -7,6 +7,7 @@ import { Plus, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/data-table/data-table";
 import { EmptyState } from "@/components/shared/empty-state";
+import { cn } from "@/lib/utils";
 
 import type { ClientRecord } from "../server";
 import { ClientsToolbar } from "./clients-toolbar";
@@ -85,8 +86,8 @@ export function ClientsListView({ clients, autoCreate }: ClientsListViewProps) {
         </Button>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <StatCard label="Total clients" value={stats.total} />
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
+        <StatCard label="Total clients" value={stats.total} featured />
         <StatCard label="GST registered" value={stats.gst} />
         <StatCard label="Unregistered" value={stats.unregistered} />
       </div>
@@ -140,9 +141,17 @@ export function ClientsListView({ clients, autoCreate }: ClientsListViewProps) {
   );
 }
 
-function StatCard({ label, value }: { label: string; value: number }) {
+function StatCard({
+  label,
+  value,
+  featured,
+}: {
+  label: string;
+  value: number;
+  featured?: boolean;
+}) {
   return (
-    <div className="rounded-lg border bg-card p-4">
+    <div className={cn("rounded-lg border bg-card p-4", featured && "col-span-2 sm:col-span-1")}>
       <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
         {label}
       </p>

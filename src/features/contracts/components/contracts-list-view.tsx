@@ -35,6 +35,7 @@ import {
 import { PageHeader } from "@/components/shared/page-header";
 import { EmptyState } from "@/components/shared/empty-state";
 import { formatINR } from "@/lib/format";
+import { cn } from "@/lib/utils";
 
 import type { ContractRecord } from "../server";
 import {
@@ -170,8 +171,8 @@ export function ContractsListView({
         }
       />
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Stat label="Total contracts" value={stats.total.toString()} />
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+        <Stat label="Total contracts" value={stats.total.toString()} featured />
         <Stat label="Signed" value={stats.signed.toString()} tone="success" />
         <Stat
           label="Awaiting signature"
@@ -369,14 +370,16 @@ function Stat({
   label,
   value,
   tone = "default",
+  featured,
 }: {
   label: string;
   value: string;
   tone?: "default" | "success" | "warning";
+  featured?: boolean;
 }) {
   return (
-    <Card>
-      <CardContent className="space-y-1 p-5">
+    <Card className={cn(featured && "col-span-2 lg:col-span-1")}>
+      <CardContent className="min-h-28 space-y-1 p-4 sm:p-5">
         <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
           {label}
         </p>

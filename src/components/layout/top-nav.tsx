@@ -13,8 +13,11 @@ import { Separator } from "@/components/ui/separator";
 export function TopNav() {
   return (
     <header
-      className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b bg-background/70 px-3 shadow-sm backdrop-blur-xl md:gap-3 md:px-6"
-      style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}
+      className="sticky top-0 z-30 flex items-center gap-2 border-b bg-background/80 px-3 shadow-sm backdrop-blur-xl md:gap-3 md:px-6"
+      style={{
+        height: "calc(3.5rem + env(safe-area-inset-top, 0px))",
+        paddingTop: "env(safe-area-inset-top, 0px)",
+      }}
     >
       {/* Mobile brand — mark + wordmark. No hamburger needed; navigation
           lives entirely in the bottom bar and its sheets. */}

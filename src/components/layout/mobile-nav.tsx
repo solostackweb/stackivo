@@ -96,7 +96,7 @@ export function MobileNav() {
         >
           <div
             aria-hidden
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-gradient-to-br from-primary/15 to-indigo-500/15 text-[12px] font-bold text-primary ring-1 ring-primary/15"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-gradient-to-br from-primary/15 to-blue-500/15 text-[12px] font-bold text-primary ring-1 ring-primary/15"
           >
             {workspaceInitials}
           </div>

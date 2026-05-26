@@ -16,17 +16,17 @@
     --popover-foreground: 222 47% 11%;
 
     /* Stripe-inspired indigo-violet primary */
-    --primary: 243 75% 52%;
+    --primary: 221 83% 53%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 243 20% 96%;
-    --secondary-foreground: 243 47% 11%;
+    --secondary: 221 30% 96%;
+    --secondary-foreground: 222 47% 11%;
 
     --muted: 240 20% 96%;
     --muted-foreground: 240 10% 46%;
 
-    --accent: 243 20% 95%;
-    --accent-foreground: 243 47% 11%;
+    --accent: 221 30% 95%;
+    --accent-foreground: 222 47% 11%;
 
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 98%;
@@ -42,13 +42,13 @@
 
     --border: 240 18% 90%;
     --input: 240 18% 90%;
-    --ring: 243 75% 52%;
+    --ring: 221 83% 53%;
 
-    --sidebar: 248 30% 98%;
-    --sidebar-foreground: 243 47% 11%;
+    --sidebar: 221 30% 98%;
+    --sidebar-foreground: 222 47% 11%;
     --sidebar-border: 240 18% 90%;
-    --sidebar-accent: 243 20% 95%;
-    --sidebar-accent-foreground: 243 47% 11%;
+    --sidebar-accent: 221 30% 95%;
+    --sidebar-accent-foreground: 222 47% 11%;
 
     --radius: 0.625rem;
   }
@@ -76,8 +76,8 @@
     --popover-foreground: 215 20% 95%;
 
     /* Indigo-violet primary — brighter, more Stripe-like in dark */
-    --primary: 243 80% 68%;
-    --primary-foreground: 238 14% 6%;
+    --primary: 217 91% 64%;
+    --primary-foreground: 222 14% 6%;
 
     --secondary: 238 14% 18%;
     --secondary-foreground: 215 20% 95%;
@@ -102,7 +102,7 @@
 
     --border: 238 14% 20%;
     --input: 238 14% 18%;
-    --ring: 243 80% 68%;
+    --ring: 217 91% 64%;
 
     /* Sidebar: deep near-black with faint violet undertone — like Linear */
     --sidebar: 238 14% 6%;
@@ -132,8 +132,8 @@
   .dark body {
     /* Richer indigo crown glow — like Stripe's dark gradient pages */
     background-image:
-      radial-gradient(ellipse 90% 50% at 50% -10%, hsl(243 60% 35% / 0.22), transparent),
-      radial-gradient(ellipse 40% 30% at 80% 60%, hsl(262 60% 30% / 0.08), transparent);
+      radial-gradient(ellipse 90% 50% at 50% -10%, hsl(221 70% 38% / 0.18), transparent),
+      radial-gradient(ellipse 40% 30% at 80% 60%, hsl(217 70% 34% / 0.06), transparent);
   }
   /*
    * Dark mode card elevation — give bordered surfaces a subtle drop shadow

@@ -63,6 +63,7 @@ export function AccountingOverview({
             value={formatINR(collectedAllTime, { compact: true })}
             sub="Paid invoices · all time"
             tone="success"
+            featured
           />
           <Tile
             icon={CircleDashed}
@@ -112,13 +113,15 @@ interface TileProps {
   value: string;
   sub: string;
   tone: "default" | "success" | "warning" | "danger" | "time";
+  featured?: boolean;
 }
 
-function Tile({ icon: Icon, label, value, sub, tone }: TileProps) {
+function Tile({ icon: Icon, label, value, sub, tone, featured }: TileProps) {
   return (
     <div
       className={cn(
         "card-lift flex items-start justify-between gap-3 rounded-xl border p-4 transition-all",
+        featured && "col-span-2 lg:col-span-1",
         tone === "default" && "border-border/60 bg-card",
         tone === "success" && "border-emerald-500/15 bg-emerald-500/[0.03]",
         tone === "warning" && "border-amber-500/15 bg-amber-500/[0.03]",
@@ -138,7 +141,7 @@ function Tile({ icon: Icon, label, value, sub, tone }: TileProps) {
       <div
         className={cn(
           "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ring-1",
-          tone === "default" && "bg-gradient-to-br from-primary/12 to-violet-500/8 text-primary ring-primary/15",
+          tone === "default" && "bg-gradient-to-br from-primary/12 to-blue-500/8 text-primary ring-primary/15",
           tone === "success" && "bg-emerald-500/12 text-emerald-600 ring-emerald-500/18 dark:text-emerald-400",
           tone === "warning" && "bg-amber-500/12 text-amber-600 ring-amber-500/18 dark:text-amber-400",
           tone === "danger"  && "bg-destructive/12 text-destructive ring-destructive/18",
