@@ -1,18 +1,24 @@
 "use client";
 
 /**
- * Two-option payment-method picker.
+ * Three-option payment-method picker (updated 0034).
  *
- * Replaces the legacy `PaymentsConnectForm` (which asked freelancers to
- * paste a Razorpay key id + secret — that approach is gone).
+ * Methods offered:
  *
- * Layout:
- *   - Header strip showing the currently-active method (or "none yet").
- *   - Two side-by-side cards. UPI carries the "Recommended" badge.
- *   - Each card holds its own form; submitting one switches the active
- *     method to that one.
+ *   1. Route Checkout  (stackivo_managed)
+ *      Client pays via Razorpay Checkout — cards, UPI, net banking,
+ *      international. ~2-3% Razorpay fee. Payout to freelancer bank T+2.
  *
- * No client-side payment SDKs run here — this is purely a settings form.
+ *   2. Smart Collect UPI  (upi_smart)
+ *      Per-invoice virtual UPI VPA; invoice auto-marks paid on payment.
+ *      Indian UPI only. ~1.77% Razorpay fee. Payout T+2.
+ *
+ *   3. UPI Direct  (upi_manual)
+ *      Client pays freelancer's UPI directly. Zero fee. Freelancer confirms
+ *      each payment manually.
+ *
+ * Both 1 and 2 share the same bank-account form and Razorpay registration.
+ * The `methodType` hidden field switches which invoice presentation is used.
  */
 
 import * as React from "react";
@@ -31,15 +37,22 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
-  Building2,
+  CreditCard,
   QrCode,
+  Smartphone,
   ShieldCheck,
-  Sparkles,
   CircleCheckBig,
+  CircleAlert,
+  Zap,
+  Building2,
+  ChevronDown,
+  ChevronUp,
+  IndianRupee,
 } from "lucide-react";
 import {
-  setManagedPaymentMethodAction,
+  setBankPaymentMethodAction,
   setUpiManualMethodAction,
+  setFeePassthroughAction,
   clearPaymentMethodAction,
   type ActionResult,
 } from "../actions-payment-methods";
@@ -47,10 +60,9 @@ import type { PaymentMethodSummary } from "../payment-methods";
 
 interface Props {
   summary: PaymentMethodSummary;
-  /** Pre-fill for the bank form when re-opening with managed already set. */
-  initialManaged?: {
+  /** Pre-fill for bank form (non-sensitive fields only). */
+  initialBank?: {
     accountHolderName: string | null;
-    bankName: string | null;
     ifsc: string | null;
   };
   initialUpiVpa: string | null;
@@ -58,30 +70,51 @@ interface Props {
 
 export function PaymentMethodPicker({
   summary,
-  initialManaged,
+  initialBank,
   initialUpiVpa,
 }: Props) {
   return (
     <div className="space-y-6">
       <StatusStrip summary={summary} />
-      <div className="grid gap-4 lg:grid-cols-2">
-        <ManagedCard
+
+      <div className="grid gap-4 lg:grid-cols-3">
+        <BankCard
+          methodType="stackivo_managed"
           active={summary.type === "stackivo_managed"}
-          initial={initialManaged}
-          last4={summary.bankAccountLast4}
-          bankName={summary.bankName}
+          initial={initialBank}
+          summary={summary}
+          title="Route Checkout"
+          description="Cards, UPI, net banking & international. Invoice auto-marks paid."
+          icon={<CreditCard className="h-4 w-4 text-muted-foreground" />}
+          feeNote="~2–3% Razorpay fee"
+          badge={null}
         />
-        <UpiCard
+        <BankCard
+          methodType="upi_smart"
+          active={summary.type === "upi_smart"}
+          initial={initialBank}
+          summary={summary}
+          title="Smart Collect UPI"
+          description="Auto-generated UPI per invoice. Invoice auto-marks paid on payment."
+          icon={<Zap className="h-4 w-4 text-muted-foreground" />}
+          feeNote="~1.77% Razorpay fee"
+          badge="Recommended"
+        />
+        <UpiManualCard
           active={summary.type === "upi_manual"}
           initialVpa={initialUpiVpa}
           maskedVpa={summary.upiVpaMasked}
         />
       </div>
+
+      {(summary.type === "stackivo_managed" || summary.type === "upi_smart") && (
+        <FeePassthroughPanel summary={summary} />
+      )}
     </div>
   );
 }
 
-// --- Status strip ----------------------------------------------------------
+// --- Status strip -----------------------------------------------------------
 
 function StatusStrip({ summary }: { summary: PaymentMethodSummary }) {
   if (!summary.type) {
@@ -94,22 +127,46 @@ function StatusStrip({ summary }: { summary: PaymentMethodSummary }) {
       </div>
     );
   }
+
+  const label =
+    summary.type === "stackivo_managed"
+      ? "Route Checkout"
+      : summary.type === "upi_smart"
+        ? "Smart Collect UPI"
+        : "UPI Direct";
+
+  const detail =
+    summary.type === "stackivo_managed" || summary.type === "upi_smart"
+      ? `${summary.bankName ?? "Bank"} ••••${summary.bankAccountLast4}`
+      : summary.upiVpaMasked;
+
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-card px-4 py-3 text-sm">
-      <div className="flex items-center gap-2">
-        <CircleCheckBig className="h-4 w-4 text-emerald-600" />
-        {summary.type === "stackivo_managed" ? (
-          <span>
-            <span className="font-medium">Stackivo Managed</span> active —
-            payouts to {summary.bankName ?? "your bank"} ending{" "}
-            <span className="font-mono">•••• {summary.bankAccountLast4}</span>
-          </span>
-        ) : (
-          <span>
-            <span className="font-medium">UPI</span> active —{" "}
-            <span className="font-mono">{summary.upiVpaMasked}</span>
-          </span>
-        )}
+      <div className="flex items-center gap-2.5">
+        <CircleCheckBig className="h-4 w-4 shrink-0 text-emerald-600" />
+        <span>
+          <span className="font-semibold">{label}</span> active
+          {detail ? (
+            <>
+              {" "}—{" "}
+              <span className="font-mono text-muted-foreground">{detail}</span>
+            </>
+          ) : null}
+        </span>
+        {(summary.type === "stackivo_managed" || summary.type === "upi_smart") &&
+          !summary.routeRegistered && (
+            <span className="flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:text-amber-400">
+              <CircleAlert className="h-3 w-3" />
+              Razorpay registration pending
+            </span>
+          )}
+        {(summary.type === "stackivo_managed" || summary.type === "upi_smart") &&
+          summary.routeRegistered && (
+            <span className="flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:text-emerald-400">
+              <ShieldCheck className="h-3 w-3" />
+              Razorpay verified
+            </span>
+          )}
       </div>
       <ClearMethodButton />
     </div>
@@ -129,7 +186,7 @@ function ClearMethodButton() {
         const ok = await confirm({
           title: "Turn off online payments?",
           description:
-            "Clients won't be able to pay invoices through Stackivo until you re-enable a method.",
+            "Clients won't be able to pay invoices online until you re-enable a method.",
           confirmLabel: "Turn off",
           variant: "destructive",
         });
@@ -144,110 +201,197 @@ function ClearMethodButton() {
   );
 }
 
-// --- Managed card ----------------------------------------------------------
+// --- Shared bank-account card (Route Checkout + Smart Collect) -------------
 
-function ManagedCard({
+function BankCard({
+  methodType,
   active,
   initial,
-  last4,
-  bankName,
+  summary,
+  title,
+  description,
+  icon,
+  feeNote,
+  badge,
 }: {
+  methodType: "stackivo_managed" | "upi_smart";
   active: boolean;
-  initial?: Props["initialManaged"];
-  last4: string | null;
-  bankName: string | null;
+  initial?: Props["initialBank"];
+  summary: PaymentMethodSummary;
+  title: string;
+  description: string;
+  icon: React.ReactNode;
+  feeNote: string;
+  badge: string | null;
 }) {
   const [state, action] = useActionState<ActionResult | undefined, FormData>(
-    setManagedPaymentMethodAction,
+    setBankPaymentMethodAction,
     undefined,
   );
 
+  const routeOk = active && summary.routeRegistered;
+  const routePending = active && !summary.routeRegistered;
+
   return (
-    <Card className={active ? "border-primary/30 bg-primary/[0.02]" : ""}>
-      <CardHeader>
-        <div className="flex items-center justify-between">
+    <Card
+      className={
+        active
+          ? "border-primary/30 bg-primary/[0.02]"
+          : badge
+            ? "border-emerald-500/20 bg-emerald-500/[0.02]"
+            : ""
+      }
+    >
+      <CardHeader className="pb-3">
+        <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-2">
-            <Building2 className="h-4 w-4 text-muted-foreground" />
-            <CardTitle className="text-base">Stackivo Managed Payments</CardTitle>
+            {icon}
+            <CardTitle className="text-base">{title}</CardTitle>
           </div>
-          {active ? <ActiveBadge /> : null}
+          <div className="flex shrink-0 flex-wrap items-center gap-1.5">
+            {badge && !active ? (
+              <Badge
+                variant="secondary"
+                className="bg-emerald-500/15 text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400"
+              >
+                {badge}
+              </Badge>
+            ) : null}
+            {active ? <ActiveBadge /> : null}
+          </div>
         </div>
-        <CardDescription>
-          Clients pay through Stackivo. Invoices auto-mark as paid. We pay
-          out to your bank within 1-2 business days.
-        </CardDescription>
+        <CardDescription className="text-xs">{description}</CardDescription>
+        <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
+          <IndianRupee className="h-3 w-3" />
+          {feeNote}
+        </div>
       </CardHeader>
-      <CardContent>
-        <form action={action} className="space-y-4">
+      <CardContent className="pt-0">
+        {/* Razorpay registration status badge when active */}
+        {routeOk && (
+          <div className="mb-3 flex items-center gap-2 rounded-md border border-emerald-500/20 bg-emerald-500/[0.06] px-3 py-2 text-xs text-emerald-700 dark:text-emerald-400">
+            <ShieldCheck className="h-3.5 w-3.5 shrink-0" />
+            Bank verified with Razorpay
+          </div>
+        )}
+        {routePending && (
+          <div className="mb-3 flex items-center gap-2 rounded-md border border-amber-500/20 bg-amber-500/[0.06] px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
+            <CircleAlert className="h-3.5 w-3.5 shrink-0" />
+            Re-save to complete Razorpay registration
+          </div>
+        )}
+
+        <form action={action} className="space-y-3">
+          {/* Hidden: tells server action which invoice UI to use */}
+          <input type="hidden" name="methodType" value={methodType} />
+
           <div className="space-y-1.5">
-            <Label htmlFor="m-name">Account holder name</Label>
+            <Label htmlFor={`${methodType}-name`} className="text-xs">
+              Account holder name
+            </Label>
             <Input
-              id="m-name"
+              id={`${methodType}-name`}
               name="accountHolderName"
               placeholder="As it appears on your bank account"
               defaultValue={initial?.accountHolderName ?? ""}
               required
+              className="h-8 text-sm"
+              autoComplete="name"
             />
           </div>
+
           <div className="space-y-1.5">
-            <Label htmlFor="m-account">Bank account number</Label>
+            <Label htmlFor={`${methodType}-account`} className="text-xs">
+              Bank account number
+            </Label>
             <Input
-              id="m-account"
+              id={`${methodType}-account`}
               name="bankAccountNumber"
-              placeholder={last4 ? `•••• •••• ${last4}` : "0000 0000 0000 00"}
+              placeholder={
+                summary.bankAccountLast4 && active
+                  ? `Currently ••••${summary.bankAccountLast4} — re-enter to update`
+                  : "000000000000"
+              }
               required
               autoComplete="off"
               inputMode="numeric"
+              className="h-8 font-mono text-sm"
             />
-            {last4 ? (
-              <p className="text-[11px] text-muted-foreground">
-                Currently on file ends in {last4}. Re-enter to update.
-              </p>
-            ) : null}
           </div>
-          <div className="grid grid-cols-2 gap-3">
+
+          <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1.5">
-              <Label htmlFor="m-ifsc">IFSC</Label>
+              <Label htmlFor={`${methodType}-ifsc`} className="text-xs">
+                IFSC code
+              </Label>
               <Input
-                id="m-ifsc"
+                id={`${methodType}-ifsc`}
                 name="ifsc"
                 placeholder="HDFC0001234"
                 defaultValue={initial?.ifsc ?? ""}
                 required
                 maxLength={11}
+                className="h-8 font-mono text-sm uppercase"
                 style={{ textTransform: "uppercase" }}
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="m-bank">Bank name</Label>
+              <Label htmlFor={`${methodType}-pan`} className="text-xs">
+                PAN
+              </Label>
               <Input
-                id="m-bank"
-                name="bankName"
-                placeholder="HDFC Bank"
-                defaultValue={initial?.bankName ?? bankName ?? ""}
+                id={`${methodType}-pan`}
+                name="pan"
+                placeholder="ABCDE1234F"
                 required
+                maxLength={10}
+                className="h-8 font-mono text-sm uppercase"
+                style={{ textTransform: "uppercase" }}
+                autoComplete="off"
               />
             </div>
           </div>
 
-          <div className="rounded-md border bg-muted/20 p-3 text-[11px] leading-relaxed text-muted-foreground">
-            <ShieldCheck className="mr-1.5 inline h-3.5 w-3.5 align-text-top" />
-            Payments are processed securely through Stackivo. Payouts are
-            transferred to your bank account within 1-2 business days.
-            Applicable transaction fees may be deducted.
+          <div className="rounded-md border bg-muted/20 p-2.5 text-[11px] leading-relaxed text-muted-foreground">
+            <ShieldCheck className="mr-1 inline h-3 w-3 align-text-top" />
+            IFSC is verified against Razorpay&apos;s bank directory. PAN is
+            stored for Razorpay compliance. Bank account number is never shown
+            in full after saving.
           </div>
 
-          <ResultBanner state={state} />
-          <SubmitButton active={active} idleLabel="Use Stackivo Managed" />
+          {state && !state.ok && (
+            <FieldError
+              error={state.error}
+              field={"field" in state ? state.field : undefined}
+            />
+          )}
+          {state?.ok && (
+            <p className="rounded-md bg-emerald-500/10 px-3 py-2 text-xs text-emerald-700 dark:text-emerald-400">
+              {state.message}
+            </p>
+          )}
+
+          <div className="flex justify-end">
+            <BankSubmitButton active={active} />
+          </div>
         </form>
       </CardContent>
     </Card>
   );
 }
 
-// --- UPI card --------------------------------------------------------------
+function BankSubmitButton({ active }: { active: boolean }) {
+  const { pending } = useFormStatus();
+  return (
+    <Button type="submit" size="sm" disabled={pending}>
+      {pending ? "Saving & verifying…" : active ? "Update details" : "Enable"}
+    </Button>
+  );
+}
 
-function UpiCard({
+// --- UPI Manual card -------------------------------------------------------
+
+function UpiManualCard({
   active,
   initialVpa,
   maskedVpa,
@@ -262,39 +406,30 @@ function UpiCard({
   );
 
   return (
-    <Card
-      className={
-        active
-          ? "border-primary/30 bg-primary/[0.02]"
-          : "border-amber-500/30 bg-amber-500/[0.03]"
-      }
-    >
-      <CardHeader>
-        <div className="flex items-center justify-between">
+    <Card className={active ? "border-primary/30 bg-primary/[0.02]" : ""}>
+      <CardHeader className="pb-3">
+        <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-2">
-            <QrCode className="h-4 w-4 text-muted-foreground" />
-            <CardTitle className="text-base">UPI Manual Payments</CardTitle>
+            <Smartphone className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-base">UPI Direct</CardTitle>
           </div>
-          <div className="flex items-center gap-2">
-            <Badge
-              variant="secondary"
-              className="bg-amber-500/15 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-400"
-            >
-              <Sparkles className="mr-1 h-3 w-3" />
-              Recommended
-            </Badge>
-            {active ? <ActiveBadge /> : null}
-          </div>
+          {active ? <ActiveBadge /> : null}
         </div>
-        <CardDescription>
-          Clients scan a QR code generated from your UPI ID. Money lands in
-          your account instantly. Mark each invoice paid once received.
+        <CardDescription className="text-xs">
+          Client pays to your UPI ID directly. Free, instant, India only.
+          You confirm each payment manually.
         </CardDescription>
+        <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
+          <IndianRupee className="h-3 w-3" />
+          Zero fee
+        </div>
       </CardHeader>
-      <CardContent>
-        <form action={action} className="space-y-4">
+      <CardContent className="pt-0">
+        <form action={action} className="space-y-3">
           <div className="space-y-1.5">
-            <Label htmlFor="u-vpa">UPI ID</Label>
+            <Label htmlFor="u-vpa" className="text-xs">
+              UPI ID
+            </Label>
             <Input
               id="u-vpa"
               name="vpa"
@@ -302,67 +437,193 @@ function UpiCard({
               defaultValue={initialVpa ?? ""}
               required
               autoComplete="off"
+              className="h-8 text-sm"
             />
-            {maskedVpa && !initialVpa ? (
+            {maskedVpa && !initialVpa && (
               <p className="text-[11px] text-muted-foreground">
-                Currently on file: {maskedVpa}. Re-enter to update.
+                Currently: {maskedVpa}. Re-enter to update.
               </p>
-            ) : null}
+            )}
           </div>
 
-          <div className="rounded-md border bg-muted/20 p-3 text-[11px] leading-relaxed text-muted-foreground">
-            Payments are received directly into your UPI account. Since they
-            happen outside Stackivo, you confirm each one manually from the
-            invoice page — we then generate the client&apos;s receipt.
+          <div className="rounded-md border bg-muted/20 p-2.5 text-[11px] leading-relaxed text-muted-foreground">
+            <QrCode className="mr-1 inline h-3 w-3 align-text-top" />
+            Clients see a QR code on every invoice. Once you spot the transfer
+            in your bank, mark the invoice paid — Stackivo generates the
+            receipt automatically.
           </div>
 
-          <ResultBanner state={state} />
-          <SubmitButton active={active} idleLabel="Use UPI payments" />
+          {state && !state.ok && (
+            <FieldError error={state.error} />
+          )}
+          {state?.ok && (
+            <p className="rounded-md bg-emerald-500/10 px-3 py-2 text-xs text-emerald-700 dark:text-emerald-400">
+              {state.message}
+            </p>
+          )}
+
+          <div className="flex justify-end">
+            <UpiSubmitButton active={active} />
+          </div>
         </form>
       </CardContent>
     </Card>
   );
 }
 
-// --- Shared bits -----------------------------------------------------------
+function UpiSubmitButton({ active }: { active: boolean }) {
+  const { pending } = useFormStatus();
+  return (
+    <Button type="submit" size="sm" disabled={pending}>
+      {pending ? "Saving…" : active ? "Update UPI ID" : "Enable"}
+    </Button>
+  );
+}
+
+// --- Fee passthrough panel -------------------------------------------------
+
+function FeePassthroughPanel({ summary }: { summary: PaymentMethodSummary }) {
+  const [expanded, setExpanded] = React.useState(false);
+  const [state, action] = useActionState<ActionResult | undefined, FormData>(
+    setFeePassthroughAction,
+    undefined,
+  );
+
+  const defaultPercent =
+    summary.feePassthrough.percent ??
+    (summary.type === "upi_smart" ? 1.77 : 2.0);
+
+  return (
+    <div className="rounded-lg border bg-card">
+      <button
+        type="button"
+        className="flex w-full items-center justify-between px-4 py-3 text-sm"
+        onClick={() => setExpanded((v) => !v)}
+      >
+        <div className="flex items-center gap-2">
+          <IndianRupee className="h-4 w-4 text-muted-foreground" />
+          <span className="font-medium">Transaction fee passthrough</span>
+          <span
+            className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+              summary.feePassthrough.enabled
+                ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400"
+                : "bg-muted text-muted-foreground"
+            }`}
+          >
+            {summary.feePassthrough.enabled ? "On" : "Off"}
+          </span>
+        </div>
+        {expanded ? (
+          <ChevronUp className="h-4 w-4 text-muted-foreground" />
+        ) : (
+          <ChevronDown className="h-4 w-4 text-muted-foreground" />
+        )}
+      </button>
+
+      {expanded && (
+        <div className="border-t px-4 pb-4 pt-3">
+          <p className="mb-3 text-xs text-muted-foreground">
+            When enabled, the Razorpay transaction fee appears as a separate
+            line item on the invoice, charged to the client. When off, you
+            absorb the fee from what you receive.
+          </p>
+          <form action={action} className="space-y-3">
+            <div className="flex items-center gap-6">
+              <label className="flex cursor-pointer items-center gap-2 text-sm">
+                <input
+                  type="radio"
+                  name="enabled"
+                  value="true"
+                  defaultChecked={summary.feePassthrough.enabled}
+                  className="accent-primary"
+                />
+                Pass fee to client
+              </label>
+              <label className="flex cursor-pointer items-center gap-2 text-sm">
+                <input
+                  type="radio"
+                  name="enabled"
+                  value="false"
+                  defaultChecked={!summary.feePassthrough.enabled}
+                  className="accent-primary"
+                />
+                I absorb the fee
+              </label>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Fee rate (%)</Label>
+                <Input
+                  name="percent"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  max="10"
+                  defaultValue={defaultPercent}
+                  className="h-8 w-24 text-sm"
+                />
+              </div>
+              <p className="mt-4 text-[11px] text-muted-foreground">
+                Razorpay charges{" "}
+                {summary.type === "upi_smart" ? "~1.77%" : "~2%"} + 18% GST.
+                Suggested:{" "}
+                {summary.type === "upi_smart" ? "2.09%" : "2.36%"} to cover GST.
+              </p>
+            </div>
+
+            {state && !state.ok && (
+              <p className="text-xs text-destructive">{state.error}</p>
+            )}
+            {state?.ok && (
+              <p className="text-xs text-emerald-700 dark:text-emerald-400">
+                {state.message}
+              </p>
+            )}
+
+            <div className="flex justify-end">
+              <FeeSubmitButton />
+            </div>
+          </form>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function FeeSubmitButton() {
+  const { pending } = useFormStatus();
+  return (
+    <Button type="submit" size="sm" variant="secondary" disabled={pending}>
+      {pending ? "Saving…" : "Save fee settings"}
+    </Button>
+  );
+}
+
+// --- Shared helpers --------------------------------------------------------
 
 function ActiveBadge() {
   return (
-    <Badge className="bg-emerald-500/15 text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/15">
+    <Badge className="shrink-0 bg-emerald-500/15 text-[10px] font-semibold uppercase tracking-wide text-emerald-700 hover:bg-emerald-500/15 dark:text-emerald-400">
+      <CircleCheckBig className="mr-1 h-2.5 w-2.5" />
       Active
     </Badge>
   );
 }
 
-function ResultBanner({ state }: { state: ActionResult | undefined }) {
-  if (!state) return null;
-  if (state.ok) {
-    return (
-      <p className="rounded-md bg-emerald-500/10 p-2.5 text-xs text-emerald-700 dark:text-emerald-400">
-        {state.message ?? "Saved."}
-      </p>
-    );
-  }
-  return (
-    <p className="rounded-md bg-destructive/10 p-2.5 text-xs text-destructive">
-      {state.error}
-    </p>
-  );
-}
-
-function SubmitButton({
-  active,
-  idleLabel,
+function FieldError({
+  error,
+  field,
 }: {
-  active: boolean;
-  idleLabel: string;
+  error: string;
+  field?: string;
 }) {
-  const { pending } = useFormStatus();
   return (
-    <div className="flex justify-end">
-      <Button type="submit" disabled={pending}>
-        {pending ? "Saving…" : active ? "Update details" : idleLabel}
-      </Button>
+    <div className="flex items-start gap-1.5 rounded-md bg-destructive/10 px-3 py-2">
+      <CircleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0 text-destructive" />
+      <p className="text-xs text-destructive">
+        {field ? <span className="font-medium capitalize">{field}: </span> : null}
+        {error}
+      </p>
     </div>
   );
 }

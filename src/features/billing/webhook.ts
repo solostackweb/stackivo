@@ -181,6 +181,20 @@ async function dispatch(event: WebhookEnvelope): Promise<void> {
       return;
     }
 
+    case "virtual_account.credited": {
+      // Smart Collect: client paid a per-invoice virtual UPI VPA.
+      // Payload shape: { virtual_account: { entity: {...} }, payment: { entity: {...} } }
+      const va = event.payload.virtual_account?.entity as unknown as
+        | { id?: string; amount_paid?: number; status?: string }
+        | undefined;
+      const payment = event.payload.payment?.entity as unknown as
+        | RazorpayPayment
+        | undefined;
+      if (!va?.id || !payment) return;
+      await applySmartCollectPayment(va.id, payment);
+      return;
+    }
+
     default:
       // Unknown / uninteresting event — log only.
       return;
@@ -323,10 +337,142 @@ async function applyInvoicePaymentEvent(
   }
 }
 
+// --- Smart Collect payment handler ----------------------------------------
+
+/**
+ * Handles `virtual_account.credited` — a client paid a per-invoice virtual
+ * UPI VPA created by Smart Collect. Marks the invoice paid and closes the VA.
+ */
+async function applySmartCollectPayment(
+  virtualAccountId: string,
+  p: RazorpayPayment,
+): Promise<void> {
+  // Resolve the invoice from the virtual account id.
+  const { resolveVirtualAccountInvoice, closeInvoiceVirtualAccount } =
+    await import("./razorpay/smart-collect");
+
+  const invoiceId = await resolveVirtualAccountInvoice(virtualAccountId);
+  if (!invoiceId) return; // VA not tracked — probably not ours.
+
+  const admin = getAdminSupabase();
+  const { data: invoiceRow } = await admin
+    .from("invoices")
+    .select(
+      "id, user_id, client_id, invoice_number, currency, total_amount, status",
+    )
+    .eq("id", invoiceId)
+    .maybeSingle();
+
+  const invoice = invoiceRow as {
+    id: string;
+    user_id: string;
+    client_id: string | null;
+    invoice_number: string;
+    currency: string;
+    total_amount: number;
+    status: string;
+  } | null;
+  if (!invoice) return;
+
+  // Record attempt regardless.
+  await recordAttempt(p, invoiceId, p.status === "captured" ? "captured" : "failed", "upi_smart");
+
+  if (invoice.status === "paid") return; // Already handled.
+
+  if (p.status !== "captured") return; // Only act on captured.
+
+  const paidAtIso = new Date(p.created_at * 1000).toISOString();
+  const total = Number(invoice.total_amount);
+
+  await admin
+    .from("invoices")
+    .update({
+      status: "paid",
+      paid_at: paidAtIso,
+      payment_status: "captured",
+      payment_method: "upi",
+      payment_method_used: "upi_smart",
+      payment_reference: p.id,
+      payment_amount: total,
+      payment_recorded_at: paidAtIso,
+    } as never)
+    .eq("id", invoice.id)
+    .neq("status", "paid");
+
+  // Close the virtual account so it can't receive duplicate payments.
+  await closeInvoiceVirtualAccount(invoiceId);
+
+  // Receipt + notification.
+  let payerEmail: string | null = null;
+  let payerName: string | null = null;
+  if (invoice.client_id) {
+    const { data: client } = await admin
+      .from("clients")
+      .select("email, full_name")
+      .eq("id", invoice.client_id)
+      .maybeSingle();
+    const c = client as { email?: string | null; full_name?: string | null } | null;
+    payerEmail = c?.email ?? null;
+    payerName = c?.full_name ?? null;
+  }
+
+  try {
+    const { generateReceiptForInvoice } = await import(
+      "@/features/invoices/receipts"
+    );
+    await generateReceiptForInvoice({
+      invoiceId: invoice.id,
+      userId: invoice.user_id,
+      paymentMethod: "upi_smart",
+      amount: total,
+      currency: invoice.currency,
+      paidAt: paidAtIso,
+      payerEmail,
+      payerName,
+      reference: p.id,
+    });
+  } catch {
+    /* receipt generation failure is non-fatal */
+  }
+
+  await admin.from("activity_events").insert({
+    user_id: invoice.user_id,
+    kind: "invoice_paid",
+    entity_type: "invoice",
+    entity_id: invoice.id,
+    title: `Invoice ${invoice.invoice_number} paid`,
+    metadata: {
+      via: "smart_collect",
+      payment_id: p.id,
+      amount: total,
+      currency: invoice.currency,
+    },
+  } as never);
+
+  await admin.from("notifications").insert({
+    user_id: invoice.user_id,
+    type: "invoice_paid",
+    title: `Invoice ${invoice.invoice_number} paid`,
+    message: `UPI payment received. Payout in 1-2 business days.`,
+  } as never);
+
+  if (payerEmail) {
+    const { sendInvoiceReceiptAction } = await import(
+      "@/features/invoices/delivery"
+    );
+    void sendInvoiceReceiptAction({
+      invoiceId: invoice.id,
+      toEmail: payerEmail,
+      toName: payerName,
+    });
+  }
+}
+
 async function recordAttempt(
   p: RazorpayPayment,
   invoiceId: string,
   status: "created" | "authorized" | "captured" | "failed" | "refunded",
+  paymentMethod: "stackivo_managed" | "upi_smart" | "upi_manual" = "stackivo_managed",
 ): Promise<void> {
   const admin = getAdminSupabase();
   await admin
@@ -340,7 +486,7 @@ async function recordAttempt(
         amount: p.amount / 100,
         currency: p.currency,
         status,
-        payment_method: "stackivo_managed",
+        payment_method: paymentMethod,
         payout_status: status === "captured" ? "pending" : "not_applicable",
         error_code: p.error_code ?? null,
         error_description: p.error_description ?? null,

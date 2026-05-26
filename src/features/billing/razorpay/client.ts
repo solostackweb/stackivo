@@ -239,3 +239,148 @@ export async function fetchPayment(id: string): Promise<RazorpayPayment> {
 export async function fetchInvoice(id: string): Promise<RazorpayInvoice> {
   return rzpFetch<RazorpayInvoice>(`/invoices/${id}`);
 }
+
+// --- Route / Payouts: Contacts & Fund Accounts -----------------------------
+
+export interface RazorpayContact {
+  id: string;
+  entity: "contact";
+  name: string;
+  type: string;
+  reference_id: string | null;
+  notes: Record<string, string> | null;
+  active: boolean;
+  created_at: number;
+}
+
+export interface RazorpayFundAccount {
+  id: string;
+  entity: "fund_account";
+  contact_id: string;
+  account_type: "bank_account" | "vpa";
+  bank_account?: {
+    ifsc: string;
+    bank_name: string;
+    name: string;
+    notes: Record<string, string>;
+    account_number: string;
+  };
+  active: boolean;
+  created_at: number;
+}
+
+export async function createContact(input: {
+  name: string;
+  referenceId: string;
+  type?: string;
+  notes?: Record<string, string>;
+}): Promise<RazorpayContact> {
+  return rzpFetch<RazorpayContact>("/contacts", {
+    method: "POST",
+    body: {
+      name: input.name,
+      type: input.type ?? "vendor",
+      reference_id: input.referenceId,
+      notes: input.notes,
+    },
+  });
+}
+
+export async function createFundAccount(input: {
+  contactId: string;
+  accountHolderName: string;
+  ifsc: string;
+  accountNumber: string;
+}): Promise<RazorpayFundAccount> {
+  return rzpFetch<RazorpayFundAccount>("/fund_accounts", {
+    method: "POST",
+    body: {
+      contact_id: input.contactId,
+      account_type: "bank_account",
+      bank_account: {
+        name: input.accountHolderName,
+        ifsc: input.ifsc,
+        account_number: input.accountNumber,
+      },
+    },
+  });
+}
+
+// --- Smart Collect: Virtual Accounts ---------------------------------------
+
+export interface RazorpayVirtualAccount {
+  id: string;
+  entity: "virtual_account";
+  name: string;
+  description: string | null;
+  amount_expected: number | null;
+  amount_paid: number;
+  status: "active" | "paid" | "closed";
+  receivers: Array<{
+    id: string;
+    entity: "vpa";
+    username: string;
+    handle: string;
+    address: string; // the full VPA e.g. "rzpayments.inv001@icici"
+  }>;
+  close_by: number | null;
+  closed_at: number | null;
+  receipt: string | null;
+  created_at: number;
+}
+
+export async function createVirtualAccount(input: {
+  /** Display name shown on bank statements. */
+  name: string;
+  description: string;
+  /** Amount in paise (exact amount expected). */
+  amountPaise: number;
+  /** Unix timestamp: when to auto-close this account. */
+  closeByUnix: number;
+  /** Your internal reference (receipt) — use invoice id. */
+  receipt: string;
+}): Promise<RazorpayVirtualAccount> {
+  return rzpFetch<RazorpayVirtualAccount>("/virtual_accounts", {
+    method: "POST",
+    body: {
+      receivers: { types: ["vpa"] },
+      description: input.description,
+      amount: input.amountPaise,
+      currency: "INR",
+      close_by: input.closeByUnix,
+      receipt: input.receipt,
+    },
+  });
+}
+
+export async function closeVirtualAccount(
+  id: string,
+): Promise<RazorpayVirtualAccount> {
+  return rzpFetch<RazorpayVirtualAccount>(`/virtual_accounts/${id}`, {
+    method: "PATCH",
+    body: { status: "closed" },
+  });
+}
+
+// --- IFSC lookup (public Razorpay IFSC API) --------------------------------
+
+export interface IfscDetails {
+  IFSC: string;
+  BANK: string;
+  BRANCH: string;
+  ADDRESS: string;
+}
+
+/** Looks up IFSC details from Razorpay's public IFSC API. Returns null on
+ *  invalid/unknown IFSC so callers can fall back gracefully. */
+export async function lookupIfsc(ifsc: string): Promise<IfscDetails | null> {
+  try {
+    const res = await fetch(`https://ifsc.razorpay.com/${ifsc.toUpperCase()}`, {
+      cache: "force-cache",
+    });
+    if (!res.ok) return null;
+    return (await res.json()) as IfscDetails;
+  } catch {
+    return null;
+  }
+}

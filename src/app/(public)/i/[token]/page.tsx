@@ -9,6 +9,7 @@ import { getUserPaymentMethod } from "@/features/billing/payment-methods";
 import { PublicPaymentPanel } from "@/features/invoices/components/public-payment-panel";
 import { PublicUpiPanel } from "@/features/invoices/components/public-upi-panel";
 import { renderUpiQrSvg } from "@/features/invoices/upi";
+import { getOrCreateInvoiceVirtualAccount } from "@/features/billing/razorpay/smart-collect";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -50,6 +51,7 @@ export default async function PublicInvoicePage({ params }: Props) {
 
   // UPI QR is rendered server-side so there's no client-side bundle.
   let upiPanelProps: { qrSvg: string; vpa: string; upiUri: string } | null = null;
+
   if (method?.type === "upi_manual") {
     const { svg, uri } = await renderUpiQrSvg({
       vpa: method.payout.vpa,
@@ -59,6 +61,21 @@ export default async function PublicInvoicePage({ params }: Props) {
       ref: viewModel.invoiceNumber,
     });
     upiPanelProps = { qrSvg: svg, vpa: method.payout.vpa, upiUri: uri };
+  } else if (method?.type === "upi_smart" && !isPaid) {
+    // Smart Collect: lazily create (or reuse) a per-invoice virtual account.
+    try {
+      const va = await getOrCreateInvoiceVirtualAccount(shared.invoice.id);
+      const { svg, uri } = await renderUpiQrSvg({
+        vpa: va.vpa,
+        payeeName: senderName,
+        amount: Number(shared.invoice.total_amount),
+        note: `Invoice ${viewModel.invoiceNumber}`,
+        ref: viewModel.invoiceNumber,
+      });
+      upiPanelProps = { qrSvg: svg, vpa: va.vpa, upiUri: uri };
+    } catch {
+      // VA creation failed — fall through to "Pay outside Stackivo" fallback.
+    }
   }
 
   const fmtDate = (iso: string | null | undefined) =>
@@ -358,7 +375,8 @@ export default async function PublicInvoicePage({ params }: Props) {
                   email: viewModel.client?.email ?? undefined,
                 }}
               />
-            ) : method?.type === "upi_manual" && upiPanelProps ? (
+            ) : (method?.type === "upi_manual" || method?.type === "upi_smart") &&
+              upiPanelProps ? (
               <PublicUpiPanel
                 qrSvg={upiPanelProps.qrSvg}
                 vpa={upiPanelProps.vpa}

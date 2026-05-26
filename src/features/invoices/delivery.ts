@@ -327,10 +327,12 @@ export async function sendInvoiceReceiptAction(input: {
     receiptNumber: receiptData?.receiptNumber,
     paymentMethod:
       receiptData?.paymentMethod === "stackivo_managed"
-        ? "Stackivo Managed (Razorpay)"
-        : receiptData?.paymentMethod === "upi_manual"
-          ? "UPI"
-          : receiptData?.paymentMethod,
+        ? "Razorpay Checkout"
+        : receiptData?.paymentMethod === "upi_smart"
+          ? "UPI (Smart Collect)"
+          : receiptData?.paymentMethod === "upi_manual"
+            ? "UPI"
+            : receiptData?.paymentMethod,
     paidAtFormatted: receiptData
       ? new Date(receiptData.paidAt).toLocaleDateString("en-IN", {
           day: "2-digit",

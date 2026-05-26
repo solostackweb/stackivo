@@ -67,8 +67,10 @@ export const PLANS: Record<PlanId, PlanDefinition> = {
     currency: "INR",
     selfServe: true,
     features: {
-      // Free plan: basic invoice share link only (no payment gateway)
+      // Free plan: invoice sharing + payment gateway (all three methods free).
+      // There is no per-transaction cut — Razorpay fees are passed through.
       "invoices.payment_links": true,
+      "invoices.payment_gateway": true,
     },
     limits: {
       // Free plan: LIFETIME client count capped at 5. Deletes do NOT

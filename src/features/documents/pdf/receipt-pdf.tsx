@@ -179,7 +179,9 @@ export function ReceiptPdf({ data }: { data: ReceiptPdfData }) {
 function labelForMethod(method: string): string {
   switch (method) {
     case "stackivo_managed":
-      return "Stackivo Managed (Razorpay)";
+      return "Razorpay Checkout";
+    case "upi_smart":
+      return "UPI (Smart Collect)";
     case "upi_manual":
       return "UPI";
     default:

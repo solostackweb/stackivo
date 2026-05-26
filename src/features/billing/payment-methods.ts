@@ -1,71 +1,95 @@
 import "server-only";
 
 /**
- * Two-option freelancer payment-method service.
+ * Three-option freelancer payment-method service (updated in 0034).
  *
- * Stackivo deliberately stays out of "marketplace routing" territory at this
- * stage. Freelancers pick exactly one of:
+ * Freelancers choose exactly one active method:
  *
- *   - stackivo_managed: the platform Razorpay account collects, ops team
- *     pays out to the freelancer's bank manually within 1-2 business days.
- *   - upi_manual: clients pay directly into the freelancer's UPI VPA; the
- *     freelancer marks the invoice paid manually.
+ *   stackivo_managed  — Razorpay Checkout (cards / UPI / net banking /
+ *     international). Client pays via Stackivo's Razorpay account; Stackivo
+ *     ops processes a Payout to the freelancer's bank within 1-2 business
+ *     days. Requires bank account + PAN; freelancer registered as a Razorpay
+ *     Contact + Fund Account.
  *
- * This module is the single place that reads/writes the 0027
- * payment-method columns on `user_profiles`. Everything else (settings UI,
- * public payment page, webhook handler, receipts) goes through here so we
- * have one shape to enforce.
+ *   upi_smart  — Smart Collect: per-invoice virtual UPI VPA. Client pays the
+ *     virtual VPA; webhook auto-marks invoice paid. Same bank registration as
+ *     stackivo_managed; Indian UPI only; ~1.77% Razorpay fee.
  *
- * Important: this module DOES NOT touch the legacy 0023 columns
- * (`razorpay_key_id`, `razorpay_key_secret_enc`, etc.). Those are
- * deprecated; they live on the row for historic data only.
+ *   upi_manual  — Client pays directly to the freelancer's static UPI VPA.
+ *     Zero fee. Freelancer confirms each payment manually.
+ *
+ * This module is the single source of truth for payment-method reads/writes.
+ * All other surfaces (settings UI, public payment page, webhook) go through
+ * these helpers so there is one shape to enforce.
  */
 
 import { getAdminSupabase } from "@/lib/supabase/admin";
-import type {
-  PaymentMethodType,
-  UserProfileRow,
-} from "@/lib/supabase/types";
+import type { PaymentMethodType, UserProfileRow } from "@/lib/supabase/types";
 
 // --- Public-facing shapes ---------------------------------------------------
 
-export interface ManagedPayoutDetails {
+export interface BankPayoutDetails {
   accountHolderName: string;
   bankAccountNumber: string;
   ifsc: string;
   bankName: string;
+  pan: string;
 }
+
+/** @deprecated Use BankPayoutDetails — kept so existing callers compile. */
+export type ManagedPayoutDetails = BankPayoutDetails;
 
 export interface UpiPayoutDetails {
   vpa: string;
+}
+
+export interface FeePassthroughConfig {
+  enabled: boolean;
+  /** Percentage stored as a plain number (e.g. 1.77 means 1.77%). Null means
+   *  we haven't set a rate yet — the UI should show the default for the active
+   *  method. */
+  percent: number | null;
 }
 
 export type PaymentMethodConfig =
   | {
       type: "stackivo_managed";
       configuredAt: string | null;
-      payout: ManagedPayoutDetails;
+      payout: BankPayoutDetails;
+      razorpayContactId: string | null;
+      razorpayFundAccountId: string | null;
+      feePassthrough: FeePassthroughConfig;
+    }
+  | {
+      type: "upi_smart";
+      configuredAt: string | null;
+      payout: BankPayoutDetails;
+      razorpayContactId: string | null;
+      razorpayFundAccountId: string | null;
+      feePassthrough: FeePassthroughConfig;
     }
   | {
       type: "upi_manual";
       configuredAt: string | null;
       payout: UpiPayoutDetails;
+      feePassthrough: FeePassthroughConfig;
     };
 
 /**
- * Lightweight summary used by UI surfaces that only need to know whether
- * a freelancer can take payments online — never includes secrets or full
- * bank-account numbers.
+ * Client-safe summary — masks sensitive fields. Use in any component that
+ * renders the current method as a status pill or read-out.
  */
 export interface PaymentMethodSummary {
   type: PaymentMethodType | null;
   configuredAt: string | null;
-  /** Last 4 digits of the bank account when type=stackivo_managed. */
+  /** Last 4 digits of the bank account (stackivo_managed / upi_smart). */
   bankAccountLast4: string | null;
-  /** Masked UPI VPA when type=upi_manual (e.g. `m••••@bank`). */
+  /** Masked UPI VPA for upi_manual (e.g. `m••••@bank`). */
   upiVpaMasked: string | null;
-  /** Display name for the bank, useful in UI ("HDFC"). */
   bankName: string | null;
+  /** Whether Razorpay vendor registration is complete. */
+  routeRegistered: boolean;
+  feePassthrough: FeePassthroughConfig;
 }
 
 // --- Read paths -------------------------------------------------------------
@@ -79,16 +103,17 @@ type PaymentMethodColumns = Pick<
   | "payout_bank_ifsc"
   | "payout_bank_name"
   | "payout_upi_vpa"
+  | "payout_pan"
+  | "razorpay_contact_id"
+  | "razorpay_fund_account_id"
+  | "fee_passthrough_enabled"
+  | "fee_passthrough_percent"
 >;
 
 const PAYMENT_METHOD_COLUMNS =
-  "payment_method_type, payment_method_configured_at, payout_account_holder_name, payout_bank_account_number, payout_bank_ifsc, payout_bank_name, payout_upi_vpa" as const;
+  "payment_method_type, payment_method_configured_at, payout_account_holder_name, payout_bank_account_number, payout_bank_ifsc, payout_bank_name, payout_upi_vpa, payout_pan, razorpay_contact_id, razorpay_fund_account_id, fee_passthrough_enabled, fee_passthrough_percent" as const;
 
-/**
- * Read the full payment-method config (including raw bank/UPI details)
- * for a freelancer. Only safe to call from server contexts — never return
- * the result to a client component verbatim.
- */
+/** Full config — only safe from server contexts. Never return to client verbatim. */
 export async function getUserPaymentMethod(
   userId: string,
 ): Promise<PaymentMethodConfig | null> {
@@ -101,27 +126,36 @@ export async function getUserPaymentMethod(
   const row = data as PaymentMethodColumns | null;
   if (!row?.payment_method_type) return null;
 
-  if (row.payment_method_type === "stackivo_managed") {
+  const feePassthrough: FeePassthroughConfig = {
+    enabled: row.fee_passthrough_enabled ?? false,
+    percent: row.fee_passthrough_percent ?? null,
+  };
+
+  if (
+    row.payment_method_type === "stackivo_managed" ||
+    row.payment_method_type === "upi_smart"
+  ) {
     if (
       !row.payout_account_holder_name ||
       !row.payout_bank_account_number ||
       !row.payout_bank_ifsc ||
       !row.payout_bank_name
     ) {
-      // Partial config — treat as "not configured yet" so the public page
-      // falls back to its safe state instead of taking payments we can't
-      // pay out.
-      return null;
+      return null; // Partial config — treat as not configured.
     }
     return {
-      type: "stackivo_managed",
+      type: row.payment_method_type,
       configuredAt: row.payment_method_configured_at,
       payout: {
         accountHolderName: row.payout_account_holder_name,
         bankAccountNumber: row.payout_bank_account_number,
         ifsc: row.payout_bank_ifsc,
         bankName: row.payout_bank_name,
+        pan: row.payout_pan ?? "",
       },
+      razorpayContactId: row.razorpay_contact_id,
+      razorpayFundAccountId: row.razorpay_fund_account_id,
+      feePassthrough,
     };
   }
 
@@ -131,16 +165,14 @@ export async function getUserPaymentMethod(
       type: "upi_manual",
       configuredAt: row.payment_method_configured_at,
       payout: { vpa: row.payout_upi_vpa },
+      feePassthrough,
     };
   }
 
   return null;
 }
 
-/**
- * Client-safe summary — masks sensitive bits. Use this in any component
- * that renders the current method as a status pill / read-out.
- */
+/** Masked summary safe for client components. */
 export async function getUserPaymentMethodSummary(
   userId: string,
 ): Promise<PaymentMethodSummary> {
@@ -152,24 +184,36 @@ export async function getUserPaymentMethodSummary(
       bankAccountLast4: null,
       upiVpaMasked: null,
       bankName: null,
+      routeRegistered: false,
+      feePassthrough: { enabled: false, percent: null },
     };
   }
-  if (config.type === "stackivo_managed") {
+
+  if (
+    config.type === "stackivo_managed" ||
+    config.type === "upi_smart"
+  ) {
     const acct = config.payout.bankAccountNumber;
     return {
-      type: "stackivo_managed",
+      type: config.type,
       configuredAt: config.configuredAt,
       bankAccountLast4: acct.slice(-4),
       upiVpaMasked: null,
       bankName: config.payout.bankName,
+      routeRegistered:
+        !!config.razorpayContactId && !!config.razorpayFundAccountId,
+      feePassthrough: config.feePassthrough,
     };
   }
+
   return {
     type: "upi_manual",
     configuredAt: config.configuredAt,
     bankAccountLast4: null,
     upiVpaMasked: maskUpiVpa(config.payout.vpa),
     bankName: null,
+    routeRegistered: false,
+    feePassthrough: config.feePassthrough,
   };
 }
 
@@ -186,10 +230,39 @@ function maskUpiVpa(vpa: string): string {
 
 const NOW = (): string => new Date().toISOString();
 
+export async function saveBankPaymentMethod(
+  userId: string,
+  type: "stackivo_managed" | "upi_smart",
+  payout: BankPayoutDetails,
+  routeIds: { contactId: string; fundAccountId: string },
+): Promise<void> {
+  const admin = getAdminSupabase();
+  await admin
+    .from("user_profiles")
+    .update({
+      payment_method_type: type,
+      payment_method_configured_at: NOW(),
+      payout_account_holder_name: payout.accountHolderName.trim(),
+      payout_bank_account_number: payout.bankAccountNumber.replace(/\s+/g, ""),
+      payout_bank_ifsc: payout.ifsc.trim().toUpperCase(),
+      payout_bank_name: payout.bankName.trim(),
+      payout_pan: payout.pan.trim().toUpperCase(),
+      razorpay_contact_id: routeIds.contactId,
+      razorpay_fund_account_id: routeIds.fundAccountId,
+      // Clear UPI-side fields so active method is unambiguous.
+      payout_upi_vpa: null,
+    } as never)
+    .eq("id", userId);
+}
+
+/** @deprecated Use saveBankPaymentMethod — kept for backward compat. */
 export async function saveStackivoManagedMethod(
   userId: string,
-  payout: ManagedPayoutDetails,
+  payout: BankPayoutDetails,
 ): Promise<void> {
+  // Legacy callers don't have route IDs yet. Save the bank fields only so
+  // existing code paths don't break; the route IDs will be filled by the
+  // new actions.
   const admin = getAdminSupabase();
   await admin
     .from("user_profiles")
@@ -200,8 +273,6 @@ export async function saveStackivoManagedMethod(
       payout_bank_account_number: payout.bankAccountNumber.replace(/\s+/g, ""),
       payout_bank_ifsc: payout.ifsc.trim().toUpperCase(),
       payout_bank_name: payout.bankName.trim(),
-      // Clear the UPI-side fields so we never store both — keeps the
-      // active method unambiguous.
       payout_upi_vpa: null,
     } as never)
     .eq("id", userId);
@@ -218,12 +289,28 @@ export async function saveUpiManualMethod(
       payment_method_type: "upi_manual",
       payment_method_configured_at: NOW(),
       payout_upi_vpa: payout.vpa.trim(),
-      // Clear managed-side fields so the UI never shows stale bank
-      // details next to an active UPI method.
+      // Clear bank-side fields.
       payout_account_holder_name: null,
       payout_bank_account_number: null,
       payout_bank_ifsc: null,
       payout_bank_name: null,
+      payout_pan: null,
+      razorpay_contact_id: null,
+      razorpay_fund_account_id: null,
+    } as never)
+    .eq("id", userId);
+}
+
+export async function saveFeePassthrough(
+  userId: string,
+  config: FeePassthroughConfig,
+): Promise<void> {
+  const admin = getAdminSupabase();
+  await admin
+    .from("user_profiles")
+    .update({
+      fee_passthrough_enabled: config.enabled,
+      fee_passthrough_percent: config.percent,
     } as never)
     .eq("id", userId);
 }
@@ -240,37 +327,52 @@ export async function clearPaymentMethod(userId: string): Promise<void> {
       payout_bank_ifsc: null,
       payout_bank_name: null,
       payout_upi_vpa: null,
+      // We intentionally preserve razorpay_contact_id / fund_account_id so
+      // the ops team can still reference them, and payout_pan for KYC.
     } as never)
     .eq("id", userId);
 }
 
 // --- Validation helpers (server-side, also used by actions) ----------------
 
-const IFSC_RE = /^[A-Z]{4}0[A-Z0-9]{6}$/;
-const ACCT_RE = /^[0-9]{6,18}$/;
-// UPI VPA grammar per NPCI: local-part `[A-Za-z0-9._-]`, handle `[A-Za-z0-9]`.
-const UPI_VPA_RE = /^[A-Za-z0-9.\-_]{2,}@[A-Za-z0-9]{2,}$/;
+export const IFSC_RE = /^[A-Z]{4}0[A-Z0-9]{6}$/;
+export const ACCT_RE = /^[0-9]{6,18}$/;
+export const PAN_RE = /^[A-Z]{5}[0-9]{4}[A-Z]$/;
+// UPI VPA grammar per NPCI.
+export const UPI_VPA_RE = /^[A-Za-z0-9.\-_]{2,}@[A-Za-z0-9]{2,}$/;
 
-export function validateManagedPayout(
-  input: ManagedPayoutDetails,
+export function validateBankPayout(
+  input: BankPayoutDetails,
 ): { ok: true } | { ok: false; error: string } {
   if (!input.accountHolderName || input.accountHolderName.trim().length < 2) {
     return { ok: false, error: "Enter the account holder name." };
   }
   const acct = input.bankAccountNumber.replace(/\s+/g, "");
   if (!ACCT_RE.test(acct)) {
+    return { ok: false, error: "Bank account number must be 6–18 digits." };
+  }
+  const ifsc = input.ifsc.trim().toUpperCase();
+  if (!IFSC_RE.test(ifsc)) {
     return {
       ok: false,
-      error: "Bank account number must be 6 to 18 digits.",
+      error: "IFSC code is invalid. Format: HDFC0001234 (4 letters, 0, 6 alphanumeric).",
     };
   }
-  if (!IFSC_RE.test(input.ifsc.trim().toUpperCase())) {
-    return { ok: false, error: "IFSC code looks invalid (e.g. HDFC0001234)." };
-  }
-  if (!input.bankName || input.bankName.trim().length < 2) {
-    return { ok: false, error: "Enter the bank name." };
+  const pan = input.pan.trim().toUpperCase();
+  if (!PAN_RE.test(pan)) {
+    return {
+      ok: false,
+      error: "PAN is invalid. Format: ABCDE1234F (5 letters, 4 digits, 1 letter).",
+    };
   }
   return { ok: true };
+}
+
+/** @deprecated Use validateBankPayout */
+export function validateManagedPayout(
+  input: Pick<BankPayoutDetails, "accountHolderName" | "bankAccountNumber" | "ifsc" | "bankName">,
+): { ok: true } | { ok: false; error: string } {
+  return validateBankPayout({ ...input, pan: "AAAAA0000A" }); // bypass PAN check for legacy callers
 }
 
 export function validateUpiVpa(

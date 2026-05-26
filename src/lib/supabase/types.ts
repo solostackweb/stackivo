@@ -176,23 +176,28 @@ export interface UserProfileRow {
   razorpay_test_mode: boolean;
   razorpay_connected_at: string | null;
   razorpay_last_verified_at: string | null;
-  // Two-option payment-method config (added in 0027). `null` means the
-  // freelancer hasn't picked a method yet — the public invoice page falls
-  // back to a "pay outside Stackivo" notice.
-  payment_method_type: "stackivo_managed" | "upi_manual" | null;
+  // Three-option payment-method config (0027 + updated in 0034).
+  // `null` means the freelancer hasn't picked a method yet.
+  payment_method_type: "stackivo_managed" | "upi_smart" | "upi_manual" | null;
   payment_method_configured_at: string | null;
   payout_account_holder_name: string | null;
   payout_bank_account_number: string | null;
   payout_bank_ifsc: string | null;
   payout_bank_name: string | null;
   payout_upi_vpa: string | null;
+  // Added in 0034: Razorpay Payouts / Smart Collect
+  payout_pan: string | null;
+  razorpay_contact_id: string | null;
+  razorpay_fund_account_id: string | null;
+  fee_passthrough_enabled: boolean;
+  fee_passthrough_percent: number | null;
   created_at: string;
   updated_at: string;
 }
 
-// --- 0027: receipts + manual confirmations ---------------------------------
+// --- 0027 + 0034: receipts + manual confirmations --------------------------
 
-export type PaymentMethodType = "stackivo_managed" | "upi_manual";
+export type PaymentMethodType = "stackivo_managed" | "upi_smart" | "upi_manual";
 
 export type PayoutStatus =
   | "not_applicable"
@@ -291,6 +296,12 @@ export interface InvoiceRow {
   // Which collection flow produced the payment (0027). Distinct from the
   // free-form `payment_method` column kept from 0013 for legacy reasons.
   payment_method_used: PaymentMethodType | null;
+  // Smart Collect fields (0034)
+  smart_collect_virtual_account_id: string | null;
+  smart_collect_vpa: string | null;
+  smart_collect_expires_at: string | null;
+  // Fee passthrough line item (0034)
+  fee_passthrough_amount: number | null;
   notes: string | null;
   terms: string | null;
   public_token: string | null;
