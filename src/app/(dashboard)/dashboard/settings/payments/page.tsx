@@ -98,13 +98,16 @@ export default async function PaymentsSettingsPage() {
               body: "Client scans a QR code for your UPI ID and pays directly. Instant, zero-fee. You confirm each payment manually and Stackivo issues the receipt.",
               note: "Free · Manual confirmation",
             },
-          ].map(({ title, body, note }) => (
+          ].map(({ title, body, note }) => {
+            const displayNote = title === "UPI Direct" ? note : "Coming soon";
+            return (
             <div key={title} className="rounded-xl border bg-muted/20 p-4">
               <p className="mb-1.5 text-xs font-semibold text-foreground">{title}</p>
               <p className="text-xs leading-relaxed text-muted-foreground">{body}</p>
-              <p className="mt-2 text-[11px] font-medium text-muted-foreground/70">{note}</p>
+              <p className="mt-2 text-[11px] font-medium text-muted-foreground/70">{displayNote}</p>
             </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </>

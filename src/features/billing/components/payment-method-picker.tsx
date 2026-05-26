@@ -14,7 +14,6 @@ import { Button } from "@/components/ui/button";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import {
   CreditCard,
   Zap,
@@ -62,12 +61,14 @@ const METHODS: {
     id: "stackivo_managed",
     icon: <CreditCard className="h-5 w-5" />,
     title: "Route Checkout",
-    tag: "Recommended",
+    tag: "Coming soon",
     tagColor:
-      "bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-950 dark:text-blue-400 dark:border-blue-800",
+      "bg-muted text-muted-foreground border border-border",
     description: "Cards, UPI, net banking & international payments.",
     fee: "~2–3% fee",
     feeColor: "text-slate-500",
+    locked: true,
+    lockedReason: "Cards, net banking, and international payments are coming soon.",
   },
   {
     id: "upi_manual",
