@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
-import { Check, Paintbrush } from "lucide-react";
+import { Check, Lock } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -38,8 +38,9 @@ const BRAND_COLORS = [
 export default function BrandingSettingsPage() {
   const { profile, setProfile, refreshProfile } = useProfile();
   const supabase = getBrowserSupabase();
-  const { canUse } = useSubscription();
-  const canRemoveBranding = canUse("platform.remove_branding");
+  const { status: subscriptionStatus, canUse } = useSubscription();
+  const canCustomizeBranding =
+    subscriptionStatus === "ready" && canUse("invoices.custom_branding");
 
   const form = useForm<BrandingInput>({
     defaultValues: {
@@ -142,121 +143,133 @@ export default function BrandingSettingsPage() {
         description="Your logo and color scheme appear on invoices, emails, and the client portal."
       />
 
-      {!canRemoveBranding && (
+      {!canCustomizeBranding && subscriptionStatus !== "loading" ? (
         <UpgradeCard
-          icon={Paintbrush}
-          title="Remove the 'Powered by Stackivo' watermark"
-          description="Your clients see your brand, not ours. Upgrade Pro to apply your logo, colors, and tagline to every invoice and email."
+          icon={Lock}
+          title="Unlock custom client-facing branding"
+          description="Upgrade to Pro to add your logo, brand icon, accent color, and brand voice across invoices, receipts, emails, and the client portal."
           features={[
-            "Your logo on invoices, PDFs, and the client portal",
-            "Custom brand color used for buttons and accents",
-            "No 'Powered by Stackivo' watermark",
-            "Custom email signature and intro copy",
+            "Logo and icon on PDFs",
+            "Custom invoice accent color",
+            "Branded email copy",
+            "Client portal branding",
           ]}
           requiredPlan="Pro"
           className="mb-2"
         />
-      )}
+      ) : null}
 
-      <SettingsSection
-        title="Brand assets"
-        description="Logos and icons used across client-facing documents."
-        onSave={saveBranding}
-        isDirty={form.formState.isDirty}
-        isSubmitting={form.formState.isSubmitting}
-      >
-        <LogoUploader
-          label="Primary logo"
-          hint="PNG or SVG on a transparent background · up to 2 MB · 512×512 recommended"
-          initialUrl={profile?.logoUrl ?? undefined}
-          onUpload={handleLogoUpload}
-          onRemove={handleLogoRemove}
-        />
-        <LogoUploader
-          label="Favicon / app icon"
-          hint="Square image · 128×128 minimum"
-          initialUrl={profile?.brandIconUrl ?? undefined}
-          onUpload={handleIconUpload}
-          onRemove={handleIconRemove}
-        />
-      </SettingsSection>
-
-      <SettingsSection
-        title="Brand color"
-        description="Used for buttons, links, and subtle accents on invoices."
-        onSave={saveBranding}
-        isDirty={form.formState.isDirty}
-        isSubmitting={form.formState.isSubmitting}
-      >
-        <div className="space-y-4">
-          <SettingsField label="Accent color" hint={`Selected: ${brandColor}`}>
-            <div className="flex flex-wrap gap-2">
-              {BRAND_COLORS.map((c) => {
-                const active = c.value.toLowerCase() === brandColor.toLowerCase();
-                return (
-                  <button
-                    key={c.value}
-                    type="button"
-                    onClick={() =>
-                      form.setValue("brandColor", c.value, { shouldDirty: true })
-                    }
-                    aria-label={`Choose ${c.name}`}
-                    aria-pressed={active}
-                    className={cn(
-                      "flex h-9 w-9 items-center justify-center rounded-md border transition-transform",
-                      active ? "scale-105 ring-2 ring-offset-2 ring-ring" : "hover:scale-105",
-                    )}
-                    style={{ backgroundColor: c.value }}
-                  >
-                    {active && (
-                      <Check className="h-4 w-4 text-white" strokeWidth={3} />
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          </SettingsField>
-
-          <SettingsField label="Custom hex" hint="Must be a 6-digit hex (e.g. #2563EB)">
-            <Input
-              value={brandColor}
-              onChange={(e) =>
-                form.setValue("brandColor", e.target.value, {
-                  shouldDirty: true,
-                })
-              }
-              className="max-w-xs font-mono uppercase tracking-widest"
+      {canCustomizeBranding ? (
+        <>
+          <SettingsSection
+            title="Brand assets"
+            description="Logos and icons used across client-facing documents."
+            onSave={saveBranding}
+            isDirty={form.formState.isDirty}
+            isSubmitting={form.formState.isSubmitting}
+          >
+            <LogoUploader
+              label="Primary logo"
+              hint="PNG or SVG on a transparent background · up to 2 MB · 512×512 recommended"
+              initialUrl={profile?.logoUrl ?? undefined}
+              onUpload={handleLogoUpload}
+              onRemove={handleLogoRemove}
             />
-          </SettingsField>
-        </div>
-      </SettingsSection>
+            <LogoUploader
+              label="Favicon / app icon"
+              hint="Square image · 128×128 minimum"
+              initialUrl={profile?.brandIconUrl ?? undefined}
+              onUpload={handleIconUpload}
+              onRemove={handleIconRemove}
+            />
+          </SettingsSection>
 
-      <SettingsSection
-        title="Brand voice"
-        description="Default copy used in email signatures and client messages."
-        onSave={saveBranding}
-        isDirty={form.formState.isDirty}
-        isSubmitting={form.formState.isSubmitting}
-      >
-        <div className="grid gap-5 sm:grid-cols-2">
-          <SettingsField label="Tagline">
-            <Input {...form.register("brandTagline")} />
-          </SettingsField>
-          <SettingsField label="Email signature">
-            <Input {...form.register("brandSignature")} />
-          </SettingsField>
-        </div>
-        <SettingsField
-          label="Default intro copy"
-          hint="Top of new invoices and proposals"
-        >
-          <Textarea
-            rows={3}
-            className="resize-none"
-            {...form.register("brandIntro")}
-          />
-        </SettingsField>
-      </SettingsSection>
+          <SettingsSection
+            title="Brand color"
+            description="Used for buttons, links, and subtle accents on invoices."
+            onSave={saveBranding}
+            isDirty={form.formState.isDirty}
+            isSubmitting={form.formState.isSubmitting}
+          >
+            <div className="space-y-4">
+              <SettingsField label="Accent color" hint={`Selected: ${brandColor}`}>
+                <div className="flex flex-wrap gap-2">
+                  {BRAND_COLORS.map((c) => {
+                    const active =
+                      c.value.toLowerCase() === brandColor.toLowerCase();
+                    return (
+                      <button
+                        key={c.value}
+                        type="button"
+                        onClick={() =>
+                          form.setValue("brandColor", c.value, {
+                            shouldDirty: true,
+                          })
+                        }
+                        aria-label={`Choose ${c.name}`}
+                        aria-pressed={active}
+                        className={cn(
+                          "flex h-9 w-9 items-center justify-center rounded-md border transition-transform",
+                          active
+                            ? "scale-105 ring-2 ring-offset-2 ring-ring"
+                            : "hover:scale-105",
+                        )}
+                        style={{ backgroundColor: c.value }}
+                      >
+                        {active ? (
+                          <Check className="h-4 w-4 text-white" strokeWidth={3} />
+                        ) : null}
+                      </button>
+                    );
+                  })}
+                </div>
+              </SettingsField>
+
+              <SettingsField
+                label="Custom hex"
+                hint="Must be a 6-digit hex (e.g. #2563EB)"
+              >
+                <Input
+                  value={brandColor}
+                  onChange={(e) =>
+                    form.setValue("brandColor", e.target.value, {
+                      shouldDirty: true,
+                    })
+                  }
+                  className="max-w-xs font-mono uppercase tracking-widest"
+                />
+              </SettingsField>
+            </div>
+          </SettingsSection>
+
+          <SettingsSection
+            title="Brand voice"
+            description="Default copy used in email signatures and client messages."
+            onSave={saveBranding}
+            isDirty={form.formState.isDirty}
+            isSubmitting={form.formState.isSubmitting}
+          >
+            <div className="grid gap-5 sm:grid-cols-2">
+              <SettingsField label="Tagline">
+                <Input {...form.register("brandTagline")} />
+              </SettingsField>
+              <SettingsField label="Email signature">
+                <Input {...form.register("brandSignature")} />
+              </SettingsField>
+            </div>
+            <SettingsField
+              label="Default intro copy"
+              hint="Top of new invoices and proposals"
+            >
+              <Textarea
+                rows={3}
+                className="resize-none"
+                {...form.register("brandIntro")}
+              />
+            </SettingsField>
+          </SettingsSection>
+        </>
+      ) : null}
     </>
   );
 }

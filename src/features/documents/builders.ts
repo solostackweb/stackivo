@@ -23,6 +23,7 @@ import type {
   ContractSignatureRow,
   InvoiceItemRow,
   InvoiceRow,
+  SubscriptionRow,
   UserProfileRow,
 } from "@/lib/supabase/types";
 import type { InvoicePdfData } from "./pdf/invoice-pdf";
@@ -32,6 +33,7 @@ import type { ReceiptPdfData } from "./pdf/receipt-pdf";
 import { resolveBrand } from "./pdf/brand";
 import { getLatestReceiptForInvoice } from "@/features/invoices/receipts";
 import type { InvoiceReceiptRow } from "@/lib/supabase/types";
+import { hasFeature } from "@/features/subscription/features";
 import { getPublicAppUrl } from "./urls";
 import { isValidPublicShareToken } from "@/features/share/server";
 import {
@@ -69,7 +71,10 @@ export async function buildInvoicePdfData(
     fetchSellerProfile(user.id),
     invoice.client_id ? fetchClient(invoice.client_id) : null,
   ]);
-  const logoUrl = await fetchBrandMarkDataUrl(seller, supabase);
+  const customBranding = await userCanCustomizeBranding(user.id, supabase);
+  const logoUrl = customBranding
+    ? await fetchBrandMarkDataUrl(seller, supabase)
+    : null;
 
   return assembleInvoicePdfData({
     invoice,
@@ -78,6 +83,7 @@ export async function buildInvoicePdfData(
     client,
     logoUrl,
     supabase,
+    customBranding,
   });
 }
 
@@ -105,7 +111,8 @@ export async function buildInvoicePdfDataByToken(
     fetchSellerProfile(inv.user_id, admin),
     inv.client_id ? fetchClient(inv.client_id, admin) : null,
   ]);
-  const logoUrl = await fetchBrandMarkDataUrl(seller, admin);
+  const customBranding = await userCanCustomizeBranding(inv.user_id, admin);
+  const logoUrl = customBranding ? await fetchBrandMarkDataUrl(seller, admin) : null;
 
   return assembleInvoicePdfData({
     invoice: inv,
@@ -114,6 +121,7 @@ export async function buildInvoicePdfDataByToken(
     client,
     logoUrl,
     supabase: admin,
+    customBranding,
   });
 }
 
@@ -233,6 +241,44 @@ async function fetchBrandMarkDataUrl(
   return fetchStorageAsDataUrl("branding-assets", seller?.brand_icon_url, client);
 }
 
+async function userCanCustomizeBranding(
+  userId: string,
+  client: AnySupabase,
+): Promise<boolean> {
+  const { data } = await client
+    .from("subscriptions")
+    .select("*")
+    .eq("user_id", userId)
+    .maybeSingle();
+  const row = (data as unknown as SubscriptionRow | null) ?? null;
+  return hasFeature(
+    row
+      ? {
+          userId: row.user_id,
+          plan: row.plan,
+          status: row.status,
+          trialEndsAt: row.trial_ends_at,
+          currentPeriodEnd: row.current_period_end,
+          razorpaySubscriptionId: row.razorpay_subscription_id,
+        }
+      : null,
+    "invoices.custom_branding",
+  );
+}
+
+function withoutCustomBranding(
+  seller: UserProfileRow | null,
+): UserProfileRow | null {
+  if (!seller) return null;
+  return {
+    ...seller,
+    brand_color: null,
+    brand_tagline: null,
+    logo_url: null,
+    brand_icon_url: null,
+  };
+}
+
 // --- Internal: assemblers -------------------------------------------------
 
 async function assembleInvoicePdfData(args: {
@@ -242,8 +288,9 @@ async function assembleInvoicePdfData(args: {
   client: ClientRow | null;
   logoUrl: string | null;
   supabase: AnySupabase;
+  customBranding: boolean;
 }): Promise<InvoicePdfData> {
-  const { invoice, items, seller, client, logoUrl, supabase } = args;
+  const { invoice, items, seller, client, logoUrl, supabase, customBranding } = args;
   const sellerSignatureImage = seller?.signature_image_url
     ? await normalizeImageForPdf(
         seller.signature_image_url,
@@ -280,7 +327,7 @@ async function assembleInvoicePdfData(args: {
     footerNote: invoice.footer_note,
     paymentLink: invoice.payment_link,
     publicUrl,
-    brandColor: seller?.brand_color ?? null,
+    brandColor: customBranding ? (seller?.brand_color ?? null) : null,
     items: items.map((it) => ({
       description: it.description,
       quantity: Number(it.quantity) || 0,
@@ -574,9 +621,13 @@ async function assembleReceiptPdfData(args: {
   seller: UserProfileRow | null;
   client: ClientRow | null;
   logoUrl: string | null;
+  customBranding: boolean;
 }): Promise<ReceiptPdfData> {
-  const { receipt, invoice, seller, client, logoUrl } = args;
-  const brand = resolveBrand(seller, logoUrl);
+  const { receipt, invoice, seller, client, logoUrl, customBranding } = args;
+  const brand = resolveBrand(
+    customBranding ? seller : withoutCustomBranding(seller),
+    logoUrl,
+  );
   return {
     receiptNumber: receipt.receipt_number,
     invoiceNumber: invoice.invoice_number,
@@ -617,8 +668,18 @@ export async function buildReceiptPdfData(
     fetchSellerProfile(invoice.user_id),
     invoice.client_id ? fetchClient(invoice.client_id) : null,
   ]);
-  const logoUrl = await fetchBrandMarkDataUrl(seller, supabase);
-  return assembleReceiptPdfData({ receipt, invoice, seller, client, logoUrl });
+  const customBranding = await userCanCustomizeBranding(invoice.user_id, supabase);
+  const logoUrl = customBranding
+    ? await fetchBrandMarkDataUrl(seller, supabase)
+    : null;
+  return assembleReceiptPdfData({
+    receipt,
+    invoice,
+    seller,
+    client,
+    logoUrl,
+    customBranding,
+  });
 }
 
 export async function buildReceiptPdfDataByToken(
@@ -639,6 +700,14 @@ export async function buildReceiptPdfDataByToken(
     fetchSellerProfile(invoice.user_id, admin),
     invoice.client_id ? fetchClient(invoice.client_id, admin) : null,
   ]);
-  const logoUrl = await fetchBrandMarkDataUrl(seller, admin);
-  return assembleReceiptPdfData({ receipt, invoice, seller, client, logoUrl });
+  const customBranding = await userCanCustomizeBranding(invoice.user_id, admin);
+  const logoUrl = customBranding ? await fetchBrandMarkDataUrl(seller, admin) : null;
+  return assembleReceiptPdfData({
+    receipt,
+    invoice,
+    seller,
+    client,
+    logoUrl,
+    customBranding,
+  });
 }

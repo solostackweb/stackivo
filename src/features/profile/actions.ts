@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { AUTH_LOGIN_ROUTE } from "@/features/auth/routes";
 import { normaliseGstin } from "@/features/gst/validation";
+import { requireFeature } from "@/features/subscription/server";
 import {
   addressSchema,
   brandingSchema,
@@ -201,6 +202,7 @@ export async function updateBusinessAddress(
 export async function updateBranding(
   input: BrandingInput,
 ): Promise<ActionResult<{ profile: Awaited<ReturnType<typeof getProfile>> }>> {
+  await requireFeature("invoices.custom_branding");
   const parsed = brandingSchema.safeParse(input);
   if (!parsed.success) return flatErrors(parsed);
   const userId = await requireUserId();
