@@ -17,7 +17,7 @@ import "server-only";
 import { redirect } from "next/navigation";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getAdminSupabase } from "@/lib/supabase/admin";
-import { requireServerEnv } from "@/config/env";
+import { publicRazorpayKeyId, requireServerEnv } from "@/config/env";
 import { AUTH_LOGIN_ROUTE } from "@/features/auth/routes";
 import type {
   BillingPaymentRow,
@@ -139,6 +139,30 @@ async function ensureRazorpayCustomer(userId: string): Promise<string> {
 
 // --- Checkout --------------------------------------------------------------
 
+function razorpayKeyMode(key: string): "test" | "live" | "unknown" {
+  if (key.startsWith("rzp_test_")) return "test";
+  if (key.startsWith("rzp_live_")) return "live";
+  return "unknown";
+}
+
+function resolveCheckoutKeyId(env: ReturnType<typeof requireServerEnv>): string {
+  if (!env.razorpayKeyId) {
+    throw new Error("[billing] RAZORPAY_KEY_ID is not configured.");
+  }
+
+  if (publicRazorpayKeyId && publicRazorpayKeyId !== env.razorpayKeyId) {
+    throw new Error(
+      `[billing] Razorpay checkout key mismatch: NEXT_PUBLIC_RAZORPAY_KEY_ID is ${razorpayKeyMode(
+        publicRazorpayKeyId,
+      )}, but RAZORPAY_KEY_ID is ${razorpayKeyMode(
+        env.razorpayKeyId,
+      )}. Use the same Razorpay key id for both values.`,
+    );
+  }
+
+  return publicRazorpayKeyId ?? env.razorpayKeyId;
+}
+
 /**
  * Create a Razorpay subscription and return the data the browser needs
  * to launch Razorpay Checkout. The DB row is updated to point at the new
@@ -148,9 +172,7 @@ export async function startCheckout(
   input: StartCheckoutInput,
 ): Promise<CheckoutSession> {
   const env = requireServerEnv();
-  if (!env.razorpayKeyId) {
-    throw new Error("[billing] RAZORPAY_KEY_ID is not configured.");
-  }
+  const checkoutKeyId = resolveCheckoutKeyId(env);
 
   const supabase = await getServerSupabase();
   const {
@@ -200,7 +222,7 @@ export async function startCheckout(
   return {
     subscriptionId: subscription.id,
     shortUrl: subscription.short_url,
-    keyId: env.razorpayKeyId,
+    keyId: checkoutKeyId,
     prefill: {
       name: profile?.full_name ?? undefined,
       email: profile?.email ?? user.email ?? undefined,

@@ -18,6 +18,19 @@ interface CheckoutButtonProps {
   disabled?: boolean;
 }
 
+function getRazorpayErrorMessage(payload: unknown): string {
+  if (!payload || typeof payload !== "object") return "Payment failed.";
+  const error = (payload as { error?: unknown }).error;
+  if (!error || typeof error !== "object") return "Payment failed.";
+  const description = (error as { description?: unknown }).description;
+  const reason = (error as { reason?: unknown }).reason;
+  return (
+    (typeof description === "string" && description) ||
+    (typeof reason === "string" && reason) ||
+    "Payment failed."
+  );
+}
+
 /**
  * One-click upgrade button.
  *
@@ -69,6 +82,10 @@ export function CheckoutButton({
         modal: {
           ondismiss: () => setLoading(false),
         },
+      });
+      rzp.on("payment.failed", (payload) => {
+        toast.error(getRazorpayErrorMessage(payload));
+        setLoading(false);
       });
       rzp.open();
     },
