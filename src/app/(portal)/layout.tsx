@@ -9,6 +9,12 @@ import { LogOut, Workflow } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { logoutAction } from "@/features/auth/actions";
 
+function portalIdFromPath(path: string): string | null {
+  const match = path.match(/^\/portal\/([^/?#]+)/);
+  const id = match?.[1];
+  return id && id !== "accept" ? decodeURIComponent(id) : null;
+}
+
 export const metadata: Metadata = {
   applicationName: "Stackivo Portal",
   manifest: "/portal.webmanifest",
@@ -81,6 +87,33 @@ export default async function PortalLayout({
     redirect(`${AUTH_LOGIN_ROUTE}?next=${encodeURIComponent(fromHeader)}`);
   }
 
+  const activePortalId = portalIdFromPath(fromHeader);
+  let topBarTitle = "Portal";
+  if (activePortalId) {
+    const { data: portalRow } = await supabase
+      .from("portals")
+      .select("name, clients(full_name, business_name)")
+      .eq("id", activePortalId)
+      .maybeSingle();
+    const portal = portalRow as
+      | {
+          name: string;
+          clients:
+            | { full_name: string | null; business_name: string | null }
+            | Array<{ full_name: string | null; business_name: string | null }>
+            | null;
+        }
+      | null;
+    const client = Array.isArray(portal?.clients)
+      ? portal?.clients[0]
+      : portal?.clients;
+    topBarTitle =
+      client?.full_name ??
+      client?.business_name ??
+      portal?.name ??
+      topBarTitle;
+  }
+
   return (
     <div
       className="flex min-h-svh flex-col text-foreground"
@@ -101,7 +134,12 @@ export default async function PortalLayout({
             <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
               <Workflow className="h-4 w-4" />
             </span>
-            <span className="truncate">Portal</span>
+            <span className="min-w-0">
+              <span className="block truncate leading-tight">{topBarTitle}</span>
+              <span className="block text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                Portal
+              </span>
+            </span>
           </Link>
           <div className="flex items-center gap-2 sm:gap-3">
             <span className="hidden max-w-[160px] truncate text-xs text-muted-foreground sm:inline">

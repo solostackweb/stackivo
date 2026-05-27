@@ -41,8 +41,6 @@ const navItems = [
 
 export function ClientPortalShell({
   portalId,
-  portalName,
-  clientName,
   brandColor = "#2563EB",
   title,
   subtitle,
@@ -61,28 +59,15 @@ export function ClientPortalShell({
   return (
     <div className="min-h-[calc(100svh-7rem)] pb-28">
       <div
-        className="sticky top-14 z-20 -mx-4 mb-4 border-b bg-background/95 px-4 py-3 backdrop-blur-md sm:-mx-6 sm:px-6"
+        className="-mx-4 mb-4 border-b bg-background/70 px-4 py-4 sm:-mx-6 sm:px-6"
         style={{ top: "calc(3.5rem + env(safe-area-inset-top, 0px))" }}
       >
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-3">
-            <span
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl text-xs font-bold text-white shadow-sm"
-              style={{ background: brandColor }}
-            >
-              {initials(clientName ?? portalName)}
-            </span>
-            <span className="min-w-0">
-              <p className="truncate text-[11px] font-medium text-muted-foreground">
-                {clientName ?? portalName}
-              </p>
-              <h1 className="truncate text-lg font-bold tracking-tight">{title}</h1>
-              {subtitle && (
-                <p className="truncate text-xs text-muted-foreground">
-                  Portal - {subtitle}
-                </p>
-              )}
-            </span>
+          <div className="min-w-0">
+            <h1 className="truncate text-2xl font-bold tracking-tight">{title}</h1>
+            {subtitle && (
+              <p className="truncate text-sm text-muted-foreground">{subtitle}</p>
+            )}
           </div>
         </div>
       </div>
@@ -502,8 +487,6 @@ export function ClientPortalMeetings({ data }: { data: ClientPortalProps }) {
 }
 
 export function ClientPortalChat({ data }: { data: ClientPortalProps }) {
-  const client = data.members.find((member) => member.role === "client") ?? data.members[0];
-
   return (
     <ClientPortalShell
       portalId={data.portalId}
@@ -513,28 +496,11 @@ export function ClientPortalChat({ data }: { data: ClientPortalProps }) {
       title="Chat"
       subtitle="Messages with your freelancer"
     >
-      <div className="space-y-5">
-        <section className="rounded-[1.35rem] border bg-card p-4 shadow-sm">
-          <div className="flex items-center gap-3">
-            <span
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-sm font-bold text-white"
-              style={{ background: data.brandColor }}
-            >
-              {initials(client?.profile?.full_name ?? data.clientName ?? data.portalName)}
-            </span>
-            <div className="min-w-0">
-              <h2 className="truncate text-sm font-semibold">
-                {data.clientName ?? data.portalName}
-              </h2>
-              <p className="truncate text-xs text-muted-foreground">
-                Portal chat - {client?.profile?.email ?? data.clientEmail ?? "private workspace"}
-              </p>
-            </div>
-          </div>
-        </section>
-
-        <MessagesPanel portalId={data.portalId} messages={data.messages} />
-      </div>
+      <MessagesPanel
+        portalId={data.portalId}
+        messages={data.messages}
+        currentUserId={data.currentUserId}
+      />
     </ClientPortalShell>
   );
 }
@@ -845,9 +811,11 @@ function FileUploadButton({ portalId }: { portalId: string }) {
 function MessagesPanel({
   portalId,
   messages,
+  currentUserId,
 }: {
   portalId: string;
   messages: ClientPortalProps["messages"];
+  currentUserId: string;
 }) {
   const router = useRouter();
   const [body, setBody] = React.useState("");
@@ -871,19 +839,25 @@ function MessagesPanel({
   }
 
   return (
-    <section className="rounded-2xl border bg-card p-4 shadow-sm">
-      <h2 className="text-sm font-semibold">Messages</h2>
-      <form onSubmit={onSubmit} className="mt-3 space-y-2">
+    <section className="overflow-hidden rounded-[1.35rem] border bg-card shadow-sm">
+      <div className="border-b px-4 py-3">
+        <h2 className="text-sm font-semibold">Conversation</h2>
+        <p className="text-xs text-muted-foreground">
+          Messages stay inside this client portal.
+        </p>
+      </div>
+      <form onSubmit={onSubmit} className="border-b bg-background/45 p-3">
         <Textarea
           placeholder="Send a short note or question..."
           value={body}
           onChange={(e) => setBody(e.target.value)}
           rows={3}
           maxLength={8000}
+          className="min-h-24 resize-none rounded-2xl bg-background"
         />
-        {error && <p className="text-xs text-destructive">{error}</p>}
-        <div className="flex justify-end">
-          <Button size="sm" className="h-9 rounded-full" disabled={pending || !body.trim()}>
+        {error && <p className="mt-2 text-xs text-destructive">{error}</p>}
+        <div className="mt-2 flex justify-end">
+          <Button size="sm" className="h-9 rounded-full px-4" disabled={pending || !body.trim()}>
             <Send className="h-3.5 w-3.5" />
             Send
           </Button>
@@ -891,15 +865,32 @@ function MessagesPanel({
       </form>
 
       {ordered.length > 0 && (
-        <ul className="mt-4 space-y-2">
-          {ordered.map((message) => (
-            <li key={message.id} className="rounded-xl border bg-background p-3">
-              <p className="text-[11px] font-semibold text-muted-foreground">
-                {message.author?.full_name ?? message.author?.email ?? "Someone"} • {relativeTime(message.created_at)}
+        <ul className="max-h-[42svh] min-h-48 space-y-3 overflow-y-auto px-4 py-4">
+          {ordered.map((message) => {
+            const mine = message.author_id === currentUserId;
+            return (
+            <li
+              key={message.id}
+              className={`max-w-[86%] rounded-2xl border p-3 ${
+                mine
+                  ? "ml-auto border-primary/30 bg-primary text-primary-foreground"
+                  : "mr-auto bg-background"
+              }`}
+            >
+              <p
+                className={`text-[11px] font-semibold ${
+                  mine ? "text-primary-foreground/75" : "text-muted-foreground"
+                }`}
+              >
+                {mine
+                  ? "You"
+                  : message.author?.full_name ?? message.author?.email ?? "Freelancer"}{" "}
+                - {relativeTime(message.created_at)}
               </p>
               <p className="mt-1 whitespace-pre-wrap text-sm">{message.body}</p>
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
     </section>
