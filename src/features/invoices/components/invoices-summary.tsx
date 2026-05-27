@@ -98,6 +98,7 @@ export function InvoicesSummary({
         helper="Across paid invoices"
         icon={TrendingUp}
         tone="default"
+        wideOnMobile
       />
     </div>
   );
@@ -110,6 +111,7 @@ interface SummaryCardProps {
   icon: React.ComponentType<{ className?: string }>;
   tone: "default" | "success";
   featured?: boolean;
+  wideOnMobile?: boolean;
 }
 
 function SummaryCard({
@@ -119,11 +121,13 @@ function SummaryCard({
   icon: Icon,
   tone,
   featured,
+  wideOnMobile,
 }: SummaryCardProps) {
   return (
     <Card className={cn(
       "group transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/20 hover:shadow-lg hover:shadow-primary/[0.05]",
       featured && "col-span-2 lg:col-span-1",
+      wideOnMobile && "col-span-2 sm:col-span-1",
     )}>
       <CardContent className="flex min-h-32 items-start justify-between gap-3 p-4 sm:p-5">
         <div className="min-w-0 space-y-1">
