@@ -186,6 +186,7 @@ export default async function PortalDetailPage({
         currentUserId={access.userId}
         role="owner"
         clientId={snapshot.client?.id ?? portal.client_id}
+        clientName={clientName}
         clientEmail={snapshot.client?.email ?? null}
         members={snapshot.members.map((m) => ({
           user_id: m.user_id,

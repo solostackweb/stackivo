@@ -94,6 +94,7 @@ export interface ViewProps {
   role: PortalRole;
   currentUserId: string;
   clientId?: string | null;
+  clientName?: string | null;
   clientEmail?: string | null;
   members: Array<{
     user_id: string;

@@ -27,6 +27,10 @@ export async function getClientPortalProps(portalId: string): Promise<ViewProps>
     currentUserId: access.userId,
     role: access.role,
     clientId: snapshot.client?.id ?? access.portal.client_id,
+    clientName:
+      snapshot.client?.fullName ??
+      snapshot.client?.businessName ??
+      access.portal.name,
     clientEmail: snapshot.client?.email ?? null,
     members: snapshot.members.map((m) => ({
       user_id: m.user_id,

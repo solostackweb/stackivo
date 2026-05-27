@@ -12,10 +12,8 @@ import {
   FileText,
   Files,
   Home,
-  Info,
   List,
   MessageSquare,
-  MoreHorizontal,
   Receipt,
   Send,
   Sparkles,
@@ -35,15 +33,16 @@ type ClientPortalProps = ViewProps;
 
 const navItems = [
   { key: "home", label: "Home", icon: Home, href: (id: string) => `/portal/${id}` },
-  { key: "updates", label: "Updates", icon: MessageSquare, href: (id: string) => `/portal/${id}/updates` },
+  { key: "invoices", label: "Invoices", icon: Receipt, href: (id: string) => `/portal/${id}/invoices` },
   { key: "files", label: "Files", icon: Files, href: (id: string) => `/portal/${id}/files` },
   { key: "meetings", label: "Meetings", icon: Video, href: (id: string) => `/portal/${id}/meetings` },
-  { key: "more", label: "More", icon: MoreHorizontal, href: (id: string) => `/portal/${id}/more` },
+  { key: "chat", label: "Chat", icon: MessageSquare, href: (id: string) => `/portal/${id}/chat` },
 ] as const;
 
 export function ClientPortalShell({
   portalId,
   portalName,
+  clientName,
   brandColor = "#2563EB",
   title,
   subtitle,
@@ -51,6 +50,7 @@ export function ClientPortalShell({
 }: {
   portalId: string;
   portalName: string;
+  clientName?: string | null;
   brandColor?: string;
   title: string;
   subtitle?: string;
@@ -70,15 +70,17 @@ export function ClientPortalShell({
               className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl text-xs font-bold text-white shadow-sm"
               style={{ background: brandColor }}
             >
-              {initials(portalName)}
+              {initials(clientName ?? portalName)}
             </span>
             <span className="min-w-0">
               <p className="truncate text-[11px] font-medium text-muted-foreground">
-                {portalName}
+                {clientName ?? portalName}
               </p>
               <h1 className="truncate text-lg font-bold tracking-tight">{title}</h1>
               {subtitle && (
-                <p className="truncate text-xs text-muted-foreground">{subtitle}</p>
+                <p className="truncate text-xs text-muted-foreground">
+                  Portal - {subtitle}
+                </p>
               )}
             </span>
           </div>
@@ -145,6 +147,7 @@ export function ClientPortalHome({ data }: { data: ClientPortalProps }) {
     <ClientPortalShell
       portalId={data.portalId}
       portalName={data.portalName}
+      clientName={data.clientName}
       brandColor={data.brandColor}
       title="Home"
       subtitle="Project status and next actions"
@@ -253,19 +256,24 @@ export function ClientPortalHome({ data }: { data: ClientPortalProps }) {
           </div>
           <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
             <ActionLink
-              icon={Files}
-              label="View Files"
-              href={`/portal/${data.portalId}/files`}
+              icon={Receipt}
+              label="Invoices"
+              href={`/portal/${data.portalId}/invoices`}
             />
             <ActionLink
-              icon={MessageSquare}
-              label="Read Updates"
-              href={`/portal/${data.portalId}/updates`}
+              icon={Files}
+              label="Files"
+              href={`/portal/${data.portalId}/files`}
             />
             <ActionLink
               icon={Video}
               label="Meetings"
               href={`/portal/${data.portalId}/meetings`}
+            />
+            <ActionLink
+              icon={MessageSquare}
+              label="Chat"
+              href={`/portal/${data.portalId}/chat`}
             />
             {meeting?.meet_link && (
               <ActionLink
@@ -289,6 +297,7 @@ export function ClientPortalUpdates({ data }: { data: ClientPortalProps }) {
     <ClientPortalShell
       portalId={data.portalId}
       portalName={data.portalName}
+      clientName={data.clientName}
       brandColor={data.brandColor}
       title="Updates"
       subtitle="Structured progress notes and approvals"
@@ -304,11 +313,77 @@ export function ClientPortalUpdates({ data }: { data: ClientPortalProps }) {
   );
 }
 
+export function ClientPortalInvoices({ data }: { data: ClientPortalProps }) {
+  const paidAmount = data.invoices
+    .filter((invoice) => invoice.status === "paid")
+    .reduce((sum, invoice) => sum + invoice.total_amount, 0);
+  const openInvoices = data.invoices.filter(
+    (invoice) => invoice.status !== "paid" && invoice.status !== "cancelled",
+  );
+  const openAmount = openInvoices.reduce(
+    (sum, invoice) => sum + invoice.total_amount,
+    0,
+  );
+  const currency = data.invoices[0]?.currency ?? "INR";
+
+  return (
+    <ClientPortalShell
+      portalId={data.portalId}
+      portalName={data.portalName}
+      clientName={data.clientName}
+      brandColor={data.brandColor}
+      title="Invoices"
+      subtitle="Payments and receipts"
+    >
+      <div className="space-y-5">
+        <section className="grid gap-3 sm:grid-cols-2">
+          <StatusCard
+            icon={Wallet}
+            label="Outstanding"
+            title={formatPortalCurrency(currency, openAmount)}
+            meta={`${openInvoices.length} invoice${openInvoices.length === 1 ? "" : "s"} open`}
+            accent={openAmount > 0 ? "amber" : "emerald"}
+          />
+          <StatusCard
+            icon={CheckCircle2}
+            label="Paid"
+            title={formatPortalCurrency(currency, paidAmount)}
+            meta="Payments recorded by your freelancer"
+            accent="emerald"
+          />
+        </section>
+
+        <section className="rounded-[1.35rem] border bg-card p-4 shadow-sm">
+          <h2 className="text-sm font-semibold">Invoice documents</h2>
+          {data.invoices.length === 0 ? (
+            <EmptyBlock
+              icon={Receipt}
+              title="No invoices yet"
+              text="Invoices shared by your freelancer will appear here."
+            />
+          ) : (
+            <div className="mt-3 space-y-2">
+              {/*
+                <DocumentExternalCard
+                  key={invoice.id}
+                  icon={Receipt}
+                  title={invoice.invoice_number}
+                  meta={`${formatPortalCurrency(invoice.currency, invoice.total_amount)} - ${invoice.status.replace(/_/g, " ")}`}
+                  href={invoice.public_token ? `/i/${invoice.public_token}` : null}
+                />
+              */}
+            </div>
+          )}
+        </section>
+      </div>
+    </ClientPortalShell>
+  );
+}
+
 export function ClientPortalFiles({ data }: { data: ClientPortalProps }) {
   const categories = [
     "deliverable",
     "contract",
-    "invoice",
     "asset",
     "meeting_note",
     "misc",
@@ -318,16 +393,16 @@ export function ClientPortalFiles({ data }: { data: ClientPortalProps }) {
     <ClientPortalShell
       portalId={data.portalId}
       portalName={data.portalName}
+      clientName={data.clientName}
       brandColor={data.brandColor}
       title="Files"
       subtitle="Documents and delivery assets"
     >
       <div className="space-y-5">
-        {(data.invoices.length > 0 ||
-          data.contracts.length > 0 ||
+        {(data.contracts.length > 0 ||
           data.welcomeDocuments.length > 0) && (
           <section className="rounded-2xl border bg-card p-4 shadow-sm">
-            <h2 className="text-sm font-semibold">Portal documents</h2>
+            <h2 className="text-sm font-semibold">Project documents</h2>
             <div className="mt-3 grid gap-2 sm:grid-cols-2">
               {data.invoices.map((invoice) => (
                 <DocumentExternalCard
@@ -365,7 +440,7 @@ export function ClientPortalFiles({ data }: { data: ClientPortalProps }) {
             <div>
               <h2 className="text-sm font-semibold">Shared files</h2>
               <p className="text-xs text-muted-foreground">
-                Deliverables, assets, invoices, and meeting notes.
+                Deliverables, assets, contracts, and meeting notes.
               </p>
             </div>
             {data.r2Enabled && <FileUploadButton portalId={data.portalId} />}
@@ -410,6 +485,7 @@ export function ClientPortalMeetings({ data }: { data: ClientPortalProps }) {
     <ClientPortalShell
       portalId={data.portalId}
       portalName={data.portalName}
+      clientName={data.clientName}
       brandColor={data.brandColor}
       title="Meetings"
       subtitle="Calls, links, and scheduling"
@@ -425,30 +501,35 @@ export function ClientPortalMeetings({ data }: { data: ClientPortalProps }) {
   );
 }
 
-export function ClientPortalMore({ data }: { data: ClientPortalProps }) {
+export function ClientPortalChat({ data }: { data: ClientPortalProps }) {
   const client = data.members.find((member) => member.role === "client") ?? data.members[0];
 
   return (
     <ClientPortalShell
       portalId={data.portalId}
       portalName={data.portalName}
+      clientName={data.clientName}
       brandColor={data.brandColor}
-      title="More"
-      subtitle="Portal details and messages"
+      title="Chat"
+      subtitle="Messages with your freelancer"
     >
       <div className="space-y-5">
-        <section className="rounded-2xl border bg-card p-4 shadow-sm">
-          <h2 className="text-sm font-semibold">Portal information</h2>
-          <div className="mt-3 space-y-2 text-sm">
-            <InfoRow icon={Info} label="Workspace" value={data.portalName} />
-            <InfoRow
-              icon={CheckCircle2}
-              label="Status"
-              value={data.portalStatus.replace(/_/g, " ")}
-            />
-            {client?.profile?.email && (
-              <InfoRow icon={MessageSquare} label="Client email" value={client.profile.email} />
-            )}
+        <section className="rounded-[1.35rem] border bg-card p-4 shadow-sm">
+          <div className="flex items-center gap-3">
+            <span
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-sm font-bold text-white"
+              style={{ background: data.brandColor }}
+            >
+              {initials(client?.profile?.full_name ?? data.clientName ?? data.portalName)}
+            </span>
+            <div className="min-w-0">
+              <h2 className="truncate text-sm font-semibold">
+                {data.clientName ?? data.portalName}
+              </h2>
+              <p className="truncate text-xs text-muted-foreground">
+                Portal chat - {client?.profile?.email ?? data.clientEmail ?? "private workspace"}
+              </p>
+            </div>
           </div>
         </section>
 
@@ -457,6 +538,8 @@ export function ClientPortalMore({ data }: { data: ClientPortalProps }) {
     </ClientPortalShell>
   );
 }
+
+export const ClientPortalMore = ClientPortalChat;
 
 function StatusCard({
   icon: Icon,
@@ -820,28 +903,6 @@ function MessagesPanel({
         </ul>
       )}
     </section>
-  );
-}
-
-function InfoRow({
-  icon: Icon,
-  label,
-  value,
-}: {
-  icon: React.ComponentType<{ className?: string }>;
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="flex items-center gap-3 rounded-xl border bg-background p-3">
-      <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-muted text-muted-foreground">
-        <Icon className="h-4 w-4" />
-      </span>
-      <span className="min-w-0">
-        <span className="block text-[11px] text-muted-foreground">{label}</span>
-        <span className="block truncate font-medium capitalize">{value}</span>
-      </span>
-    </div>
   );
 }
 

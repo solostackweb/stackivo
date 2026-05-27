@@ -101,7 +101,7 @@ export default async function PortalLayout({
             <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
               <Workflow className="h-4 w-4" />
             </span>
-            <span className="truncate">Client Portal</span>
+            <span className="truncate">Portal</span>
           </Link>
           <div className="flex items-center gap-2 sm:gap-3">
             <span className="hidden max-w-[160px] truncate text-xs text-muted-foreground sm:inline">
@@ -117,13 +117,18 @@ export default async function PortalLayout({
         </div>
       </header>
       <main
-        className="mx-auto w-full max-w-5xl flex-1 px-4 py-6 sm:px-6 sm:py-10 motion-safe:animate-page-enter"
+        className="mx-auto w-full max-w-5xl flex-1 px-4 py-6 sm:px-6 sm:py-10"
         style={{
           paddingBottom: "max(env(safe-area-inset-bottom, 0px), 2rem)",
         }}
       >
         {children}
       </main>
+      <style>{`
+        .crisp-client {
+          display: none !important;
+        }
+      `}</style>
     </div>
   );
 }
