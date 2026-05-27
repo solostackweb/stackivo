@@ -74,7 +74,7 @@ export default async function ClientPortalIndexPage() {
                 <div className="flex items-start justify-between gap-3">
                   <div
                     className="h-9 w-9 shrink-0 rounded-md"
-                    style={{ background: p.brand_color ?? "#6366F1" }}
+                    style={{ background: p.brand_color ?? "#2563EB" }}
                     aria-hidden
                   />
                   <Badge variant="outline" className="capitalize text-[10px]">

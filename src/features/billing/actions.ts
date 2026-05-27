@@ -17,6 +17,7 @@ import {
   refreshCurrentSubscription,
   startCheckout,
 } from "./server";
+import { RazorpayApiError } from "./razorpay/client";
 import type { CheckoutSession } from "./types";
 
 type ActionResult<T = undefined> =
@@ -27,6 +28,14 @@ const StartCheckoutSchema = z.object({
   plan: z.enum(["pro", "business"]),
   cycle: z.enum(["monthly", "yearly"]),
 });
+
+function billingErrorMessage(err: unknown, fallback: string): string {
+  if (err instanceof RazorpayApiError && err.status === 401) {
+    return "Razorpay authentication failed. Check that RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET are copied from the same Razorpay test/live account, then restart the app.";
+  }
+
+  return err instanceof Error ? err.message : fallback;
+}
 
 export async function startCheckoutAction(
   raw: unknown,
@@ -42,7 +51,7 @@ export async function startCheckoutAction(
   } catch (err) {
     return {
       ok: false,
-      error: err instanceof Error ? err.message : "Checkout failed.",
+      error: billingErrorMessage(err, "Checkout failed."),
     };
   }
 }
@@ -62,7 +71,7 @@ export async function cancelSubscriptionAction(
   } catch (err) {
     return {
       ok: false,
-      error: err instanceof Error ? err.message : "Cancellation failed.",
+      error: billingErrorMessage(err, "Cancellation failed."),
     };
   }
 }
@@ -80,7 +89,7 @@ export async function reactivateSubscriptionAction(): Promise<
   } catch (err) {
     return {
       ok: false,
-      error: err instanceof Error ? err.message : "Reactivation failed.",
+      error: billingErrorMessage(err, "Reactivation failed."),
     };
   }
 }
@@ -93,7 +102,7 @@ export async function refreshSubscriptionAction(): Promise<ActionResult> {
   } catch (err) {
     return {
       ok: false,
-      error: err instanceof Error ? err.message : "Refresh failed.",
+      error: billingErrorMessage(err, "Refresh failed."),
     };
   }
 }

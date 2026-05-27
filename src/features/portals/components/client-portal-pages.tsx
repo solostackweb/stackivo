@@ -4,6 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
+  ArrowRight,
   CheckCircle2,
   Clock3,
   Download,
@@ -43,12 +44,14 @@ const navItems = [
 export function ClientPortalShell({
   portalId,
   portalName,
+  brandColor = "#2563EB",
   title,
   subtitle,
   children,
 }: {
   portalId: string;
   portalName: string;
+  brandColor?: string;
   title: string;
   subtitle?: string;
   children: React.ReactNode;
@@ -62,14 +65,22 @@ export function ClientPortalShell({
         style={{ top: "calc(3.5rem + env(safe-area-inset-top, 0px))" }}
       >
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-3">
-          <div className="min-w-0">
-            <p className="truncate text-[11px] font-medium text-muted-foreground">
-              {portalName}
-            </p>
-            <h1 className="truncate text-lg font-bold tracking-tight">{title}</h1>
-            {subtitle && (
-              <p className="truncate text-xs text-muted-foreground">{subtitle}</p>
-            )}
+          <div className="flex min-w-0 items-center gap-3">
+            <span
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl text-xs font-bold text-white shadow-sm"
+              style={{ background: brandColor }}
+            >
+              {initials(portalName)}
+            </span>
+            <span className="min-w-0">
+              <p className="truncate text-[11px] font-medium text-muted-foreground">
+                {portalName}
+              </p>
+              <h1 className="truncate text-lg font-bold tracking-tight">{title}</h1>
+              {subtitle && (
+                <p className="truncate text-xs text-muted-foreground">{subtitle}</p>
+              )}
+            </span>
           </div>
         </div>
       </div>
@@ -81,7 +92,7 @@ export function ClientPortalShell({
         className="fixed inset-x-0 bottom-0 z-50 px-3 pb-3 sm:hidden"
         style={{ paddingBottom: "max(env(safe-area-inset-bottom, 0px), 0.75rem)" }}
       >
-        <div className="mx-auto flex max-w-md items-center justify-between rounded-full border bg-background/95 p-1.5 shadow-2xl shadow-slate-900/15 backdrop-blur-md">
+        <div className="mx-auto flex max-w-md items-center justify-between rounded-[1.4rem] border bg-background/95 p-1.5 shadow-2xl shadow-slate-900/15 backdrop-blur-md">
           {navItems.map(({ key, href, icon: Icon, label }) => {
             const url = href(portalId);
             const active =
@@ -90,11 +101,12 @@ export function ClientPortalShell({
               <Link
                 key={key}
                 href={url}
-                className={`flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-full px-1.5 py-2 text-[10px] font-semibold transition ${
+                className={`flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-2xl px-1.5 py-2 text-[10px] font-semibold transition ${
                   active
-                    ? "bg-primary text-primary-foreground shadow-sm"
+                    ? "text-white shadow-sm"
                     : "text-muted-foreground hover:bg-muted hover:text-foreground"
                 }`}
+                style={active ? { background: brandColor } : undefined}
               >
                 <Icon className="h-[18px] w-[18px]" />
                 <span>{label}</span>
@@ -133,15 +145,16 @@ export function ClientPortalHome({ data }: { data: ClientPortalProps }) {
     <ClientPortalShell
       portalId={data.portalId}
       portalName={data.portalName}
+      brandColor={data.brandColor}
       title="Home"
       subtitle="Project status and next actions"
     >
       <div className="space-y-5">
         <section
-          className="overflow-hidden rounded-2xl border bg-card p-5 shadow-sm"
+          className="overflow-hidden rounded-[1.6rem] border bg-card shadow-sm"
           style={{ borderTop: `4px solid ${data.brandColor}` }}
         >
-          <div className="flex items-start justify-between gap-4">
+          <div className="flex items-start justify-between gap-4 p-5 sm:p-6">
             <div className="min-w-0">
               <p className="text-xs font-medium text-muted-foreground">Good to see you</p>
               <h2 className="mt-1 truncate text-2xl font-bold tracking-tight">
@@ -158,7 +171,7 @@ export function ClientPortalHome({ data }: { data: ClientPortalProps }) {
               {initials(data.portalName)}
             </div>
           </div>
-          <div className="mt-5 h-2 overflow-hidden rounded-full bg-muted">
+          <div className="mx-5 mb-5 h-2.5 overflow-hidden rounded-full bg-muted sm:mx-6 sm:mb-6">
             <div
               className="h-full rounded-full"
               style={{ width: `${completion}%`, background: data.brandColor }}
@@ -166,43 +179,79 @@ export function ClientPortalHome({ data }: { data: ClientPortalProps }) {
           </div>
         </section>
 
-        <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <section className="grid gap-3 md:grid-cols-2">
+          <PortalActionCard
+            icon={pendingApprovals > 0 ? CheckCircle2 : Files}
+            label={pendingApprovals > 0 ? "Review needed" : "Next delivery"}
+            title={
+              pendingApprovals > 0
+                ? `${pendingApprovals} approval${pendingApprovals > 1 ? "s" : ""} waiting`
+                : deliverable?.name ?? latestUpdate?.title ?? "Nothing pending"
+            }
+            href={
+              pendingApprovals > 0
+                ? `/portal/${data.portalId}/updates`
+                : `/portal/${data.portalId}/files`
+            }
+            color={data.brandColor}
+          />
+          <PortalActionCard
+            icon={meeting?.meet_link ? Video : Clock3}
+            label={meeting?.meet_link ? "Meeting room" : "Schedule"}
+            title={meeting?.meet_link ? "Join meeting" : meeting?.topic ?? "No meeting scheduled"}
+            href={meeting?.meet_link ?? `/portal/${data.portalId}/meetings`}
+            external={Boolean(meeting?.meet_link)}
+            color={data.brandColor}
+          />
+        </section>
+
+        <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <StatusCard
             icon={Wallet}
             label="Payments"
             title={formatPortalCurrency(currency, outstandingAmount)}
             meta={`${formatPortalCurrency(currency, paidAmount)} paid`}
+            accent="emerald"
           />
           <StatusCard
             icon={Files}
             label="Current deliverable"
             title={deliverable?.name ?? "No deliverable yet"}
             meta={deliverable ? "Ready in Files" : "Your freelancer will share it here"}
+            accent="blue"
           />
           <StatusCard
             icon={Clock3}
             label="Upcoming meeting"
             title={meeting?.proposed_time ?? "No meeting scheduled"}
             meta={meeting?.topic ?? "Meetings will appear here"}
+            accent="amber"
           />
           <StatusCard
             icon={CheckCircle2}
             label="Pending approvals"
             title={pendingApprovals > 0 ? `${pendingApprovals} waiting` : "Nothing pending"}
             meta="Review requests appear in Updates"
+            accent="rose"
           />
           <StatusCard
             icon={MessageSquare}
             label="Recent update"
             title={latestUpdate?.title ?? "No updates yet"}
             meta={latestUpdate?.body ?? "Progress notes will appear here"}
-            className="sm:col-span-2 lg:col-span-1"
+            className="sm:col-span-2 lg:col-span-4"
+            accent="slate"
           />
         </section>
 
-        <section className="rounded-2xl border bg-card p-4 shadow-sm">
-          <h2 className="text-sm font-semibold">Quick actions</h2>
-          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+        <section className="rounded-[1.35rem] border bg-card p-4 shadow-sm">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-sm font-semibold">Workspace shortcuts</h2>
+            <span className="text-[11px] font-medium text-muted-foreground">
+              Client PWA
+            </span>
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
             <ActionLink
               icon={Files}
               label="View Files"
@@ -240,6 +289,7 @@ export function ClientPortalUpdates({ data }: { data: ClientPortalProps }) {
     <ClientPortalShell
       portalId={data.portalId}
       portalName={data.portalName}
+      brandColor={data.brandColor}
       title="Updates"
       subtitle="Structured progress notes and approvals"
     >
@@ -268,6 +318,7 @@ export function ClientPortalFiles({ data }: { data: ClientPortalProps }) {
     <ClientPortalShell
       portalId={data.portalId}
       portalName={data.portalName}
+      brandColor={data.brandColor}
       title="Files"
       subtitle="Documents and delivery assets"
     >
@@ -359,6 +410,7 @@ export function ClientPortalMeetings({ data }: { data: ClientPortalProps }) {
     <ClientPortalShell
       portalId={data.portalId}
       portalName={data.portalName}
+      brandColor={data.brandColor}
       title="Meetings"
       subtitle="Calls, links, and scheduling"
     >
@@ -380,6 +432,7 @@ export function ClientPortalMore({ data }: { data: ClientPortalProps }) {
     <ClientPortalShell
       portalId={data.portalId}
       portalName={data.portalName}
+      brandColor={data.brandColor}
       title="More"
       subtitle="Portal details and messages"
     >
@@ -411,17 +464,27 @@ function StatusCard({
   title,
   meta,
   className,
+  accent = "slate",
 }: {
   icon: React.ComponentType<{ className?: string }>;
   label: string;
   title: string;
   meta: string;
   className?: string;
+  accent?: "emerald" | "blue" | "amber" | "rose" | "slate";
 }) {
+  const accents = {
+    emerald: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+    blue: "bg-blue-500/10 text-blue-700 dark:text-blue-400",
+    amber: "bg-amber-500/10 text-amber-700 dark:text-amber-400",
+    rose: "bg-rose-500/10 text-rose-700 dark:text-rose-400",
+    slate: "bg-slate-500/10 text-slate-700 dark:text-slate-300",
+  };
+
   return (
-    <div className={`rounded-2xl border bg-card p-4 shadow-sm ${className ?? ""}`}>
+    <div className={`rounded-[1.15rem] border bg-card p-4 shadow-sm ${className ?? ""}`}>
       <div className="mb-3 flex items-center gap-2 text-xs font-medium text-muted-foreground">
-        <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-muted">
+        <span className={`flex h-8 w-8 items-center justify-center rounded-xl ${accents[accent]}`}>
           <Icon className="h-4 w-4" />
         </span>
         {label}
@@ -431,6 +494,47 @@ function StatusCard({
         {meta}
       </p>
     </div>
+  );
+}
+
+function PortalActionCard({
+  icon: Icon,
+  label,
+  title,
+  href,
+  color,
+  external,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  title: string;
+  href: string;
+  color: string;
+  external?: boolean;
+}) {
+  return (
+    <Link
+      href={href}
+      target={external ? "_blank" : undefined}
+      rel={external ? "noreferrer" : undefined}
+      className="group flex items-center gap-3 rounded-[1.25rem] border bg-card p-4 shadow-sm transition hover:border-primary/40"
+    >
+      <span
+        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-white shadow-sm"
+        style={{ background: color }}
+      >
+        <Icon className="h-4 w-4" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+          {label}
+        </span>
+        <span className="mt-0.5 block truncate text-sm font-semibold">
+          {title}
+        </span>
+      </span>
+      <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground transition group-hover:translate-x-0.5 group-hover:text-foreground" />
+    </Link>
   );
 }
 

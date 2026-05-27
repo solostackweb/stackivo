@@ -87,7 +87,7 @@ export default async function PortalIndexPage() {
                   <div className="flex items-start justify-between gap-2">
                     <div
                       className="h-7 w-7 shrink-0 rounded-md"
-                      style={{ background: p.brand_color ?? "#6366F1" }}
+                      style={{ background: p.brand_color ?? "#2563EB" }}
                       aria-hidden
                     />
                     <Badge

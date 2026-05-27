@@ -82,9 +82,15 @@ export default async function PortalLayout({
   }
 
   return (
-    <div className="flex min-h-svh flex-col bg-muted/20 text-foreground">
+    <div
+      className="flex min-h-svh flex-col text-foreground"
+      style={{
+        background:
+          "linear-gradient(180deg, hsl(var(--background)), hsl(var(--muted) / 0.32))",
+      }}
+    >
       <header
-        className="sticky top-0 z-30 border-b bg-background/90 backdrop-blur-md"
+        className="sticky top-0 z-30 border-b bg-background/95 backdrop-blur-md"
         style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}
       >
         <div className="mx-auto flex h-14 max-w-5xl items-center justify-between gap-3 px-4 sm:px-6">
@@ -92,7 +98,7 @@ export default async function PortalLayout({
             href="/portal"
             className="flex min-w-0 items-center gap-2 text-sm font-semibold tracking-tight"
           >
-            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
               <Workflow className="h-4 w-4" />
             </span>
             <span className="truncate">Client Portal</span>

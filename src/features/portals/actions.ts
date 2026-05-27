@@ -110,7 +110,7 @@ export async function createPortalAction(
       owner_user_id: user.id,
       name: parsed.data.name,
       client_id: parsed.data.clientId,
-      brand_color: parsed.data.brandColor ?? "#6366F1",
+      brand_color: parsed.data.brandColor ?? "#2563EB",
     } as never)
     .select("id")
     .single();

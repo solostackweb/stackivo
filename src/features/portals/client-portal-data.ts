@@ -22,7 +22,7 @@ export async function getClientPortalProps(portalId: string): Promise<ViewProps>
   return {
     portalId,
     portalName: access.portal.name,
-    brandColor: access.portal.brand_color ?? "#6366F1",
+    brandColor: access.portal.brand_color ?? "#2563EB",
     portalStatus: access.portal.status,
     currentUserId: access.userId,
     role: access.role,

@@ -50,7 +50,7 @@ export function CreatePortalButton({
   const router = useRouter();
   const [open, setOpen] = React.useState(false);
   const [name, setName] = React.useState("");
-  const [brandColor, setBrandColor] = React.useState("#6366F1");
+  const [brandColor, setBrandColor] = React.useState("#2563EB");
   const [clientId, setClientId] = React.useState<string>("");
   const [clientDialogOpen, setClientDialogOpen] = React.useState(false);
   const [clientOptions, setClientOptions] = React.useState(() => clients);
