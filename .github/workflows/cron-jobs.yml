@@ -1,0 +1,126 @@
+name: Cron jobs
+
+# Replaces Vercel Cron (Pro-only). Calls the existing Next.js cron
+# API routes via HTTP. All endpoints are protected by the CRON_SECRET
+# env var — add it to your GitHub repo:
+#   Settings → Secrets and variables → Actions → New repository secret
+#   Name:  CRON_SECRET
+#   Value: (same value as your Vercel/production CRON_SECRET env var)
+#
+# APP_URL is also required:
+#   Name:  APP_URL
+#   Value: https://stackivo.me  (no trailing slash)
+
+on:
+  schedule:
+    # ── Daily invoice reminders ─────────────────────────────────────────
+    # Due-soon: 3:00 UTC = 8:30 AM IST — fires before the working day
+    - cron: "0 3 * * *"
+    # Overdue:  3:30 UTC = 9:00 AM IST — fires 30 min after due-soon
+    - cron: "30 3 * * *"
+    # ── Admin export ────────────────────────────────────────────────────
+    - cron: "0 * * * *"
+    # ── Operational monitor ─────────────────────────────────────────────
+    - cron: "*/15 * * * *"
+  # Allow manual trigger from the Actions tab (useful for testing)
+  workflow_dispatch:
+    inputs:
+      job:
+        description: "Which job to run"
+        required: true
+        default: "invoices-overdue"
+        type: choice
+        options:
+          - invoices-overdue
+          - invoices-due-soon
+          - admin-export
+          - monitor
+
+jobs:
+  # ── Due-soon reminder (daily at 3:00 UTC) ──────────────────────────────
+  invoices-due-soon:
+    name: Invoice due-soon reminders
+    runs-on: ubuntu-latest
+    if: >
+      github.event_name == 'workflow_dispatch' && github.event.inputs.job == 'invoices-due-soon' ||
+      github.event_name == 'schedule' && startsWith(github.event.schedule, '0 3')
+    steps:
+      - name: Ping /api/cron/invoices-due-soon
+        run: |
+          response=$(curl -sf -w "\n%{http_code}" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.APP_URL }}/api/cron/invoices-due-soon")
+          http_code=$(echo "$response" | tail -n1)
+          body=$(echo "$response" | head -n-1)
+          echo "Status: $http_code"
+          echo "Body: $body"
+          if [ "$http_code" -lt 200 ] || [ "$http_code" -ge 300 ]; then
+            echo "::error::Cron returned HTTP $http_code"
+            exit 1
+          fi
+
+  # ── Overdue reminders (daily at 3:30 UTC) ──────────────────────────────
+  invoices-overdue:
+    name: Overdue invoice reminders
+    runs-on: ubuntu-latest
+    if: >
+      github.event_name == 'workflow_dispatch' && github.event.inputs.job == 'invoices-overdue' ||
+      github.event_name == 'schedule' && startsWith(github.event.schedule, '30 3')
+    steps:
+      - name: Ping /api/cron/invoices-overdue
+        run: |
+          response=$(curl -sf -w "\n%{http_code}" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.APP_URL }}/api/cron/invoices-overdue")
+          http_code=$(echo "$response" | tail -n1)
+          body=$(echo "$response" | head -n-1)
+          echo "Status: $http_code"
+          echo "Body: $body"
+          if [ "$http_code" -lt 200 ] || [ "$http_code" -ge 300 ]; then
+            echo "::error::Cron returned HTTP $http_code"
+            exit 1
+          fi
+
+  # ── Admin export (hourly) ───────────────────────────────────────────────
+  admin-export:
+    name: Admin export
+    runs-on: ubuntu-latest
+    if: >
+      github.event_name == 'workflow_dispatch' && github.event.inputs.job == 'admin-export' ||
+      github.event_name == 'schedule' && startsWith(github.event.schedule, '0 *')
+    steps:
+      - name: Ping /api/cron/admin-export
+        run: |
+          response=$(curl -sf -w "\n%{http_code}" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.APP_URL }}/api/cron/admin-export")
+          http_code=$(echo "$response" | tail -n1)
+          body=$(echo "$response" | head -n-1)
+          echo "Status: $http_code"
+          echo "Body: $body"
+          if [ "$http_code" -lt 200 ] || [ "$http_code" -ge 300 ]; then
+            echo "::error::Cron returned HTTP $http_code"
+            exit 1
+          fi
+
+  # ── Operational monitor (every 15 min) ─────────────────────────────────
+  monitor:
+    name: Operational monitor
+    runs-on: ubuntu-latest
+    if: >
+      github.event_name == 'workflow_dispatch' && github.event.inputs.job == 'monitor' ||
+      github.event_name == 'schedule' && startsWith(github.event.schedule, '*/15')
+    steps:
+      - name: Ping /api/cron/monitor
+        run: |
+          response=$(curl -sf -w "\n%{http_code}" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.APP_URL }}/api/cron/monitor")
+          http_code=$(echo "$response" | tail -n1)
+          body=$(echo "$response" | head -n-1)
+          echo "Status: $http_code"
+          echo "Body: $body"
+          if [ "$http_code" -lt 200 ] || [ "$http_code" -ge 300 ]; then
+            echo "::error::Cron returned HTTP $http_code"
+            exit 1
+          fi
