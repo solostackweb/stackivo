@@ -16,6 +16,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { getBusinessProfile } from "@/features/onboarding/server";
+import { ReferralNudge } from "@/features/referral/components/referral-card";
 
 interface QuickAction {
   label: string;
@@ -51,7 +53,10 @@ const ACTIONS: QuickAction[] = [
   },
 ];
 
-export function QuickActions() {
+export async function QuickActions() {
+  const profile = await getBusinessProfile();
+  const referralCode = profile?.referralCode ?? null;
+
   return (
     <Card className="flex h-full flex-col border-border/60 shadow-sm shadow-primary/[0.03]">
       <CardHeader className="pb-3">
@@ -91,6 +96,13 @@ export function QuickActions() {
             );
           })}
         </ul>
+
+        {/* Referral nudge — shown when the profile has a referral code */}
+        {referralCode && (
+          <div className="mt-2 px-1 pb-1">
+            <ReferralNudge code={referralCode} />
+          </div>
+        )}
       </CardContent>
     </Card>
   );

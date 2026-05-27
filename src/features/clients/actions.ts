@@ -177,3 +177,86 @@ export async function deleteClientAction(
   revalidatePath("/dashboard/clients");
   return { ok: true, message: "Client deleted." };
 }
+
+// --- CSV bulk import -------------------------------------------------------
+
+export interface CsvClientRow {
+  fullName: string;
+  businessName?: string;
+  email?: string;
+  phone?: string;
+}
+
+export interface ImportClientsResult {
+  ok: boolean;
+  imported: number;
+  skipped: number;
+  blocked: boolean;
+  error?: string;
+}
+
+/**
+ * Bulk-imports clients from a parsed CSV row array.
+ *
+ * - Rows with no `fullName` are silently skipped.
+ * - Runs the free-plan `assertCanCreateClient` check before every
+ *   insertion and stops the batch early if the limit is reached.
+ * - Non-GST only: CSV imports never set `gst_registered = true` because
+ *   GSTIN + state validation can't be inferred from a flat CSV row.
+ * - Max 200 rows per call.
+ */
+export async function importClientsAction(
+  rows: CsvClientRow[],
+): Promise<ImportClientsResult> {
+  const userId = await requireUserId();
+  const supabase = await getServerSupabase();
+
+  const validRows = rows
+    .slice(0, 200)
+    .filter((r) => r.fullName?.trim().length > 0);
+
+  if (validRows.length === 0) {
+    return { ok: false, imported: 0, skipped: 0, blocked: false, error: "No valid rows found." };
+  }
+
+  let imported = 0;
+  let skipped = 0;
+  let blocked = false;
+
+  for (const row of validRows) {
+    // Check limit before every insert so we don't blow past the cap.
+    const limitCheck = await assertCanCreateClient();
+    if (limitCheck) {
+      blocked = true;
+      break;
+    }
+
+    const { error } = await supabase.from("clients").insert({
+      user_id: userId,
+      full_name: row.fullName.trim(),
+      business_name: row.businessName?.trim() || null,
+      email: row.email?.trim() || null,
+      phone: row.phone?.trim() || null,
+      gst_registered: false,
+      gst_number: null,
+      state_code: null,
+      billing_address: null,
+      notes: null,
+    } as never);
+
+    if (error) {
+      skipped += 1;
+    } else {
+      imported += 1;
+    }
+  }
+
+  revalidatePath("/dashboard/clients");
+
+  return {
+    ok: true,
+    imported,
+    skipped,
+    blocked,
+  };
+}

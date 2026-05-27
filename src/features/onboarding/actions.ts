@@ -15,6 +15,8 @@ import { normaliseGstin } from "@/features/gst/validation";
 import { getServerSupabase } from "@/lib/supabase/server";
 import type { OnboardingStep } from "@/lib/supabase/types";
 import { trackServerEvent } from "@/lib/analytics/server";
+import { applyPendingReferralAction } from "@/features/referral/actions";
+import { completeReferralForUser } from "@/features/referral/server";
 import { pathForStep } from "./routes";
 import {
   businessStepSchema,
@@ -153,6 +155,12 @@ export async function saveGstStep(
   // pages themselves still work. They just won't see the new short flow.
   const result = await advanceStep(userId, "done", patch);
   if (!result.ok) return result;
+
+  // Apply any pending referral code from the signup cookie, then mark
+  // this user's referral as completed so the referrer earns their reward.
+  // Both calls are fire-and-forget — a failure here must never block onboarding.
+  await applyPendingReferralAction().catch(() => null);
+  await completeReferralForUser(userId).catch(() => null);
 
   // Fire the activation event server-side so adblockers / DNT
   // visitors still count. The shortened-flow tag lets us A/B compare

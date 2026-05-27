@@ -373,27 +373,57 @@ export function renderInvoiceReminderEmail(
   input: InvoiceReminderInput,
 ): EmailRender {
   const isOverdue = input.daysOverdue > 0;
+  const isDueToday = input.daysOverdue === 0;
+  const isDueTomorrow = input.daysOverdue === -1;
+
   const overdueLine = isOverdue
     ? `Invoice ${input.invoiceNumber} is ${input.daysOverdue} day${input.daysOverdue === 1 ? "" : "s"} past due. The amount and pay link below are still valid.`
-    : `This is a friendly reminder that invoice ${input.invoiceNumber} is due ${input.dueDate}.`;
+    : isDueTomorrow
+      ? `Just a heads-up — invoice ${input.invoiceNumber} is due tomorrow (${input.dueDate}). Please arrange payment at your earliest convenience.`
+      : isDueToday
+        ? `Invoice ${input.invoiceNumber} is due today. Please arrange payment to avoid a late mark.`
+        : `This is a friendly reminder that invoice ${input.invoiceNumber} is due ${input.dueDate}.`;
 
   const paragraphs = [`Hi ${input.clientName},`, overdueLine];
   if (input.message?.trim()) paragraphs.push(input.message.trim());
 
+  const subjectLine = isOverdue
+    ? `Reminder: invoice ${input.invoiceNumber} is overdue (${input.amountFormatted})`
+    : isDueTomorrow
+      ? `Invoice ${input.invoiceNumber} is due tomorrow — ${input.amountFormatted}`
+      : isDueToday
+        ? `Invoice ${input.invoiceNumber} is due today — ${input.amountFormatted}`
+        : `Reminder: invoice ${input.invoiceNumber} (${input.amountFormatted})`;
+
+  const eyebrow = isOverdue
+    ? "Overdue invoice"
+    : isDueTomorrow || isDueToday
+      ? "Payment due soon"
+      : "Payment reminder";
+
+  const heading = isOverdue
+    ? `Invoice ${input.invoiceNumber} is overdue`
+    : isDueTomorrow
+      ? `Due tomorrow`
+      : isDueToday
+        ? `Due today`
+        : `Friendly reminder`;
+
+  const dueDateLabel = isOverdue ? "Days overdue" : "Due date";
+  const dueDateValue = isOverdue ? String(input.daysOverdue) : input.dueDate;
+
   return {
-    subject: isOverdue
-      ? `Reminder: invoice ${input.invoiceNumber} is overdue (${input.amountFormatted})`
-      : `Reminder: invoice ${input.invoiceNumber} (${input.amountFormatted})`,
+    subject: subjectLine,
     html: envelope({
-      preheader: `Reminder · invoice ${input.invoiceNumber} · ${input.amountFormatted}`,
-      eyebrow: isOverdue ? "Overdue invoice" : "Payment reminder",
-      heading: isOverdue ? `Invoice ${input.invoiceNumber} is overdue` : `Friendly reminder`,
-      subheading: `${input.amountFormatted} · originally due ${input.dueDate}`,
+      preheader: `${eyebrow} · invoice ${input.invoiceNumber} · ${input.amountFormatted}`,
+      eyebrow,
+      heading,
+      subheading: `${input.amountFormatted} · due ${input.dueDate}`,
       paragraphs,
       facts: [
         { label: "Invoice", value: input.invoiceNumber },
         { label: "Amount", value: input.amountFormatted },
-        { label: isOverdue ? "Days overdue" : "Due date", value: isOverdue ? String(input.daysOverdue) : input.dueDate },
+        { label: dueDateLabel, value: dueDateValue },
       ],
       cta: { label: "View & pay", href: input.publicUrl },
       signature: formatSenderSignature(input.senderName, input.senderEmail),

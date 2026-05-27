@@ -9,6 +9,7 @@ import {
   CreditCard,
   Monitor,
   Wallet,
+  Gift,
 } from "lucide-react";
 
 export interface SettingsNavItem {
@@ -89,6 +90,12 @@ export const SETTINGS_NAV_GROUPS: SettingsNavGroup[] = [
         label: "Appearance",
         description: "Theme & density",
         icon: Monitor,
+      },
+      {
+        href: "/dashboard/settings/referral",
+        label: "Refer & earn",
+        description: "Share Stackivo, get Pro free",
+        icon: Gift,
       },
     ],
   },

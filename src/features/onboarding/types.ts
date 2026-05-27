@@ -84,6 +84,9 @@ export interface BusinessProfile {
 
   // Free-plan enforcement
   lifetimeClientsCreated: number;
+
+  // Referral
+  referralCode: string | null;
 }
 
 export interface NotificationPreferences {
@@ -210,6 +213,7 @@ export function mapProfileRow(row: UserProfileRow): BusinessProfile {
     onboardingCompletedAt: row.onboarding_completed_at,
     onboardingStep: row.onboarding_step,
     lifetimeClientsCreated: row.lifetime_clients_created,
+    referralCode: row.referral_code ?? null,
   };
 }
 

@@ -9,11 +9,12 @@ import {
   AUTH_DEFAULT_REDIRECT,
   isClientPortalPath,
 } from "@/features/auth/routes";
+import { storeReferralCodeAction } from "@/features/referral/actions";
 
 export const metadata = { title: "Sign up" };
 
 interface PageProps {
-  searchParams: Promise<{ error?: string; next?: string }>;
+  searchParams: Promise<{ error?: string; next?: string; ref?: string }>;
 }
 
 export default async function SignupPage({ searchParams }: PageProps) {
@@ -24,6 +25,12 @@ export default async function SignupPage({ searchParams }: PageProps) {
       ? sp.next
       : undefined;
   if (user) redirect(next ?? AUTH_DEFAULT_REDIRECT);
+
+  // Persist the referral code in a cookie so it survives email verification
+  // and can be applied during onboarding.
+  if (sp.ref && /^[A-Z0-9]{6,12}$/i.test(sp.ref)) {
+    await storeReferralCodeAction(sp.ref);
+  }
 
   return (
     <AuthFormShell

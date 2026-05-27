@@ -4,6 +4,7 @@ import { ArrowRight, CheckCircle2, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getBusinessProfile } from "@/features/onboarding/server";
 import { OnboardingShell } from "@/features/onboarding/components/onboarding-shell";
+import { OnboardingCelebration } from "@/features/onboarding/components/onboarding-celebration";
 import { AUTH_LOGIN_ROUTE } from "@/features/auth/routes";
 
 export const metadata = { title: "You're all set" };
@@ -23,6 +24,7 @@ export default async function OnboardingDonePage() {
       description="Your Stackivo workspace is fully set up."
     >
       <div className="flex flex-col items-center gap-7 py-6 text-center">
+        {/* Success icon */}
         <div className="relative">
           <span
             aria-hidden
@@ -33,6 +35,7 @@ export default async function OnboardingDonePage() {
           </span>
         </div>
 
+        {/* Business summary */}
         <div className="space-y-2">
           <p className="inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-xs font-semibold text-primary">
             <Sparkles className="h-3.5 w-3.5" /> Workspace ready
@@ -47,16 +50,30 @@ export default async function OnboardingDonePage() {
           </p>
         </div>
 
+        {/* Primary CTA */}
         <Button
           asChild
           size="lg"
           className="h-11 px-6 text-sm font-semibold shadow-lg shadow-primary/20 transition-shadow hover:shadow-xl hover:shadow-primary/25"
         >
-          <Link href="/dashboard">
-            Enter your dashboard <ArrowRight className="ml-1.5 h-4 w-4" />
+          <Link href="/dashboard/invoices/new">
+            Send your first invoice <ArrowRight className="ml-1.5 h-4 w-4" />
           </Link>
         </Button>
+
+        <p className="text-xs text-muted-foreground">
+          or{" "}
+          <Link
+            href="/dashboard"
+            className="font-medium text-foreground underline underline-offset-4 hover:opacity-75"
+          >
+            explore your dashboard
+          </Link>
+        </p>
       </div>
+
+      {/* Confetti burst + quick-action cards (client component) */}
+      <OnboardingCelebration />
     </OnboardingShell>
   );
 }

@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Users } from "lucide-react";
+import { Plus, Upload, Users } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/data-table/data-table";
@@ -15,6 +15,7 @@ import { buildClientColumns } from "./clients-columns";
 import { ClientFormDialog } from "./client-form-dialog";
 import { DeleteClientDialog } from "./delete-client-dialog";
 import { ClientMobileCard } from "./client-mobile-card";
+import { CsvImportDialog } from "./csv-import-dialog";
 
 interface ClientsListViewProps {
   clients: ClientRecord[];
@@ -45,6 +46,7 @@ export function ClientsListView({ clients, autoCreate }: ClientsListViewProps) {
     null,
   );
   const [deleteOpen, setDeleteOpen] = React.useState(false);
+  const [importOpen, setImportOpen] = React.useState(false);
 
   const handleAdd = () => {
     setEditingClient(null);
@@ -81,9 +83,18 @@ export function ClientsListView({ clients, autoCreate }: ClientsListViewProps) {
             Manage your clients, contacts, and billing details.
           </p>
         </div>
-        <Button onClick={handleAdd} size="sm">
-          <Plus /> Add client
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            onClick={() => setImportOpen(true)}
+            variant="outline"
+            size="sm"
+          >
+            <Upload className="h-3.5 w-3.5" /> Import CSV
+          </Button>
+          <Button onClick={handleAdd} size="sm">
+            <Plus /> Add client
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
@@ -136,6 +147,11 @@ export function ClientsListView({ clients, autoCreate }: ClientsListViewProps) {
         open={deleteOpen}
         onOpenChange={setDeleteOpen}
         client={deletingClient}
+      />
+
+      <CsvImportDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
       />
     </div>
   );

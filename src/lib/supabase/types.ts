@@ -191,6 +191,10 @@ export interface UserProfileRow {
   razorpay_fund_account_id: string | null;
   fee_passthrough_enabled: boolean;
   fee_passthrough_percent: number | null;
+  // Referral system (added in 0035)
+  referral_code: string;
+  referred_by: string | null;
+  referral_count: number;
   created_at: string;
   updated_at: string;
 }
@@ -920,6 +924,20 @@ export interface PortalWelcomeDocumentRow {
   added_at: string;
 }
 
+// --- Referral system (0035) -------------------------------------------------
+
+export type ReferralStatus = "pending" | "completed" | "cancelled";
+
+export interface ReferralEventRow {
+  id: string;
+  referrer_id: string;
+  referred_id: string;
+  status: ReferralStatus;
+  reward_months: number;
+  created_at: string;
+  completed_at: string | null;
+}
+
 // --- `Database` shape matching what `createClient<Database>()` expects ------
 
 export interface Database {
@@ -1228,6 +1246,12 @@ export interface Database {
         Insert: Partial<PortalWelcomeDocumentRow> &
           Pick<PortalWelcomeDocumentRow, "portal_id" | "document_id">;
         Update: Partial<PortalWelcomeDocumentRow>;
+      };
+      referral_events: {
+        Row: ReferralEventRow;
+        Insert: Partial<ReferralEventRow> &
+          Pick<ReferralEventRow, "referrer_id" | "referred_id">;
+        Update: Partial<ReferralEventRow>;
       };
     };
     Views: {
