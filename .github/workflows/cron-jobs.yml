@@ -14,15 +14,15 @@ name: Cron jobs
 on:
   schedule:
     # ── Daily invoice reminders ─────────────────────────────────────────
-    # Due-soon: 3:00 UTC = 8:30 AM IST — fires before the working day
+    # Due-soon: 3:00 UTC = 8:30 AM IST
     - cron: "0 3 * * *"
-    # Overdue:  3:30 UTC = 9:00 AM IST — fires 30 min after due-soon
+    # Overdue:  3:30 UTC = 9:00 AM IST
     - cron: "30 3 * * *"
-    # ── Admin export ────────────────────────────────────────────────────
+    # ── Admin export (hourly) ───────────────────────────────────────────
     - cron: "0 * * * *"
-    # ── Operational monitor ─────────────────────────────────────────────
+    # ── Operational monitor (every 15 min) ──────────────────────────────
     - cron: "*/15 * * * *"
-  # Allow manual trigger from the Actions tab (useful for testing)
+  # Manual trigger from Actions tab
   workflow_dispatch:
     inputs:
       job:
@@ -36,91 +36,96 @@ on:
           - admin-export
           - monitor
 
+# Shared curl helper — defined once, reused by every job via env
+env:
+  BASE_URL: ${{ secrets.APP_URL }}
+  SECRET:   ${{ secrets.CRON_SECRET }}
+
 jobs:
-  # ── Due-soon reminder (daily at 3:00 UTC) ──────────────────────────────
+  # ── Due-soon reminder (daily at 3:00 UTC) ────────────────────────────────
   invoices-due-soon:
     name: Invoice due-soon reminders
     runs-on: ubuntu-latest
-    if: >
-      github.event_name == 'workflow_dispatch' && github.event.inputs.job == 'invoices-due-soon' ||
-      github.event_name == 'schedule' && startsWith(github.event.schedule, '0 3')
+    if: >-
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.job == 'invoices-due-soon') ||
+      (github.event_name == 'schedule' && github.event.schedule == '0 3 * * *')
     steps:
-      - name: Ping /api/cron/invoices-due-soon
+      - name: Call /api/cron/invoices-due-soon
         run: |
-          response=$(curl -sf -w "\n%{http_code}" \
-            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-            "${{ secrets.APP_URL }}/api/cron/invoices-due-soon")
-          http_code=$(echo "$response" | tail -n1)
-          body=$(echo "$response" | head -n-1)
-          echo "Status: $http_code"
-          echo "Body: $body"
-          if [ "$http_code" -lt 200 ] || [ "$http_code" -ge 300 ]; then
-            echo "::error::Cron returned HTTP $http_code"
+          echo "Calling: $BASE_URL/api/cron/invoices-due-soon"
+          HTTP_CODE=$(curl -s -o /tmp/body.txt -w "%{http_code}" \
+            -H "Authorization: Bearer $SECRET" \
+            "$BASE_URL/api/cron/invoices-due-soon")
+          BODY=$(cat /tmp/body.txt)
+          echo "HTTP status : $HTTP_CODE"
+          echo "Response    : $BODY"
+          if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 300 ]; then
+            echo "::error::Endpoint returned HTTP $HTTP_CODE — $BODY"
             exit 1
           fi
 
-  # ── Overdue reminders (daily at 3:30 UTC) ──────────────────────────────
+  # ── Overdue reminders (daily at 3:30 UTC) ────────────────────────────────
   invoices-overdue:
     name: Overdue invoice reminders
     runs-on: ubuntu-latest
-    if: >
-      github.event_name == 'workflow_dispatch' && github.event.inputs.job == 'invoices-overdue' ||
-      github.event_name == 'schedule' && startsWith(github.event.schedule, '30 3')
+    if: >-
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.job == 'invoices-overdue') ||
+      (github.event_name == 'schedule' && github.event.schedule == '30 3 * * *')
     steps:
-      - name: Ping /api/cron/invoices-overdue
+      - name: Call /api/cron/invoices-overdue
         run: |
-          response=$(curl -sf -w "\n%{http_code}" \
-            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-            "${{ secrets.APP_URL }}/api/cron/invoices-overdue")
-          http_code=$(echo "$response" | tail -n1)
-          body=$(echo "$response" | head -n-1)
-          echo "Status: $http_code"
-          echo "Body: $body"
-          if [ "$http_code" -lt 200 ] || [ "$http_code" -ge 300 ]; then
-            echo "::error::Cron returned HTTP $http_code"
+          echo "Calling: $BASE_URL/api/cron/invoices-overdue"
+          HTTP_CODE=$(curl -s -o /tmp/body.txt -w "%{http_code}" \
+            -H "Authorization: Bearer $SECRET" \
+            "$BASE_URL/api/cron/invoices-overdue")
+          BODY=$(cat /tmp/body.txt)
+          echo "HTTP status : $HTTP_CODE"
+          echo "Response    : $BODY"
+          if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 300 ]; then
+            echo "::error::Endpoint returned HTTP $HTTP_CODE — $BODY"
             exit 1
           fi
 
-  # ── Admin export (hourly) ───────────────────────────────────────────────
+  # ── Admin export (hourly) ─────────────────────────────────────────────────
   admin-export:
     name: Admin export
     runs-on: ubuntu-latest
-    if: >
-      github.event_name == 'workflow_dispatch' && github.event.inputs.job == 'admin-export' ||
-      github.event_name == 'schedule' && startsWith(github.event.schedule, '0 *')
+    if: >-
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.job == 'admin-export') ||
+      (github.event_name == 'schedule' && github.event.schedule == '0 * * * *')
     steps:
-      - name: Ping /api/cron/admin-export
+      - name: Call /api/cron/admin-export
         run: |
-          response=$(curl -sf -w "\n%{http_code}" \
-            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-            "${{ secrets.APP_URL }}/api/cron/admin-export")
-          http_code=$(echo "$response" | tail -n1)
-          body=$(echo "$response" | head -n-1)
-          echo "Status: $http_code"
-          echo "Body: $body"
-          if [ "$http_code" -lt 200 ] || [ "$http_code" -ge 300 ]; then
-            echo "::error::Cron returned HTTP $http_code"
+          echo "Calling: $BASE_URL/api/cron/admin-export"
+          HTTP_CODE=$(curl -s -o /tmp/body.txt -w "%{http_code}" \
+            -H "Authorization: Bearer $SECRET" \
+            "$BASE_URL/api/cron/admin-export")
+          BODY=$(cat /tmp/body.txt)
+          echo "HTTP status : $HTTP_CODE"
+          echo "Response    : $BODY"
+          if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 300 ]; then
+            echo "::error::Endpoint returned HTTP $HTTP_CODE — $BODY"
             exit 1
           fi
 
-  # ── Operational monitor (every 15 min) ─────────────────────────────────
+  # ── Operational monitor (every 15 min) ───────────────────────────────────
   monitor:
     name: Operational monitor
     runs-on: ubuntu-latest
-    if: >
-      github.event_name == 'workflow_dispatch' && github.event.inputs.job == 'monitor' ||
-      github.event_name == 'schedule' && startsWith(github.event.schedule, '*/15')
+    if: >-
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.job == 'monitor') ||
+      (github.event_name == 'schedule' && github.event.schedule == '*/15 * * * *')
     steps:
-      - name: Ping /api/cron/monitor
+      - name: Call /api/cron/monitor
         run: |
-          response=$(curl -sf -w "\n%{http_code}" \
-            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-            "${{ secrets.APP_URL }}/api/cron/monitor")
-          http_code=$(echo "$response" | tail -n1)
-          body=$(echo "$response" | head -n-1)
-          echo "Status: $http_code"
-          echo "Body: $body"
-          if [ "$http_code" -lt 200 ] || [ "$http_code" -ge 300 ]; then
-            echo "::error::Cron returned HTTP $http_code"
+          echo "Calling: $BASE_URL/api/cron/monitor"
+          HTTP_CODE=$(curl -s -o /tmp/body.txt -w "%{http_code}" \
+            -H "Authorization: Bearer $SECRET" \
+            "$BASE_URL/api/cron/monitor")
+          BODY=$(cat /tmp/body.txt)
+          echo "HTTP status : $HTTP_CODE"
+          echo "Response    : $BODY"
+          if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 300 ]; then
+            echo "::error::Endpoint returned HTTP $HTTP_CODE — $BODY"
             exit 1
           fi
