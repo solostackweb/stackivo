@@ -34,6 +34,8 @@ import {
   LifeBuoy,
   Mail,
   Menu,
+  PanelLeftClose,
+  PanelLeftOpen,
   Search,
   Settings,
   Shield,
@@ -44,6 +46,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/shared/theme-toggle";
 import {
   CommandPalette,
   useCommandPaletteShortcut,
@@ -106,9 +109,26 @@ const NAV_GROUPS: NavGroup[] = [
 export function AdminShell({ children, adminEmail, viewingAs }: AdminShellProps) {
   const pathname = usePathname() ?? "";
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = React.useState(false);
   const [paletteOpen, setPaletteOpen] = React.useState(false);
 
   useCommandPaletteShortcut(setPaletteOpen);
+
+  React.useEffect(() => {
+    const stored = window.localStorage.getItem("stackivo:admin-sidebar");
+    if (stored === "collapsed") setSidebarCollapsed(true);
+  }, []);
+
+  const toggleSidebarCollapsed = React.useCallback(() => {
+    setSidebarCollapsed((value) => {
+      const next = !value;
+      window.localStorage.setItem(
+        "stackivo:admin-sidebar",
+        next ? "collapsed" : "expanded",
+      );
+      return next;
+    });
+  }, []);
 
   // Close the mobile sidebar + palette on navigation.
   React.useEffect(() => {
@@ -123,12 +143,18 @@ export function AdminShell({ children, adminEmail, viewingAs }: AdminShellProps)
       <TopBar
         adminEmail={adminEmail}
         onToggleSidebar={() => setSidebarOpen((o) => !o)}
+        onToggleCollapsed={toggleSidebarCollapsed}
         sidebarOpen={sidebarOpen}
+        sidebarCollapsed={sidebarCollapsed}
         onOpenPalette={() => setPaletteOpen(true)}
       />
 
-      <div className="flex flex-1">
-        <Sidebar pathname={pathname} mobileOpen={sidebarOpen} />
+      <div className="flex flex-1 bg-muted/20 dark:bg-background">
+        <Sidebar
+          pathname={pathname}
+          mobileOpen={sidebarOpen}
+          collapsed={sidebarCollapsed}
+        />
 
         {/* Mobile backdrop */}
         {sidebarOpen ? (
@@ -140,8 +166,8 @@ export function AdminShell({ children, adminEmail, viewingAs }: AdminShellProps)
           />
         ) : null}
 
-        <main className="flex-1 px-4 py-5 sm:px-6 md:px-8 max-w-[1440px] mx-auto w-full">
-          {children}
+        <main className="min-w-0 flex-1 px-4 py-6 sm:px-6 md:px-8">
+          <div className="mx-auto w-full max-w-[1520px]">{children}</div>
         </main>
       </div>
 
@@ -165,17 +191,21 @@ export function AdminShell({ children, adminEmail, viewingAs }: AdminShellProps)
 function TopBar({
   adminEmail,
   sidebarOpen,
+  sidebarCollapsed,
   onToggleSidebar,
+  onToggleCollapsed,
   onOpenPalette,
 }: {
   adminEmail: string;
   sidebarOpen: boolean;
+  sidebarCollapsed: boolean;
   onToggleSidebar: () => void;
+  onToggleCollapsed: () => void;
   onOpenPalette: () => void;
 }) {
   return (
-    <header className="sticky top-0 z-40 border-b border-border/60 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/70">
-      <div className="flex h-14 items-center gap-3 px-4 sm:px-6 md:px-8 max-w-[1440px] mx-auto w-full">
+    <header className="sticky top-0 z-40 border-b border-border/70 bg-background/95 shadow-sm shadow-black/[0.02] backdrop-blur supports-[backdrop-filter]:bg-background/80">
+      <div className="flex h-14 items-center gap-3 px-4 sm:px-6 md:px-8">
         <Button
           variant="ghost"
           size="icon"
@@ -184,6 +214,19 @@ function TopBar({
           onClick={onToggleSidebar}
         >
           {sidebarOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="hidden h-8 w-8 md:inline-flex"
+          aria-label={sidebarCollapsed ? "Expand navigation" : "Collapse navigation"}
+          onClick={onToggleCollapsed}
+        >
+          {sidebarCollapsed ? (
+            <PanelLeftOpen className="h-4 w-4" />
+          ) : (
+            <PanelLeftClose className="h-4 w-4" />
+          )}
         </Button>
 
         <Link
@@ -203,7 +246,7 @@ function TopBar({
 
         <button
           type="button"
-          className="ml-2 hidden h-8 flex-1 max-w-md items-center gap-2 rounded-md border bg-muted/40 px-2.5 text-xs text-muted-foreground hover:bg-muted sm:flex"
+          className="ml-2 hidden h-8 flex-1 max-w-xl items-center gap-2 rounded-md border bg-muted/45 px-2.5 text-xs text-muted-foreground shadow-inner shadow-black/[0.02] hover:bg-muted sm:flex"
           onClick={onOpenPalette}
         >
           <Search className="h-3.5 w-3.5" />
@@ -214,6 +257,7 @@ function TopBar({
         </button>
 
         <div className="ml-auto flex items-center gap-3">
+          <ThemeToggle />
           <Link
             href="/dashboard"
             className="hidden items-center gap-1 text-xs text-muted-foreground hover:text-foreground sm:inline-flex"
@@ -235,21 +279,29 @@ function TopBar({
 function Sidebar({
   pathname,
   mobileOpen,
+  collapsed,
 }: {
   pathname: string;
   mobileOpen: boolean;
+  collapsed: boolean;
 }) {
   return (
     <aside
       className={cn(
-        "fixed inset-y-0 left-0 z-40 mt-14 w-60 shrink-0 transform border-r border-border/60 bg-sidebar/70 backdrop-blur transition-transform md:relative md:mt-0 md:translate-x-0",
+        "fixed inset-y-0 left-0 z-40 mt-14 shrink-0 transform border-r border-border/70 bg-sidebar/95 shadow-xl shadow-black/5 backdrop-blur transition-[width,transform] md:sticky md:top-14 md:z-20 md:mt-0 md:h-[calc(100vh-3.5rem)] md:translate-x-0 md:shadow-none",
+        collapsed ? "w-[4.25rem]" : "w-72 md:w-64",
         mobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0",
       )}
     >
-      <nav className="flex flex-col gap-3 p-3">
+      <nav className="flex h-full flex-col gap-3 overflow-y-auto p-3 scrollbar-thin">
         {NAV_GROUPS.map((group) => (
           <div key={group.heading} className="flex flex-col gap-0.5">
-            <div className="px-1 pb-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">
+            <div
+              className={cn(
+                "px-1 pb-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60",
+                collapsed && "sr-only",
+              )}
+            >
               {group.heading}
             </div>
             {group.items.map((item) => {
@@ -263,21 +315,39 @@ function Sidebar({
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    "flex items-center gap-2 rounded-md px-2.5 py-1.5 text-sm transition-colors",
+                    "flex h-9 items-center gap-2 rounded-md px-2.5 text-sm transition-colors",
                     active
                       ? "bg-primary/10 text-primary font-medium ring-1 ring-primary/15"
                       : "text-muted-foreground hover:bg-accent/70 hover:text-foreground",
+                    collapsed && "justify-center px-0",
                   )}
+                  title={collapsed ? item.label : undefined}
                 >
                   <Icon className="h-3.5 w-3.5" />
-                  {item.label}
+                  <span className={cn(collapsed && "sr-only")}>
+                    {item.label}
+                  </span>
                 </Link>
               );
             })}
           </div>
         ))}
+        <div className="mt-auto" />
+        <div
+          className={cn(
+            "rounded-md border border-border/70 bg-background/50 px-3 py-2 text-[11px] text-muted-foreground",
+            collapsed && "hidden",
+          )}
+        >
+          Command shell for support, billing, growth, and incidents.
+        </div>
       </nav>
-      <div className="border-t border-border/60 px-3 py-3 text-[11px] text-muted-foreground">
+      <div
+        className={cn(
+          "border-t border-border/60 px-3 py-3 text-[11px] text-muted-foreground",
+          collapsed && "hidden",
+        )}
+      >
         ⌘K to search
       </div>
     </aside>
