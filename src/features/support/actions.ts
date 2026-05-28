@@ -26,7 +26,12 @@ import { sendEmail } from "@/features/email/service";
 import { log } from "@/lib/logger";
 import { requireAdmin } from "@/features/admin/server";
 import { createZohoTicket, isZohoConfigured } from "./zoho-client";
-import { sendCrispMessage, updateCrispState } from "./crisp-client";
+import {
+  listCrispConversations,
+  sendCrispMessage,
+  updateCrispState,
+} from "./crisp-client";
+import { upsertSupportThread } from "./webhooks";
 import type { BugReportInput, BugReportResult, SupportCategory, SupportStatus, SupportPriority } from "./types";
 
 const bugReportSchema = z.object({
@@ -195,8 +200,9 @@ export async function submitBugReportAction(
 // Admin-only thread management actions
 // ---------------------------------------------------------------------------
 
-export interface AdminActionResult {
+export interface AdminActionResult<T = undefined> {
   ok: boolean;
+  data?: T;
   error?: string;
 }
 
@@ -366,6 +372,63 @@ export async function sendThreadReplyAction(
 
   revalidatePath(`/admin/support/${threadId}`);
   return { ok: true };
+}
+
+export async function syncCrispConversationsAction(): Promise<
+  AdminActionResult<{ count: number }>
+> {
+  await requireAdmin();
+
+  const conversations = await listCrispConversations({
+    pageNumber: 1,
+    filterResolved: false,
+  });
+
+  if (conversations.length === 0) {
+    return {
+      ok: false,
+      error:
+        "No Crisp conversations returned. Check CRISP_API_IDENTIFIER, CRISP_API_KEY, and NEXT_PUBLIC_CRISP_WEBSITE_ID.",
+    };
+  }
+
+  let count = 0;
+  for (const conversation of conversations) {
+    const stateMap: Record<string, SupportStatus> = {
+      pending: "new",
+      unresolved: "open",
+      resolved: "resolved",
+    };
+    const subject =
+      conversation.meta?.subject ??
+      conversation.last_message?.content?.slice(0, 200) ??
+      conversation.meta?.email ??
+      conversation.meta?.nickname ??
+      "Crisp conversation";
+    const lastMessageAt =
+      conversation.last_message?.timestamp ??
+      conversation.updated_at ??
+      conversation.created_at;
+
+    const result = await upsertSupportThread({
+      externalSystem: "crisp",
+      externalId: conversation.session_id,
+      subject,
+      status: stateMap[conversation.state] ?? "open",
+      priority:
+        conversation.unread?.operator && conversation.unread.operator > 0
+          ? "high"
+          : "normal",
+      contactEmail: conversation.meta?.email ?? null,
+      externalUrl: `https://app.crisp.chat/website/${process.env.NEXT_PUBLIC_CRISP_WEBSITE_ID}/inbox/${conversation.session_id}/`,
+      lastMessageAt: new Date(lastMessageAt).toISOString(),
+    });
+
+    if (result.ok) count += 1;
+  }
+
+  revalidatePath("/admin/support");
+  return { ok: true, data: { count } };
 }
 
 // ---------------------------------------------------------------------------

@@ -324,6 +324,11 @@ export interface CrispConversationListItem {
   last_message?: { content?: string; timestamp?: number };
 }
 
+function normaliseCrispMs(value: number | undefined): number | null {
+  if (!value || !Number.isFinite(value)) return null;
+  return value < 10_000_000_000 ? value * 1000 : value;
+}
+
 /**
  * List conversations for the website, newest-first.
  * Used to seed/sync the support inbox when webhooks are missed.
@@ -336,15 +341,16 @@ export async function listCrispConversations(opts: {
   if (!cfg) return [];
 
   const params = new URLSearchParams({
-    page_number: String(opts.pageNumber ?? 1),
+    per_page: "50",
   });
   if (opts.filterResolved === false) {
-    params.set("filter_resolved", "0");
+    params.set("filter_not_resolved", "1");
   }
 
   try {
+    const pageNumber = opts.pageNumber ?? 1;
     const res = await fetch(
-      `${CRISP_API_BASE}/website/${cfg.websiteId}/conversations/1?${params}`,
+      `${CRISP_API_BASE}/website/${cfg.websiteId}/conversations/${pageNumber}?${params}`,
       {
         method: "GET",
         headers: {
@@ -356,7 +362,25 @@ export async function listCrispConversations(opts: {
     );
     if (!res.ok) return [];
     const data = (await res.json()) as { data?: CrispConversationListItem[] };
-    return data.data ?? [];
+    return (data.data ?? []).map((conversation) => {
+      const updatedAt = normaliseCrispMs(conversation.updated_at);
+      const createdAt = normaliseCrispMs(conversation.created_at);
+      const lastMessageAt = normaliseCrispMs(
+        conversation.last_message?.timestamp,
+      );
+
+      return {
+        ...conversation,
+        updated_at: updatedAt ?? createdAt ?? Date.now(),
+        created_at: createdAt ?? updatedAt ?? Date.now(),
+        last_message: conversation.last_message
+          ? {
+              ...conversation.last_message,
+              timestamp: lastMessageAt ?? updatedAt ?? createdAt ?? Date.now(),
+            }
+          : conversation.last_message,
+      };
+    });
   } catch (err) {
     log.warn("crisp.api.list_conversations_failed", {
       error: err instanceof Error ? err.message : String(err),

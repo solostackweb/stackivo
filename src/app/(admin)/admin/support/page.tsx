@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { getAdminSupabase } from "@/lib/supabase/admin";
 import { AdminPageHeader } from "@/components/admin/page-header";
+import { CrispSyncButton } from "@/components/admin/crisp-sync-button";
 import { listSupportThreads, getSupportPulse } from "@/features/support/admin-queries";
 import { formatRelative, formatIstStamp } from "@/features/admin/format";
 import { cn } from "@/lib/utils";
@@ -97,6 +98,7 @@ export default async function AdminSupportPage({ searchParams }: Props) {
     <div className="space-y-5">
       <AdminPageHeader
         title="Support"
+        actions={<CrispSyncButton />}
         subtitle="Unified inbox — Crisp chats · delivery failures"
       />
 

@@ -13,7 +13,7 @@
  *   4. Upsert metadata into public.support_threads.
  *
  * Events we handle:
- *   - message:send / message:received  → thread bumped to "open"
+ *   - message:send / message:sent / message:received -> thread bumped to "open"
  *   - session:set_state                → resolved/closed → status update
  *   - session:set_email                → re-link to a user
  *
@@ -158,6 +158,27 @@ export async function POST(req: Request): Promise<Response> {
   }
 }
 
-export async function GET(): Promise<Response> {
-  return new NextResponse("Method not allowed", { status: 405 });
+export async function GET(req: Request): Promise<Response> {
+  const env = requireServerEnv();
+  if (!env.crispWebhookSecret) {
+    return NextResponse.json(
+      { ok: false, configured: false, error: "CRISP_WEBHOOK_SECRET missing" },
+      { status: 404 },
+    );
+  }
+
+  const url = new URL(req.url);
+  const token = url.searchParams.get("token") ?? "";
+  if (!token || !timingSafeEqual(token, env.crispWebhookSecret)) {
+    return NextResponse.json(
+      { ok: false, configured: true, error: "Bad webhook token" },
+      { status: 401 },
+    );
+  }
+
+  return NextResponse.json({
+    ok: true,
+    configured: true,
+    websiteIdConfigured: Boolean(publicEnv.crispWebsiteId),
+  });
 }
