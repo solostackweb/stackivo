@@ -34,6 +34,7 @@ interface CrispEnvelope {
   event: string;
   website_id?: string;
   data?: {
+    website_id?: string;
     session_id?: string;
     user?: { user_id?: string; nickname?: string; email?: string };
     fingerprint?: string | number;
@@ -45,6 +46,35 @@ interface CrispEnvelope {
     routing?: unknown;
   };
   timestamp?: number;
+}
+
+function normaliseCrispTimestamp(value: number | undefined): string | null {
+  if (!value || !Number.isFinite(value)) return null;
+  const ms = value < 10_000_000_000 ? value * 1000 : value;
+  return new Date(ms).toISOString();
+}
+
+function contentToSubject(
+  content: NonNullable<CrispEnvelope["data"]>["content"],
+): string | null {
+  if (!content) return null;
+  if (typeof content === "string") return content.slice(0, 200);
+  if ("text" in content && typeof content.text === "string") {
+    return content.text.slice(0, 200);
+  }
+  if ("name" in content && typeof content.name === "string") {
+    return content.name.slice(0, 200);
+  }
+  return null;
+}
+
+function ackUpsertFailure(event: string, sessionId: string, error?: string) {
+  log.warn("crisp.webhook.upsert_failed", { event, sessionId, error });
+  return NextResponse.json({
+    ok: false,
+    accepted: true,
+    error: "support_thread_upsert_failed",
+  });
 }
 
 function timingSafeEqual(a: string, b: string): boolean {
@@ -92,7 +122,7 @@ export async function POST(req: Request): Promise<Response> {
     return NextResponse.json({ ok: true, ignored: "no session_id" });
   }
 
-  const websiteId = payload.website_id ?? "";
+  const websiteId = payload.website_id ?? payload.data?.website_id ?? "";
   const externalUrl = websiteId
     ? `https://app.crisp.chat/website/${websiteId}/inbox/${sessionId}/`
     : null;
@@ -100,28 +130,26 @@ export async function POST(req: Request): Promise<Response> {
   switch (payload.event) {
     case "message:send":
     case "message:sent":
-    case "message:received": {
+    case "message:received":
+    case "message:updated":
+    case "session:request:initiated": {
       const subject =
-        typeof payload.data?.content === "string"
-          ? payload.data.content.slice(0, 200)
-          : null;
+        contentToSubject(payload.data?.content) ??
+        payload.data?.user?.email ??
+        payload.data?.user?.nickname ??
+        "Crisp conversation";
       const result = await upsertSupportThread({
         externalSystem: "crisp",
         externalId: sessionId,
         subject,
         status: "open",
         priority: "normal",
-        contactEmail: payload.data?.user?.email ?? null,
+        contactEmail: payload.data?.user?.email ?? payload.data?.email ?? null,
         externalUrl,
-        lastMessageAt: payload.timestamp
-          ? new Date(payload.timestamp).toISOString()
-          : null,
+        lastMessageAt: normaliseCrispTimestamp(payload.timestamp),
       });
       if (!result.ok) {
-        return NextResponse.json(
-          { ok: false, error: result.error },
-          { status: 500 },
-        );
+        return ackUpsertFailure(payload.event, sessionId, result.error);
       }
       return NextResponse.json({ ok: true, id: result.id });
     }
@@ -145,10 +173,7 @@ export async function POST(req: Request): Promise<Response> {
         externalUrl,
       });
       if (!result.ok) {
-        return NextResponse.json(
-          { ok: false, error: result.error },
-          { status: 500 },
-        );
+        return ackUpsertFailure(payload.event, sessionId, result.error);
       }
       return NextResponse.json({ ok: true });
     }
@@ -182,4 +207,13 @@ export async function GET(req: Request): Promise<Response> {
     configured: true,
     websiteIdConfigured: Boolean(publicEnv.crispWebsiteId),
   });
+}
+
+export async function HEAD(req: Request): Promise<Response> {
+  const res = await GET(req);
+  return new Response(null, { status: res.status, headers: res.headers });
+}
+
+export async function OPTIONS(): Promise<Response> {
+  return new Response(null, { status: 204 });
 }
