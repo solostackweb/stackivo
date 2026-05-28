@@ -50,6 +50,7 @@ const FREE_MODULES: ModuleKey[] = [
   "clients",
   "projects",
   "invoices",
+  "contracts",
   "time",
   "pulse",
   "notifications",

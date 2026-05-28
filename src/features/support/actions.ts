@@ -58,6 +58,17 @@ const ZOHO_PRIORITY: Record<SupportCategory, "Low" | "Medium" | "High"> = {
   "feature-request": "Low",
 };
 
+function zohoToPriority(p: "Low" | "Medium" | "High"): SupportPriority {
+  switch (p) {
+    case "High":
+      return "high";
+    case "Medium":
+      return "normal";
+    default:
+      return "low";
+  }
+}
+
 const ZOHO_CATEGORY: Record<SupportCategory, string> = {
   billing: "Billing",
   bug: "Issue",
@@ -142,6 +153,25 @@ export async function submitBugReportAction(
         category: data.category,
         user_id: userId,
       });
+      // Mirror into support_threads so /admin/support shows this request.
+      await upsertSupportThread({
+        externalSystem: "zoho_desk",
+        externalId: res.ticketId ?? `zoho-${Date.now()}`,
+        subject,
+        status: "new",
+        priority: zohoToPriority(ZOHO_PRIORITY[data.category]),
+        category: data.category,
+        tags,
+        contactEmail: email,
+        externalUrl: res.ticketId
+          ? `https://desk.zoho.in/support/stackivo/ShowHomePage.do#Cases/dv/${res.ticketId}`
+          : null,
+        lastMessageAt: new Date().toISOString(),
+      }).catch((err) =>
+        log.warn("support.bug_report.thread_upsert_failed", {
+          error: err instanceof Error ? err.message : String(err),
+        }),
+      );
       return { ok: true, via: "zoho_desk", ticket_id: res.ticketId };
     }
     log.warn("support.bug_report.zoho_failed_fallback_email", {
@@ -187,6 +217,22 @@ export async function submitBugReportAction(
       category: data.category,
       user_id: userId,
     });
+    // Mirror into support_threads so /admin/support shows this request.
+    await upsertSupportThread({
+      externalSystem: "email",
+      externalId: `email-${Date.now()}-${email.replace(/[^a-z0-9]/gi, "_").slice(0, 40)}`,
+      subject,
+      status: "new",
+      priority: zohoToPriority(ZOHO_PRIORITY[data.category]),
+      category: data.category,
+      tags,
+      contactEmail: email,
+      lastMessageAt: new Date().toISOString(),
+    }).catch((err) =>
+      log.warn("support.bug_report.thread_upsert_failed", {
+        error: err instanceof Error ? err.message : String(err),
+      }),
+    );
     return { ok: true, via: "email_fallback" };
   } catch (err) {
     log.error("support.bug_report.email_failed", {

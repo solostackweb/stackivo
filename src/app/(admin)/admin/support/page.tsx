@@ -176,6 +176,10 @@ export default async function AdminSupportPage({ searchParams }: Props) {
                         <div className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-500/10">
                           <MessageCircle className="h-3.5 w-3.5 text-emerald-600" />
                         </div>
+                      ) : t.external_system === "email" ? (
+                        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-violet-500/10">
+                          <Mail className="h-3.5 w-3.5 text-violet-600" />
+                        </div>
                       ) : (
                         <div className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-500/10">
                           <Ticket className="h-3.5 w-3.5 text-blue-600" />

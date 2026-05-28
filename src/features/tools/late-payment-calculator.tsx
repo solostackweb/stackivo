@@ -23,6 +23,7 @@
  */
 
 import * as React from "react";
+import { ToolInlineCta } from "./tool-page";
 
 type Mode = "simple" | "compound";
 
@@ -210,7 +211,12 @@ export function LatePaymentCalculator() {
           />
         </dl>
 
-        <div className="mt-6 rounded-lg border bg-amber-500/5 p-4 text-xs leading-relaxed">
+        <ToolInlineCta
+          resultLine={`Total owed ₹${formatINR(result.totalOwed)}`}
+          ctaText="send an overdue reminder invoice with this figure"
+        />
+
+        <div className="mt-4 rounded-lg border bg-amber-500/5 p-4 text-xs leading-relaxed">
           <p className="font-medium text-foreground">How to actually claim this</p>
           <ol className="mt-1.5 list-decimal space-y-1 pl-4 text-muted-foreground">
             <li>

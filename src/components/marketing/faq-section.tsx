@@ -15,11 +15,11 @@ export interface FaqItem {
 const DEFAULT_FAQS: FaqItem[] = [
   {
     q: "Is Stackivo really free?",
-    a: "Yes — the Free plan gives you full platform access (invoices, projects, contracts, time, Pulse) and is capped only at 5 lifetime clients. No card required.",
+    a: "Yes. The Free plan is free forever for your first 5 lifetime clients and includes clients, projects, GST-ready invoices, contracts, time tracking, basic Pulse, and notifications. No card required.",
   },
   {
     q: "Do I need to be GST-registered to use Stackivo?",
-    a: "No. Stackivo works for non-GST freelancers too — your invoices are issued as standard non-GST invoices with the right footer note. When you do register, just toggle on GST mode and we handle CGST / SGST / IGST automatically.",
+    a: "No. Stackivo works for non-GST freelancers too - your invoices are issued as standard non-GST invoices with the right footer note. When you do register, just toggle on GST mode and we handle CGST / SGST / IGST automatically.",
   },
   {
     q: "Can I track time and bill from it?",
@@ -27,15 +27,15 @@ const DEFAULT_FAQS: FaqItem[] = [
   },
   {
     q: "What about contracts?",
-    a: "Draft proposals and contracts inside Stackivo, share a public signing link, and watch the status timeline (sent → viewed → signed). E-signature provider integration is coming next.",
+    a: "Yes. Draft proposals and contracts inside Stackivo, share a public signing link, and watch the status timeline from sent to signed.",
   },
   {
     q: "Will my data be safe?",
-    a: "Every workspace is isolated by Supabase row-level security — no other user can ever read your data. Daily backups are part of the platform.",
+    a: "Every workspace is isolated by Supabase row-level security - no other user can ever read your data. Daily backups are part of the platform.",
   },
   {
     q: "Can I upgrade or downgrade later?",
-    a: "Yes — pricing is monthly or yearly, and you can switch plans at any time. Your data is always portable.",
+    a: "Yes. Pricing is monthly or yearly, and you can switch plans at any time. Your data is always portable.",
   },
 ];
 
@@ -55,6 +55,7 @@ export function FaqSection({
   const faqs = items ?? DEFAULT_FAQS;
   const [open, setOpen] = React.useState<number | null>(0);
   const track = useTrack();
+
   const handleToggle = (i: number) => {
     const willOpen = open !== i;
     setOpen(willOpen ? i : null);
@@ -65,6 +66,7 @@ export function FaqSection({
       });
     }
   };
+
   return (
     <Section id={id}>
       <Reveal>

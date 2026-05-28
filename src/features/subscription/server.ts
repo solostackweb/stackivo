@@ -172,7 +172,23 @@ export async function canUseFeature(feature: FeatureKey): Promise<boolean> {
 
 export async function canAccessModule(module: ModuleKey): Promise<boolean> {
   const sub = await getCurrentSubscription();
+  if (paywallsDisabled()) return true;
   return hasModule(sub, module);
+}
+
+export async function requireModule(
+  module: ModuleKey,
+  redirectTo?: string,
+): Promise<CurrentSubscription> {
+  const sub = await getCurrentSubscription();
+  if (!sub) redirect(AUTH_LOGIN_ROUTE);
+  if (paywallsDisabled()) return sub;
+  if (hasModule(sub, module)) return sub;
+
+  const fallback = `/dashboard/settings/billing?module=${encodeURIComponent(
+    module,
+  )}`;
+  redirect(redirectTo ?? fallback);
 }
 
 /**

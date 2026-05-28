@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, Sparkles } from "lucide-react";
+import { ArrowRight, Sparkles, Zap } from "lucide-react";
 import { Section } from "@/components/marketing/section";
 import { Reveal } from "@/components/marketing/motion";
 import { Button } from "@/components/ui/button";
@@ -110,5 +110,44 @@ export function ToolFooter({
         </Reveal>
       </Section>
     </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Inline result CTA — rendered inside the calculator itself after a result
+// is computed. Client-compatible (no server imports).
+// ---------------------------------------------------------------------------
+
+/**
+ * A compact action strip shown immediately after the calculator result.
+ * `resultLine` should be the key number from the calculation, e.g.
+ * "Total invoice: ₹11,800" — it appears in the CTA copy to make it
+ * feel contextual and immediate.
+ */
+export function ToolInlineCta({
+  resultLine,
+  ctaText,
+  href = "/signup",
+}: {
+  resultLine: string;
+  ctaText: string;
+  href?: string;
+}) {
+  return (
+    <div className="mt-5 flex flex-col gap-3 rounded-xl border border-primary/20 bg-primary/[0.04] p-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex items-center gap-2.5">
+        <Zap className="h-4 w-4 shrink-0 text-primary" aria-hidden />
+        <p className="text-sm text-muted-foreground">
+          <span className="font-semibold text-foreground">{resultLine}</span>
+          {" — "}
+          {ctaText}
+        </p>
+      </div>
+      <Button asChild size="sm" className="shrink-0 gap-1.5 whitespace-nowrap">
+        <Link href={href}>
+          Send invoice free <ArrowRight className="h-3.5 w-3.5" />
+        </Link>
+      </Button>
+    </div>
   );
 }

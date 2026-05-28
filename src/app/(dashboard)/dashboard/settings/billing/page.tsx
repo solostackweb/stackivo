@@ -1,4 +1,6 @@
 import * as React from "react";
+import { ArrowRight, Check, Users, FileText, Palette, BarChart2 } from "lucide-react";
+import Link from "next/link";
 import {
   SettingsPageHeader,
   SettingsSection,
@@ -89,16 +91,11 @@ export default async function BillingSettingsPage({
       <PaymentMethodCard subscription={subscription} payments={payments} />
 
       {(params.upgrade || params.limit) && (
-        <div className="rounded-md border border-primary/30 bg-primary/5 p-4 text-sm">
-          <p className="font-medium text-primary">
-            {params.limit
-              ? `You've hit a ${humaniseMetric(params.limit)} limit on your current plan.`
-              : `You need ${formatPlanName(params.plan)} to use ${humaniseFeature(params.upgrade!)}.`}
-          </p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Upgrade below to unlock it instantly. Your existing data is preserved.
-          </p>
-        </div>
+        <UpgradeInterstitial
+          limitHit={params.limit}
+          featureNeeded={params.upgrade}
+          planNeeded={params.plan}
+        />
       )}
 
       <SettingsSection
@@ -108,15 +105,17 @@ export default async function BillingSettingsPage({
         <UsageGrid snapshots={usage} />
       </SettingsSection>
 
-      <SettingsSection
-        title="Plan management"
-        description="Upgrade, renew, downgrade, or move back to Free from inside Stackivo. Razorpay only processes the payment."
-      >
-        <PlanPicker
-          currentPlan={subscription?.plan ?? "free"}
-          currentCycle={subscription?.billingCycle ?? "monthly"}
-        />
-      </SettingsSection>
+      <div id="plan-management" className="scroll-mt-20">
+        <SettingsSection
+          title="Plan management"
+          description="Upgrade, renew, downgrade, or move back to Free from inside Stackivo. Razorpay only processes the payment."
+        >
+          <PlanPicker
+            currentPlan={subscription?.plan ?? "free"}
+            currentCycle={subscription?.billingCycle ?? "monthly"}
+          />
+        </SettingsSection>
+      </div>
 
       <SettingsSection
         title="Invoices & receipts"
@@ -125,6 +124,94 @@ export default async function BillingSettingsPage({
         <PaymentHistory payments={payments} />
       </SettingsSection>
     </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Warm upgrade interstitial — shown when user hits a plan limit
+// ---------------------------------------------------------------------------
+
+const PRO_BENEFITS = [
+  { icon: Users, text: "Unlimited clients — no ceiling, ever" },
+  { icon: FileText, text: "Contracts + e-signature in one click" },
+  { icon: Palette, text: "Your logo, your branding — remove Stackivo watermark" },
+  { icon: BarChart2, text: "Pulse GST reports + full analytics" },
+];
+
+function UpgradeInterstitial({
+  limitHit,
+  featureNeeded,
+  planNeeded,
+}: {
+  limitHit?: string;
+  featureNeeded?: string;
+  planNeeded?: string;
+}) {
+  const isClientLimit = limitHit === "clients_created";
+
+  const headline = isClientLimit
+    ? "You've hit 5 clients — your business is growing."
+    : featureNeeded
+      ? `${humaniseFeature(featureNeeded ?? "")} is a Pro feature.`
+      : "Ready to grow beyond the free plan?";
+
+  const subtext = isClientLimit
+    ? "The free plan holds your first 5 clients. Freelancers earning ₹5L+ / year use Pro to manage unlimited clients, send contracts, and brand their workspace — for less than a client dinner."
+    : `Upgrade to ${formatPlanName(planNeeded)} to unlock this and everything else Pro includes.`;
+
+  return (
+    <div className="overflow-hidden rounded-xl border border-primary/30 bg-gradient-to-br from-primary/[0.06] via-background to-violet-500/[0.04]">
+      {/* Header */}
+      <div className="border-b border-primary/15 px-6 py-5">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-widest text-primary">
+              Upgrade to Pro
+            </p>
+            <h2 className="mt-1 text-lg font-semibold tracking-tight">
+              {headline}
+            </h2>
+            <p className="mt-1.5 max-w-xl text-sm text-muted-foreground leading-relaxed">
+              {subtext}
+            </p>
+          </div>
+          <div className="shrink-0 text-right">
+            <p className="text-2xl font-bold tabular-nums">₹499</p>
+            <p className="text-xs text-muted-foreground">per month</p>
+            <p className="mt-0.5 text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
+              or ₹399/mo billed yearly
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Benefits */}
+      <div className="px-6 py-4">
+        <ul className="grid gap-2 sm:grid-cols-2">
+          {PRO_BENEFITS.map(({ icon: Icon, text }) => (
+            <li key={text} className="flex items-center gap-2.5 text-sm">
+              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10">
+                <Check className="h-3 w-3 text-primary" />
+              </span>
+              <span className="text-muted-foreground">{text}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      {/* CTA */}
+      <div className="flex flex-col gap-2 border-t border-primary/15 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-xs text-muted-foreground">
+          Cancel anytime · existing data always preserved · instant activation
+        </p>
+        <Link
+          href="#plan-management"
+          className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-md shadow-primary/20 transition hover:bg-primary/90"
+        >
+          Upgrade to Pro now <ArrowRight className="h-4 w-4" />
+        </Link>
+      </div>
+    </div>
   );
 }
 

@@ -2,34 +2,22 @@
  * /admin/analytics — embedded PostHog dashboard.
  *
  * Per the audit: don't rebuild what PostHog already does. We just
- * iframe the public dashboard URL the admin saved in
- * `platform_settings.posthog_dashboard_url`. If it's not set, render
- * a setup nudge.
+ * iframe the public dashboard URL set in the POSTHOG_DASHBOARD_URL
+ * environment variable. If it's not set, render a setup nudge.
  */
 
-import Link from "next/link";
-import { getPlatformSetting } from "@/features/admin/queries";
 import { AdminPageHeader } from "@/components/admin/page-header";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminAnalyticsPage() {
-  const url = await getPlatformSetting<string>("posthog_dashboard_url");
-  const trimmed = (url ?? "").trim();
+  const trimmed = (process.env.POSTHOG_DASHBOARD_URL ?? "").trim();
 
   return (
     <div className="flex h-[calc(100vh-6rem)] flex-col space-y-3">
       <AdminPageHeader
         title="Analytics"
         subtitle="Embedded PostHog dashboard"
-        actions={
-          <Link
-            href="/admin/settings"
-            className="rounded border px-3 py-1.5 text-xs hover:bg-accent"
-          >
-            Configure URL
-          </Link>
-        }
       />
 
       {!trimmed ? (
@@ -43,13 +31,9 @@ export default async function AdminAnalyticsPage() {
               Click <strong>Share</strong> → enable a public-share link.
             </li>
             <li>
-              Paste the URL into{" "}
-              <Link href="/admin/settings" className="underline">
-                /admin/settings
-              </Link>{" "}
-              under <code>posthog_dashboard_url</code>.
+              Add <code>POSTHOG_DASHBOARD_URL=&lt;url&gt;</code> to your Vercel environment variables.
             </li>
-            <li>Reload this page.</li>
+            <li>Redeploy and reload this page.</li>
           </ol>
         </div>
       ) : (

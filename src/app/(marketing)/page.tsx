@@ -5,7 +5,6 @@ import { WorkflowSection } from "@/components/marketing/workflow-section";
 import { GstSection } from "@/components/marketing/gst-section";
 import { PainSection } from "@/components/marketing/pain-section";
 import { PulseSection } from "@/components/marketing/pulse-section";
-import { TestimonialsSection } from "@/components/marketing/testimonials-section";
 import { FaqSection } from "@/components/marketing/faq-section";
 import { CtaBand } from "@/components/marketing/cta-band";
 import { FounderNote } from "@/components/marketing/founder-note";
@@ -20,7 +19,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Stackivo — Your freelance workflow, all in one place",
     description:
-      "Clients, invoices, contracts, projects, time tracking — one workspace built for every independent professional. Free for your first 5 clients.",
+      "Clients, projects, GST-ready invoices, contracts, time tracking, and payments in one workspace. Free forever for your first 5 clients.",
     url: siteConfig.url,
   },
 };
@@ -61,7 +60,6 @@ export default async function LandingPage() {
       <GstSection />
       <PulseSection />
       <FounderNote />
-      <TestimonialsSection />
       <FaqSection />
       <CtaBand authState={authState} />
     </>

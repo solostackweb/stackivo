@@ -89,7 +89,7 @@ export default async function AdminSupportThreadPage({ params }: Props) {
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1 hover:text-foreground"
               >
-                Open in {isCrisp ? "Crisp" : "Zoho"} <ExternalLink className="h-3 w-3" />
+                Open in {isCrisp ? "Crisp" : thread.external_system === "zoho_desk" ? "Zoho" : "source"} <ExternalLink className="h-3 w-3" />
               </a>
             )}
           </span>
@@ -115,7 +115,9 @@ export default async function AdminSupportThreadPage({ params }: Props) {
             <div className="rounded-lg border border-dashed border-border/60 p-5 text-center text-xs text-muted-foreground">
               {isCrisp
                 ? "No messages fetched yet. They appear here once Crisp API is configured."
-                : "Message history is only available for Crisp conversations."}
+                : thread.external_system === "email"
+                  ? "This request came via the in-app contact form. Full details were delivered to support@stackivo.me."
+                  : "Message history is only available for Crisp conversations."}
             </div>
           ) : (
             <div className="space-y-2 rounded-lg border border-border/60 bg-card p-3">

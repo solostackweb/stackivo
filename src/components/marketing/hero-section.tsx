@@ -192,6 +192,9 @@ function HeroCtas({ authState }: { authState: MarketingAuthState }) {
       >
         <Link href="/pricing" data-cta="hero_pricing">See pricing</Link>
       </Button>
+      <p className="text-xs font-medium text-muted-foreground sm:ml-1">
+        No credit card required
+      </p>
     </div>
   );
 }

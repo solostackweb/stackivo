@@ -1,5 +1,7 @@
 "use client";
 
+import { ToolInlineCta } from "./tool-page";
+
 /**
  * GST calculator (India).
  *
@@ -158,7 +160,12 @@ export function GstCalculator() {
           <Row label="Total invoice amount" value={r.total} bold />
         </dl>
 
-        <div className="mt-6 rounded-lg border bg-background/60 p-4 text-xs leading-relaxed text-muted-foreground">
+        <ToolInlineCta
+          resultLine={`Total invoice ₹${r.total.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`}
+          ctaText="send it to your client in 30 seconds"
+        />
+
+        <div className="mt-4 rounded-lg border bg-background/60 p-4 text-xs leading-relaxed text-muted-foreground">
           <p className="font-medium text-foreground">Heads up</p>
           <p className="mt-1.5">
             GST applies once you cross{" "}

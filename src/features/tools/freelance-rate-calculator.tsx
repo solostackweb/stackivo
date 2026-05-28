@@ -19,6 +19,7 @@
 
 import * as React from "react";
 import { useTrack } from "@/lib/analytics/track";
+import { ToolInlineCta } from "./tool-page";
 
 interface Inputs {
   /** Annual take-home target, INR. */
@@ -191,7 +192,12 @@ export function FreelanceRateCalculator() {
           />
         </dl>
 
-        <div className="mt-6 rounded-lg border bg-background/60 p-4 text-xs leading-relaxed text-muted-foreground">
+        <ToolInlineCta
+          resultLine={`Your rate: ₹${formatINR(Math.ceil(result.hourly / 50) * 50)}/hr`}
+          ctaText="invoice clients at this rate directly in Stackivo"
+        />
+
+        <div className="mt-4 rounded-lg border bg-background/60 p-4 text-xs leading-relaxed text-muted-foreground">
           <p className="font-medium text-foreground">Reality check</p>
           <p className="mt-1.5">
             This is the <strong>floor</strong>, not the ceiling. Charge more

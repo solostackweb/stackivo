@@ -38,16 +38,6 @@ const KNOWN_SETTINGS: KnownSetting[] = [
     hint: "Force-disable outbound email even when env says live (kill switch). null = use env default.",
     defaultValue: null,
   },
-  {
-    key: "posthog_dashboard_url",
-    hint: "Public dashboard URL embedded at /admin/analytics. Leave empty to hide.",
-    defaultValue: "",
-  },
-  {
-    key: "posthog_feature_flags_url",
-    hint: "PostHog feature-flags page URL embedded at /admin/flags. Leave empty to hide.",
-    defaultValue: "",
-  },
 ];
 
 export default async function AdminSettingsPage() {

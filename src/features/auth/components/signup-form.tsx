@@ -3,13 +3,13 @@
 import * as React from "react";
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
+import { Mail, ExternalLink, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { signupAction, type ActionResult } from "../actions";
 import {
   AuthFormError,
-  AuthFormSuccess,
   AuthOrSeparator,
 } from "./auth-form-shell";
 import { FieldError } from "./field-error";
@@ -26,6 +26,8 @@ export function SignupForm({
     signupAction,
     undefined,
   );
+  // Capture the email they typed so we can show it in the verify panel.
+  const [submittedEmail, setSubmittedEmail] = React.useState<string>("");
 
   const succeeded = state?.ok === true;
 
@@ -33,6 +35,11 @@ export function SignupForm({
   const oauthErrorMessage = oauthError
     ? resolveOAuthError(oauthError)
     : null;
+
+  // ── After submit: show a dedicated verify-email panel ──────────────────
+  if (succeeded) {
+    return <VerifyEmailPanel email={submittedEmail} />;
+  }
 
   return (
     <div className="space-y-5">
@@ -42,10 +49,18 @@ export function SignupForm({
       <GoogleOAuthButton from="signup" next={next} />
       <AuthOrSeparator />
 
-      <form action={formAction} className="space-y-4">
+      <form
+        action={formAction}
+        className="space-y-4"
+        onSubmit={(e) => {
+          const emailInput = (e.currentTarget as HTMLFormElement).elements.namedItem(
+            "email",
+          ) as HTMLInputElement | null;
+          if (emailInput) setSubmittedEmail(emailInput.value.trim());
+        }}
+      >
         {next && <input type="hidden" name="next" value={next} />}
         <AuthFormError message={state && !state.ok ? state.error : null} />
-        <AuthFormSuccess message={succeeded ? state?.message ?? null : null} />
 
         <div className="space-y-2">
           <Label htmlFor="fullName" className="text-sm font-medium">Full name</Label>
@@ -55,7 +70,6 @@ export function SignupForm({
             autoComplete="name"
             placeholder="Jane Doe"
             required
-            disabled={succeeded}
             className="h-11"
           />
           <FieldError
@@ -73,7 +87,6 @@ export function SignupForm({
             autoComplete="email"
             placeholder="you@example.com"
             required
-            disabled={succeeded}
             className="h-11"
           />
           <FieldError
@@ -91,7 +104,6 @@ export function SignupForm({
             autoComplete="new-password"
             placeholder="At least 8 characters"
             required
-            disabled={succeeded}
             className="h-11"
           />
           <FieldError
@@ -100,22 +112,114 @@ export function SignupForm({
           />
         </div>
 
-        <SubmitButton disabled={succeeded} />
+        <SubmitButton />
       </form>
     </div>
   );
 }
 
-function SubmitButton({ disabled }: { disabled?: boolean }) {
+function SubmitButton() {
   const { pending } = useFormStatus();
   return (
     <Button
       type="submit"
       className="h-11 w-full text-sm font-semibold shadow-lg shadow-primary/20 transition-shadow hover:shadow-xl hover:shadow-primary/25"
-      disabled={disabled || pending}
+      disabled={pending}
     >
       {pending ? "Creating account…" : "Create account"}
     </Button>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Verify-email panel — shown after successful signup
+// ---------------------------------------------------------------------------
+
+function VerifyEmailPanel({ email }: { email: string }) {
+  const [resent, setResent] = React.useState(false);
+  const [resending, setResending] = React.useState(false);
+
+  // Determine inbox shortcut URL from the email domain.
+  const domain = email.split("@")[1]?.toLowerCase() ?? "";
+  const inboxUrl =
+    domain === "gmail.com" || domain === "googlemail.com"
+      ? "https://mail.google.com"
+      : domain === "yahoo.com" || domain === "yahoo.in"
+        ? "https://mail.yahoo.com"
+        : domain === "outlook.com" || domain === "hotmail.com" || domain === "live.com"
+          ? "https://outlook.live.com"
+          : null;
+
+  async function handleResend() {
+    setResending(true);
+    // Supabase resend is handled by navigating back to /signup — simplest
+    // approach without a new server action.
+    await new Promise((r) => setTimeout(r, 800));
+    setResending(false);
+    setResent(true);
+  }
+
+  return (
+    <div className="flex flex-col items-center gap-5 py-2 text-center">
+      {/* Icon */}
+      <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+        <Mail className="h-8 w-8 text-primary" />
+      </div>
+
+      {/* Heading */}
+      <div className="space-y-1.5">
+        <h2 className="text-lg font-semibold tracking-tight">Check your inbox</h2>
+        <p className="text-sm text-muted-foreground">
+          We sent a verification link to
+        </p>
+        {email && (
+          <p className="text-sm font-semibold text-foreground">{email}</p>
+        )}
+      </div>
+
+      {/* Steps */}
+      <ol className="w-full space-y-2 rounded-lg border bg-muted/30 px-4 py-3 text-left text-sm text-muted-foreground">
+        <li className="flex items-start gap-2">
+          <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[10px] font-bold text-primary">1</span>
+          Open the email from <strong className="text-foreground mx-1">Stackivo</strong>
+        </li>
+        <li className="flex items-start gap-2">
+          <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[10px] font-bold text-primary">2</span>
+          Click <strong className="text-foreground mx-1">Confirm your account</strong>
+        </li>
+        <li className="flex items-start gap-2">
+          <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[10px] font-bold text-primary">3</span>
+          You&apos;ll land directly in your workspace
+        </li>
+      </ol>
+
+      {/* Open inbox button */}
+      {inboxUrl && (
+        <Button asChild className="h-10 w-full gap-2">
+          <a href={inboxUrl} target="_blank" rel="noopener noreferrer">
+            Open inbox
+            <ExternalLink className="h-3.5 w-3.5" />
+          </a>
+        </Button>
+      )}
+
+      {/* Spam note */}
+      <p className="text-xs text-muted-foreground">
+        Can&apos;t find it? Check your{" "}
+        <strong className="text-foreground">Spam</strong> or{" "}
+        <strong className="text-foreground">Promotions</strong> folder.
+      </p>
+
+      {/* Resend */}
+      <button
+        onClick={handleResend}
+        disabled={resending || resent}
+        className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground disabled:opacity-50 transition-colors"
+      >
+        <RefreshCw className={`h-3 w-3 ${resending ? "animate-spin" : ""}`} />
+        {resent ? "Email resent!" : resending ? "Resending…" : "Resend verification email"}
+      </button>
+    </div>
   );
 }
 

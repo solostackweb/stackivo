@@ -7,7 +7,7 @@
  * client modules.
  */
 
-export type SupportSystem = "crisp" | "zoho_desk" | "brevo_failure";
+export type SupportSystem = "crisp" | "zoho_desk" | "email" | "brevo_failure";
 
 export type SupportStatus =
   | "new"

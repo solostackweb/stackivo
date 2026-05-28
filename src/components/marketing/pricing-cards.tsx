@@ -35,7 +35,8 @@ const TIERS: Tier[] = [
     ctaHref: "/signup",
     features: [
       "Up to 5 lifetime clients",
-      "Unlimited invoices & time tracking",
+      "Unlimited GST-ready invoices",
+      "Contracts, projects, time tracking, and basic Pulse",
       "GST-ready invoicing engine",
       "PDF download & invoice sharing",
       "Basic dashboard & notifications",
@@ -54,7 +55,8 @@ const TIERS: Tier[] = [
     features: [
       "Unlimited clients & projects",
       "Custom invoice branding (remove watermark)",
-      "Contracts with e-signatures",
+      "Advanced contracts and templates",
+      "Advanced time reports and exports",
       "Client portal",
       "Razorpay / UPI payment gateway",
       "Pulse analytics (12-month history)",
@@ -133,7 +135,7 @@ export function PricingCards({
       </StaggerReveal>
 
       <p className="mt-6 text-center text-xs text-muted-foreground">
-        All prices in INR. Yearly billing saves ~17%. GST extra where applicable.
+        Free forever for your first 5 clients. No credit card required. All prices in INR; GST extra where applicable.
       </p>
     </div>
   );
@@ -296,19 +298,29 @@ function PlanCta({
 
   if (tier.popular) {
     return (
-      <Button asChild className="btn-gradient mt-6 w-full rounded-xl border-0">
-        <Link href={tier.ctaHref}>{tier.ctaLabel}</Link>
-      </Button>
+      <>
+        <Button asChild className="btn-gradient mt-6 w-full rounded-xl border-0">
+          <Link href={tier.ctaHref}>{tier.ctaLabel}</Link>
+        </Button>
+        <p className="mt-2 text-center text-[11px] text-muted-foreground">
+          No credit card required
+        </p>
+      </>
     );
   }
 
   return (
-    <Button
-      asChild
-      className="mt-6 w-full rounded-xl border-primary/20 hover:border-primary/40 hover:bg-primary/5"
-      variant="outline"
-    >
-      <Link href={tier.ctaHref}>{tier.ctaLabel}</Link>
-    </Button>
+    <>
+      <Button
+        asChild
+        className="mt-6 w-full rounded-xl border-primary/20 hover:border-primary/40 hover:bg-primary/5"
+        variant="outline"
+      >
+        <Link href={tier.ctaHref}>{tier.ctaLabel}</Link>
+      </Button>
+      <p className="mt-2 text-center text-[11px] text-muted-foreground">
+        No credit card required
+      </p>
+    </>
   );
 }
