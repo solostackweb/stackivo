@@ -232,7 +232,7 @@ export async function updateThreadStatusAction(
 
   const { error } = await admin
     .from("support_threads")
-    .update({ status, updated_at: new Date().toISOString() })
+    .update({ status, updated_at: new Date().toISOString() } as never)
     .eq("id", threadId);
   if (error) return { ok: false, error: error.message };
 
@@ -261,7 +261,7 @@ export async function updateThreadPriorityAction(
 
   const { error } = await admin
     .from("support_threads")
-    .update({ priority, updated_at: new Date().toISOString() })
+    .update({ priority, updated_at: new Date().toISOString() } as never)
     .eq("id", threadId);
   if (error) return { ok: false, error: error.message };
 
@@ -279,7 +279,7 @@ export async function updateThreadCategoryAction(
 
   const { error } = await admin
     .from("support_threads")
-    .update({ category, updated_at: new Date().toISOString() })
+    .update({ category, updated_at: new Date().toISOString() } as never)
     .eq("id", threadId);
   if (error) return { ok: false, error: error.message };
 
@@ -303,7 +303,7 @@ export async function addThreadTagAction(
   const newTags = Array.from(new Set([...thread.tags, trimmed]));
   const { error } = await admin
     .from("support_threads")
-    .update({ tags: newTags, updated_at: new Date().toISOString() })
+    .update({ tags: newTags, updated_at: new Date().toISOString() } as never)
     .eq("id", threadId);
   if (error) return { ok: false, error: error.message };
 
@@ -324,7 +324,7 @@ export async function removeThreadTagAction(
   const newTags = thread.tags.filter((t) => t !== tag);
   const { error } = await admin
     .from("support_threads")
-    .update({ tags: newTags, updated_at: new Date().toISOString() })
+    .update({ tags: newTags, updated_at: new Date().toISOString() } as never)
     .eq("id", threadId);
   if (error) return { ok: false, error: error.message };
 
@@ -361,7 +361,7 @@ export async function sendThreadReplyAction(
   const admin = getAdminSupabase();
   await admin
     .from("support_threads")
-    .update({ status: "open", updated_at: new Date().toISOString() })
+    .update({ status: "open", updated_at: new Date().toISOString() } as never)
     .eq("id", threadId);
 
   revalidatePath(`/admin/support/${threadId}`);
