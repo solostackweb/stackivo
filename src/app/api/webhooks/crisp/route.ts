@@ -79,11 +79,12 @@ export async function POST(req: Request): Promise<Response> {
     return new NextResponse("Invalid JSON", { status: 400 });
   }
 
-  // Verify the payload belongs to our website (secondary trust check).
+  // Secondary trust check only. The URL token is the real authentication
+  // gate; do not fail deliveries here because Crisp workspaces can contain
+  // multiple websites and a mismatched env should not break support ingestion.
   const knownWebsiteId = publicEnv.crispWebsiteId;
   if (knownWebsiteId && payload.website_id && payload.website_id !== knownWebsiteId) {
     log.warn("crisp.webhook.wrong_website", { got: payload.website_id });
-    return new NextResponse("Wrong website", { status: 403 });
   }
 
   const sessionId = payload.data?.session_id;
