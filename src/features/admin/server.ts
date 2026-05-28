@@ -13,9 +13,14 @@
  *                            (e.g. logging a read-only inspection).
  *   assertNotViewAs()     — refuse writes while in view-as session.
  *
- * Authorization signal: `auth.users.raw_app_meta_data -> 'role' = 'admin'`.
- * The bit is set manually via SQL. See ADMIN_PANEL_AUDIT.md §2.2 +
- * OBSERVABILITY_SETUP.md §0.
+ * Authorization signal: `ADMIN_EMAIL` environment variable.
+ * Any authenticated user whose email matches this env var is treated as
+ * the admin. The legacy SQL role (`auth.users.raw_app_meta_data->>'role'
+ * = 'admin'`) is honoured as a fallback so existing sessions keep working,
+ * but the canonical gate is the env var — no SQL required.
+ *
+ * Set in .env.local (dev) and Vercel Environment Variables (prod):
+ *   ADMIN_EMAIL=founder@yourcompany.com
  */
 
 import "server-only";
@@ -77,8 +82,7 @@ export async function requireAdmin(): Promise<User> {
     redirect(AUTH_LOGIN_ROUTE);
   }
 
-  const role = readRole(user);
-  if (role !== "admin") {
+  if (!isAdminUser(user)) {
     await recordSecurityEvent({
       kind: "rls_guard_miss",
       severity: "alert",
@@ -126,18 +130,34 @@ async function readAal(
 async function currentPath(): Promise<string> {
   try {
     const h = await headers();
-    // Next.js sets x-invoke-path for App Router server contexts; fall
-    // back to referer if unavailable (rare).
-    return h.get("x-invoke-path") ?? h.get("next-url") ?? "";
+    // x-pathname is set by our middleware on every request so it's always
+    // available in server components. x-invoke-path is a Next.js internal
+    // that isn't reliably present on Vercel's Edge runtime.
+    return (
+      h.get("x-pathname") ??
+      h.get("x-invoke-path") ??
+      h.get("next-url") ??
+      ""
+    );
   } catch {
     return "";
   }
 }
 
-function readRole(user: User): string | null {
+/**
+ * Returns true if the user should be treated as an admin.
+ *
+ * Primary check: `ADMIN_EMAIL` env var — the company email set in
+ * Vercel environment variables. No SQL needed.
+ *
+ * Fallback: legacy `role = 'admin'` in app_metadata, for backward
+ * compatibility with any session that was granted via SQL.
+ */
+function isAdminUser(user: User): boolean {
+  const adminEmail = process.env.ADMIN_EMAIL?.toLowerCase().trim();
+  if (adminEmail && user.email?.toLowerCase() === adminEmail) return true;
   const meta = user.app_metadata as { role?: unknown } | null | undefined;
-  const role = meta?.role;
-  return typeof role === "string" ? role : null;
+  return meta?.role === "admin";
 }
 
 /**
@@ -151,7 +171,7 @@ export async function getAdminOrNull(): Promise<User | null> {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return null;
-  return readRole(user) === "admin" ? user : null;
+  return isAdminUser(user) ? user : null;
 }
 
 // ---------------------------------------------------------------------------

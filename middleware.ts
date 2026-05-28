@@ -49,6 +49,11 @@ export async function middleware(request: NextRequest) {
   // read it back.
   response.headers.set("x-request-id", requestId);
 
+  // Forward the pathname so server components (e.g. requireAdmin) can
+  // detect the current route without relying on x-invoke-path, which
+  // is not reliably set on Vercel's Edge runtime.
+  response.headers.set("x-pathname", pathname);
+
   const pathname = request.nextUrl.pathname;
   const isClientPortalUser =
     user?.user_metadata &&
@@ -72,7 +77,11 @@ export async function middleware(request: NextRequest) {
   if (isAdminPath) {
     if (user) {
       const role = (user.app_metadata as { role?: unknown } | null)?.role;
-      if (role !== "admin") {
+      const adminEmail = process.env.ADMIN_EMAIL?.toLowerCase().trim();
+      const isAdmin =
+        role === "admin" ||
+        (!!adminEmail && user.email?.toLowerCase() === adminEmail);
+      if (!isAdmin) {
         const notFoundUrl = request.nextUrl.clone();
         notFoundUrl.pathname = "/404";
         notFoundUrl.search = "";
@@ -134,10 +143,14 @@ export async function middleware(request: NextRequest) {
     const dashUrl = request.nextUrl.clone();
     const next = request.nextUrl.searchParams.get("next");
     const role = (user.app_metadata as { role?: unknown } | null)?.role;
+    const adminEmail = process.env.ADMIN_EMAIL?.toLowerCase().trim();
+    const isAdmin =
+      role === "admin" ||
+      (!!adminEmail && user.email?.toLowerCase() === adminEmail);
     const defaultFor =
       isClientPortalUser
         ? "/portal"
-        : role === "admin"
+        : isAdmin
           ? "/admin"
           : AUTH_DEFAULT_REDIRECT;
     const safeNext =
@@ -156,7 +169,11 @@ export async function middleware(request: NextRequest) {
   //    work so admins can drop into the freelancer surface if they want.
   if (user && (pathname === "/dashboard" || pathname === "/dashboard/")) {
     const role = (user.app_metadata as { role?: unknown } | null)?.role;
-    if (role === "admin") {
+    const adminEmail2 = process.env.ADMIN_EMAIL?.toLowerCase().trim();
+    const isAdminUser =
+      role === "admin" ||
+      (!!adminEmail2 && user.email?.toLowerCase() === adminEmail2);
+    if (isAdminUser) {
       const adminUrl = request.nextUrl.clone();
       adminUrl.pathname = "/admin";
       adminUrl.search = "";
