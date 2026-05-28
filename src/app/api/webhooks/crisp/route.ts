@@ -1,28 +1,28 @@
 /**
  * Crisp webhook receiver.
  *
- * Crisp posts events as JSON with a shared-secret HMAC signature in
- * the `X-Crisp-Signature` header. We:
+ * Crisp does not expose a signing secret in its webhook UI, so we
+ * authenticate via a secret token embedded in the webhook URL:
  *
- *   1. Reject without 404 when `CRISP_WEBHOOK_SECRET` is unset (so
- *      unconfigured deploys can't be probed).
- *   2. Verify the signature in constant time.
- *   3. Upsert metadata into `public.support_threads`.
+ *   https://stackivo.me/api/webhooks/crisp?token=<CRISP_WEBHOOK_SECRET>
  *
- * Events we care about:
- *   - `message:received`            → thread bumped to "open"
- *   - `session:set_state`           → resolved/closed → status update
- *   - `session:set_email`           → re-link to a user
+ * Steps:
+ *   1. Reject with 404 when CRISP_WEBHOOK_SECRET is unset.
+ *   2. Compare ?token= query param against the secret in constant time.
+ *   3. Verify website_id in payload matches NEXT_PUBLIC_CRISP_WEBSITE_ID.
+ *   4. Upsert metadata into public.support_threads.
+ *
+ * Events we handle:
+ *   - message:send / message:received  → thread bumped to "open"
+ *   - session:set_state                → resolved/closed → status update
+ *   - session:set_email                → re-link to a user
  *
  * Anything else is acknowledged with 200 so Crisp stops retrying.
- *
- * Crisp documents its webhook payload at:
- *   https://docs.crisp.chat/references/rtm-events/v1/
  */
 
 import { NextResponse } from "next/server";
 import crypto from "node:crypto";
-import { requireServerEnv } from "@/config/env";
+import { requireServerEnv, env as publicEnv } from "@/config/env";
 import { log } from "@/lib/logger";
 import { upsertSupportThread, setSupportThreadStatus } from "@/features/support/webhooks";
 import type { SupportStatus } from "@/features/support/types";
@@ -48,9 +48,12 @@ interface CrispEnvelope {
 }
 
 function timingSafeEqual(a: string, b: string): boolean {
-  const ab = Buffer.from(a);
-  const bb = Buffer.from(b);
-  if (ab.length !== bb.length) return false;
+  // Pad to equal length so length difference doesn't short-circuit.
+  const maxLen = Math.max(a.length, b.length);
+  const ab = Buffer.alloc(maxLen);
+  const bb = Buffer.alloc(maxLen);
+  ab.write(a);
+  bb.write(b);
   return crypto.timingSafeEqual(ab, bb);
 }
 
@@ -60,28 +63,27 @@ export async function POST(req: Request): Promise<Response> {
     return new NextResponse("Not configured", { status: 404 });
   }
 
-  const raw = await req.text();
-  const signature = req.headers.get("x-crisp-signature") ?? "";
-
-  // Crisp's signature scheme: HMAC-SHA256 of the body using the
-  // shared secret as the key. Header carries the hex digest.
-  const expected = crypto
-    .createHmac("sha256", env.crispWebhookSecret)
-    .update(raw)
-    .digest("hex");
-
-  if (!signature || !timingSafeEqual(signature, expected)) {
-    log.warn("crisp.webhook.bad_signature", {
-      sig_len: signature.length,
-    });
-    return new NextResponse("Invalid signature", { status: 401 });
+  // Auth: compare ?token= in URL against the stored secret.
+  const url = new URL(req.url);
+  const token = url.searchParams.get("token") ?? "";
+  if (!token || !timingSafeEqual(token, env.crispWebhookSecret)) {
+    log.warn("crisp.webhook.bad_token");
+    return new NextResponse("Unauthorized", { status: 401 });
   }
 
+  const raw = await req.text();
   let payload: CrispEnvelope;
   try {
     payload = JSON.parse(raw) as CrispEnvelope;
   } catch {
     return new NextResponse("Invalid JSON", { status: 400 });
+  }
+
+  // Verify the payload belongs to our website (secondary trust check).
+  const knownWebsiteId = publicEnv.crispWebsiteId;
+  if (knownWebsiteId && payload.website_id && payload.website_id !== knownWebsiteId) {
+    log.warn("crisp.webhook.wrong_website", { got: payload.website_id });
+    return new NextResponse("Wrong website", { status: 403 });
   }
 
   const sessionId = payload.data?.session_id;

@@ -12,6 +12,7 @@
 import { listPlatformSettings } from "@/features/admin/queries";
 import { AdminPageHeader } from "@/components/admin/page-header";
 import { SettingRow } from "@/components/admin/setting-row";
+import { SlackAlertSection } from "@/components/admin/slack-alert-section";
 
 export const dynamic = "force-dynamic";
 
@@ -74,6 +75,11 @@ export default async function AdminSettingsPage() {
       hint: "Custom / undocumented key.",
     }));
 
+  // Slack webhook status — never expose the full URL to the client.
+  const rawWebhook = process.env.OPS_SLACK_WEBHOOK_URL?.trim() ?? null;
+  const slackConfigured = !!rawWebhook;
+  const slackPreview = rawWebhook ? rawWebhook.slice(0, 40) : null;
+
   return (
     <div className="space-y-5">
       <AdminPageHeader
@@ -81,26 +87,43 @@ export default async function AdminSettingsPage() {
         subtitle="Platform-wide kill switches & config. Service-role only — every change audited."
       />
 
-      <ul className="space-y-2">
-        {rows.map((r) => (
-          <SettingRow
-            key={r.key}
-            settingKey={r.key}
-            value={r.value}
-            updatedAt={r.updatedAt}
-            hint={r.hint}
-          />
-        ))}
-        {extras.map((r) => (
-          <SettingRow
-            key={r.key}
-            settingKey={r.key}
-            value={r.value}
-            updatedAt={r.updatedAt}
-            hint={r.hint}
-          />
-        ))}
-      </ul>
+      {/* ── Integrations ─────────────────────────────────────────────────── */}
+      <div>
+        <h2 className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+          Integrations
+        </h2>
+        <SlackAlertSection
+          configured={slackConfigured}
+          webhookPreview={slackPreview}
+        />
+      </div>
+
+      {/* ── Platform settings ────────────────────────────────────────────── */}
+      <div>
+        <h2 className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+          Platform Settings
+        </h2>
+        <ul className="space-y-2">
+          {rows.map((r) => (
+            <SettingRow
+              key={r.key}
+              settingKey={r.key}
+              value={r.value}
+              updatedAt={r.updatedAt}
+              hint={r.hint}
+            />
+          ))}
+          {extras.map((r) => (
+            <SettingRow
+              key={r.key}
+              settingKey={r.key}
+              value={r.value}
+              updatedAt={r.updatedAt}
+              hint={r.hint}
+            />
+          ))}
+        </ul>
+      </div>
     </div>
   );
 }

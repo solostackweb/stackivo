@@ -1,17 +1,18 @@
 /**
  * /admin/emails
  *
- * Two stacked sections:
+ * Three stacked sections:
  *
- *   1. Delivery log     — filterable (status, recipient email substring),
- *                          paginated. Click-through to Brevo dashboard
- *                          if `provider_message_id` exists.
- *   2. Suppression list — last 100 rows, search by email, remove inline.
- *                          New manual additions via the small add form.
+ *   0. Brevo Stats       — 30-day aggregate metrics (delivery/open/click/bounce)
+ *   1. Delivery log      — filterable (status, recipient email substring),
+ *                           paginated. Click-through to Brevo dashboard
+ *                           if `provider_message_id` exists.
+ *   2. Suppression list  — last 100 rows, search by email, remove inline.
+ *                           New manual additions via the small add form.
  */
 
 import Link from "next/link";
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, TrendingUp, TrendingDown, Minus } from "lucide-react";
 
 import { listEmails, listSuppressions } from "@/features/admin/queries";
 import { AdminPageHeader } from "@/components/admin/page-header";
@@ -25,6 +26,11 @@ import {
   SuppressionRemoveButton,
 } from "@/components/admin/suppression-actions";
 import { cn } from "@/lib/utils";
+import {
+  getBrevoEmailStats,
+  getBrevoAccount,
+  isBrevoConfigured,
+} from "@/lib/brevo-api";
 
 export const dynamic = "force-dynamic";
 
@@ -48,7 +54,7 @@ export default async function AdminEmailsPage({ searchParams }: Props) {
   const suppQ = asString(sp.supp) ?? undefined;
   const page = Math.max(parseInt(asString(sp.page) ?? "1", 10) || 1, 1);
 
-  const [emails, suppressions] = await Promise.all([
+  const [emails, suppressions, brevoStats, brevoAccount] = await Promise.all([
     listEmails({
       status: status === "all" ? "all" : status,
       q,
@@ -56,6 +62,8 @@ export default async function AdminEmailsPage({ searchParams }: Props) {
       pageSize: 50,
     }),
     listSuppressions(suppQ, 100),
+    getBrevoEmailStats(),
+    getBrevoAccount(),
   ]);
   const totalPages = Math.max(1, Math.ceil(emails.total / 50));
 
@@ -76,6 +84,102 @@ export default async function AdminEmailsPage({ searchParams }: Props) {
           </span>
         }
       />
+
+      {/* ── Brevo 30-day stats ─────────────────────────────────────────────── */}
+      {isBrevoConfigured() ? (
+        <section>
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-foreground">
+              Brevo — Last 30 Days
+            </h2>
+            {brevoAccount && (
+              <span className="text-[11px] text-muted-foreground">
+                {brevoAccount.email} · Plan: {brevoAccount.plan}
+                {brevoAccount.creditsLeft !== null
+                  ? ` · ${brevoAccount.creditsLeft.toLocaleString()} sends left`
+                  : ""}
+              </span>
+            )}
+          </div>
+          {brevoStats ? (
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-8">
+              <BrevoCard label="Sent" value={brevoStats.sent} />
+              <BrevoCard label="Delivered" value={brevoStats.delivered} />
+              <BrevoCard
+                label="Delivery Rate"
+                value={brevoStats.deliveryRate !== null ? `${brevoStats.deliveryRate}%` : "—"}
+                tone={
+                  brevoStats.deliveryRate === null
+                    ? "neutral"
+                    : brevoStats.deliveryRate >= 95
+                      ? "good"
+                      : brevoStats.deliveryRate >= 85
+                        ? "warn"
+                        : "bad"
+                }
+              />
+              <BrevoCard
+                label="Open Rate"
+                value={brevoStats.openRate !== null ? `${brevoStats.openRate}%` : "—"}
+                tone={
+                  brevoStats.openRate === null
+                    ? "neutral"
+                    : brevoStats.openRate >= 25
+                      ? "good"
+                      : brevoStats.openRate >= 15
+                        ? "warn"
+                        : "bad"
+                }
+              />
+              <BrevoCard
+                label="Click Rate"
+                value={brevoStats.clickRate !== null ? `${brevoStats.clickRate}%` : "—"}
+                tone={
+                  brevoStats.clickRate === null
+                    ? "neutral"
+                    : brevoStats.clickRate >= 3
+                      ? "good"
+                      : "neutral"
+                }
+              />
+              <BrevoCard
+                label="Bounces"
+                value={brevoStats.bounces}
+                tone={brevoStats.bounces === 0 ? "good" : brevoStats.bounces < 5 ? "warn" : "bad"}
+              />
+              <BrevoCard
+                label="Bounce Rate"
+                value={brevoStats.bounceRate !== null ? `${brevoStats.bounceRate}%` : "—"}
+                tone={
+                  brevoStats.bounceRate === null
+                    ? "neutral"
+                    : brevoStats.bounceRate < 2
+                      ? "good"
+                      : brevoStats.bounceRate < 5
+                        ? "warn"
+                        : "bad"
+                }
+              />
+              <BrevoCard
+                label="Spam Reports"
+                value={brevoStats.spamReports}
+                tone={brevoStats.spamReports === 0 ? "good" : "bad"}
+              />
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Could not load Brevo statistics. Check that{" "}
+              <code className="text-xs">BREVO_API_KEY</code> is valid.
+            </p>
+          )}
+        </section>
+      ) : (
+        <section className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+          Brevo stats unavailable — set{" "}
+          <code className="text-xs">BREVO_API_KEY</code> in environment
+          variables to enable 30-day email metrics.
+        </section>
+      )}
 
       {/* Status tabs */}
       <div className="flex flex-wrap gap-1.5 border-b border-border/60 pb-1">
@@ -368,4 +472,48 @@ function parseStatusTab(v: string | undefined): StatusTab | undefined {
   return (STATUS_TABS as readonly string[]).includes(v ?? "")
     ? (v as StatusTab)
     : undefined;
+}
+
+// ---------------------------------------------------------------------------
+// Brevo metric card
+// ---------------------------------------------------------------------------
+
+type CardTone = "good" | "warn" | "bad" | "neutral";
+
+function BrevoCard({
+  label,
+  value,
+  tone = "neutral",
+}: {
+  label: string;
+  value: string | number;
+  tone?: CardTone;
+}) {
+  const toneClass =
+    tone === "good"
+      ? "text-emerald-600 dark:text-emerald-400"
+      : tone === "warn"
+        ? "text-amber-600 dark:text-amber-400"
+        : tone === "bad"
+          ? "text-red-600 dark:text-red-400"
+          : "text-foreground";
+
+  const ToneIcon =
+    tone === "good"
+      ? TrendingUp
+      : tone === "bad"
+        ? TrendingDown
+        : Minus;
+
+  return (
+    <div className="rounded-lg border bg-card p-3">
+      <p className="mb-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+        {label}
+      </p>
+      <div className={cn("flex items-center gap-1 text-lg font-semibold tabular-nums", toneClass)}>
+        <ToneIcon className="h-3.5 w-3.5 shrink-0" aria-hidden />
+        {typeof value === "number" ? value.toLocaleString() : value}
+      </div>
+    </div>
+  );
 }

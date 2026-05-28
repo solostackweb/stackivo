@@ -3,23 +3,31 @@
 /**
  * Support system — server actions exposed to client components.
  *
- * Currently:
- *   - submitBugReportAction()  → creates a Zoho Desk ticket from the
- *                                  in-app `/help` form, with an email
- *                                  fallback through Brevo when Zoho
- *                                  isn't configured.
+ *   submitBugReportAction()     → creates a Zoho Desk ticket from the
+ *                                  in-app `/help` form.
  *
- * All actions are best-effort and return a typed envelope so the UI
- * can render success/failure deterministically.
+ *   --- Admin-only actions (require requireAdmin()) ---
+ *   updateThreadStatusAction()  → change status (open/resolved/etc.)
+ *   updateThreadPriorityAction() → change priority
+ *   updateThreadCategoryAction() → set category
+ *   addThreadTagAction()        → append a tag (idempotent)
+ *   removeThreadTagAction()     → remove a tag
+ *   sendThreadReplyAction()     → send reply via Crisp + append note
+ *
+ * All actions are best-effort and return a typed envelope.
  */
 
 import { z } from "zod";
 import { cookies } from "next/headers";
+import { revalidatePath } from "next/cache";
 import { getServerSupabase } from "@/lib/supabase/server";
+import { getAdminSupabase } from "@/lib/supabase/admin";
 import { sendEmail } from "@/features/email/service";
 import { log } from "@/lib/logger";
+import { requireAdmin } from "@/features/admin/server";
 import { createZohoTicket, isZohoConfigured } from "./zoho-client";
-import type { BugReportInput, BugReportResult, SupportCategory } from "./types";
+import { sendCrispMessage, updateCrispState } from "./crisp-client";
+import type { BugReportInput, BugReportResult, SupportCategory, SupportStatus, SupportPriority } from "./types";
 
 const bugReportSchema = z.object({
   category: z.enum([
@@ -182,6 +190,187 @@ export async function submitBugReportAction(
     return { ok: false, error: "Could not deliver report. Please email support@stackivo.me directly." };
   }
 }
+
+// ---------------------------------------------------------------------------
+// Admin-only thread management actions
+// ---------------------------------------------------------------------------
+
+export interface AdminActionResult {
+  ok: boolean;
+  error?: string;
+}
+
+async function getThread(id: string) {
+  const admin = getAdminSupabase();
+  const { data, error } = await admin
+    .from("support_threads")
+    .select("*")
+    .eq("id", id)
+    .single();
+  if (error || !data) return null;
+  return data as {
+    id: string;
+    external_system: string;
+    external_id: string;
+    status: SupportStatus;
+    priority: SupportPriority;
+    category: SupportCategory | null;
+    tags: string[];
+    user_id: string | null;
+  };
+}
+
+export async function updateThreadStatusAction(
+  threadId: string,
+  status: SupportStatus,
+): Promise<AdminActionResult> {
+  await requireAdmin();
+  const admin = getAdminSupabase();
+
+  const thread = await getThread(threadId);
+  if (!thread) return { ok: false, error: "Thread not found" };
+
+  const { error } = await admin
+    .from("support_threads")
+    .update({ status, updated_at: new Date().toISOString() })
+    .eq("id", threadId);
+  if (error) return { ok: false, error: error.message };
+
+  // Mirror state to Crisp if this is a Crisp conversation
+  if (thread.external_system === "crisp") {
+    const crispState =
+      status === "resolved" || status === "closed"
+        ? "resolved"
+        : status === "waiting"
+          ? "pending"
+          : "unresolved";
+    await updateCrispState(thread.external_id, crispState).catch(() => null);
+  }
+
+  revalidatePath("/admin/support");
+  revalidatePath(`/admin/support/${threadId}`);
+  return { ok: true };
+}
+
+export async function updateThreadPriorityAction(
+  threadId: string,
+  priority: SupportPriority,
+): Promise<AdminActionResult> {
+  await requireAdmin();
+  const admin = getAdminSupabase();
+
+  const { error } = await admin
+    .from("support_threads")
+    .update({ priority, updated_at: new Date().toISOString() })
+    .eq("id", threadId);
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath("/admin/support");
+  revalidatePath(`/admin/support/${threadId}`);
+  return { ok: true };
+}
+
+export async function updateThreadCategoryAction(
+  threadId: string,
+  category: SupportCategory | null,
+): Promise<AdminActionResult> {
+  await requireAdmin();
+  const admin = getAdminSupabase();
+
+  const { error } = await admin
+    .from("support_threads")
+    .update({ category, updated_at: new Date().toISOString() })
+    .eq("id", threadId);
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath(`/admin/support/${threadId}`);
+  return { ok: true };
+}
+
+export async function addThreadTagAction(
+  threadId: string,
+  tag: string,
+): Promise<AdminActionResult> {
+  await requireAdmin();
+  const admin = getAdminSupabase();
+
+  const thread = await getThread(threadId);
+  if (!thread) return { ok: false, error: "Thread not found" };
+
+  const trimmed = tag.trim().toLowerCase().slice(0, 50);
+  if (!trimmed) return { ok: false, error: "Tag cannot be empty" };
+
+  const newTags = Array.from(new Set([...thread.tags, trimmed]));
+  const { error } = await admin
+    .from("support_threads")
+    .update({ tags: newTags, updated_at: new Date().toISOString() })
+    .eq("id", threadId);
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath(`/admin/support/${threadId}`);
+  return { ok: true };
+}
+
+export async function removeThreadTagAction(
+  threadId: string,
+  tag: string,
+): Promise<AdminActionResult> {
+  await requireAdmin();
+  const admin = getAdminSupabase();
+
+  const thread = await getThread(threadId);
+  if (!thread) return { ok: false, error: "Thread not found" };
+
+  const newTags = thread.tags.filter((t) => t !== tag);
+  const { error } = await admin
+    .from("support_threads")
+    .update({ tags: newTags, updated_at: new Date().toISOString() })
+    .eq("id", threadId);
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath(`/admin/support/${threadId}`);
+  return { ok: true };
+}
+
+export async function sendThreadReplyAction(
+  threadId: string,
+  message: string,
+): Promise<AdminActionResult> {
+  await requireAdmin();
+
+  const trimmed = message.trim();
+  if (!trimmed || trimmed.length < 2) return { ok: false, error: "Message too short" };
+  if (trimmed.length > 5000) return { ok: false, error: "Message too long (max 5000 chars)" };
+
+  const thread = await getThread(threadId);
+  if (!thread) return { ok: false, error: "Thread not found" };
+
+  let sent = false;
+
+  if (thread.external_system === "crisp") {
+    const res = await sendCrispMessage(thread.external_id, trimmed);
+    if (!res.ok) return { ok: false, error: res.error ?? "Crisp send failed" };
+    sent = true;
+  }
+
+  if (!sent) {
+    return { ok: false, error: "Replies are only supported for Crisp conversations currently." };
+  }
+
+  // Bump status to open (waiting → open means operator replied)
+  const admin = getAdminSupabase();
+  await admin
+    .from("support_threads")
+    .update({ status: "open", updated_at: new Date().toISOString() })
+    .eq("id", threadId);
+
+  revalidatePath(`/admin/support/${threadId}`);
+  return { ok: true };
+}
+
+// ---------------------------------------------------------------------------
+// Private helpers (not admin actions)
+// ---------------------------------------------------------------------------
 
 function renderEmailHtml(args: {
   email: string;
