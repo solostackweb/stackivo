@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { toast } from "sonner";
-import { PenLine, CheckCircle2, RotateCcw } from "lucide-react";
+import { CheckCircle2, LockKeyhole, PenLine } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -43,10 +43,11 @@ export function FreelancerSignatureCard({
 
   const legalName = profile?.legalName ?? profile?.fullName ?? "";
   const hasSignature = Boolean(
-    profile?.signatureType &&
-      (profile.signatureType !== "type"
-        ? profile.signatureImageUrl
-        : profile.signatureTextValue),
+    profile?.signatureUpdatedAt ||
+      (profile?.signatureType &&
+        (profile.signatureType !== "type"
+          ? profile.signatureImageUrl
+          : profile.signatureTextValue)),
   );
 
   const previewContent =
@@ -74,10 +75,17 @@ export function FreelancerSignatureCard({
         className="max-h-20 max-w-full object-contain"
       />
     ) : (
-      <span className="text-sm text-muted-foreground">Signature not added yet</span>
+      <span className="text-sm text-muted-foreground">
+        Signature not added yet
+      </span>
     );
 
   const handleSave = async (signature: FreelancerSignatureData) => {
+    if (hasSignature) {
+      toast.error("Your saved signature is locked.");
+      return;
+    }
+
     setPending(true);
     try {
       await onSave(signature);
@@ -86,7 +94,9 @@ export function FreelancerSignatureCard({
       onSaved?.();
     } catch (error) {
       console.error(error);
-      toast.error("Failed to save signature");
+      toast.error(
+        error instanceof Error ? error.message : "Failed to save signature",
+      );
     } finally {
       setPending(false);
     }
@@ -104,7 +114,7 @@ export function FreelancerSignatureCard({
             {hasSignature ? (
               <div className="inline-flex items-center gap-2 rounded-full bg-success/10 px-3 py-1 text-xs font-medium text-success">
                 <CheckCircle2 className="h-3.5 w-3.5" />
-                Ready
+                Locked
               </div>
             ) : null}
           </div>
@@ -124,25 +134,21 @@ export function FreelancerSignatureCard({
           ) : null}
 
           <div className="flex items-center gap-3">
-            <Button type="button" onClick={() => setOpen(true)} disabled={pending}>
-              <PenLine className="h-4 w-4" />
-              {pending
-                ? "Saving…"
-                : hasSignature
-                  ? "Update signature"
-                  : buttonLabel}
-            </Button>
             {hasSignature ? (
+              <p className="inline-flex items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+                <LockKeyhole className="h-4 w-4" />
+                Signature registered permanently
+              </p>
+            ) : (
               <Button
                 type="button"
-                variant="outline"
                 onClick={() => setOpen(true)}
                 disabled={pending}
               >
-                <RotateCcw className="h-4 w-4" />
-                Replace
+                <PenLine className="h-4 w-4" />
+                {pending ? "Saving..." : buttonLabel}
               </Button>
-            ) : null}
+            )}
           </div>
         </CardContent>
       </Card>
@@ -157,8 +163,6 @@ export function FreelancerSignatureCard({
         showConsent={false}
         defaultLegalName={legalName}
       />
-
-      {pending ? null : null}
     </>
   );
 }

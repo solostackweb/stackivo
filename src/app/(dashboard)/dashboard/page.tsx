@@ -203,9 +203,9 @@ export default async function DashboardPage() {
           hasSignature={Boolean(
             profile.signatureType ||
               profile.signatureImageUrl ||
-              profile.signatureTextValue,
+              profile.signatureTextValue ||
+              profile.signatureUpdatedAt,
           )}
-          hasClient={profile.lifetimeClientsCreated > 0}
         />
       ) : null}
 

@@ -32,6 +32,9 @@ export type ActionResult<T = undefined> =
   | { ok: true; data?: T; message?: string }
   | { ok: false; error: string; fieldErrors?: Record<string, string[]> };
 
+const SIGNATURE_LOCKED_ERROR =
+  "Your signature is already registered and locked. Contact support if it must be changed.";
+
 async function requireUserId(): Promise<string> {
   const supabase = await getServerSupabase();
   const {
@@ -231,6 +234,29 @@ export async function updateSignature(
   if (!parsed.success) return flatErrors(parsed);
   const userId = await requireUserId();
   const supabase = await getServerSupabase();
+
+  const { data: existingSignature, error: existingError } = await supabase
+    .from("user_profiles")
+    .select(
+      "signature_type, signature_image_url, signature_text_value, signature_updated_at",
+    )
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (existingError) return { ok: false, error: existingError.message };
+
+  const locked = Boolean(
+    existingSignature &&
+      ((existingSignature as { signature_type?: string | null }).signature_type ||
+        (existingSignature as { signature_image_url?: string | null })
+          .signature_image_url ||
+        (existingSignature as { signature_text_value?: string | null })
+          .signature_text_value ||
+        (existingSignature as { signature_updated_at?: string | null })
+          .signature_updated_at),
+  );
+
+  if (locked) return { ok: false, error: SIGNATURE_LOCKED_ERROR };
 
   const { error } = await supabase
     .from("user_profiles")

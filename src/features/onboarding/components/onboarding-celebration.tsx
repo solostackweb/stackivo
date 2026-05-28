@@ -69,7 +69,7 @@ const QUICK_ACTIONS = [
     icon: Users,
     title: "Add your clients",
     description: "Import a CSV or add them one by one — as many as you need.",
-    href: "/dashboard/clients/new",
+    href: "/dashboard/clients?create=1",
     cta: "Add client",
     highlight: false,
   },
@@ -213,7 +213,7 @@ export function FirstInvoiceCelebration({ show }: { show: boolean }) {
         </p>
       </div>
       <Button asChild size="sm" variant="outline" className="shrink-0">
-        <Link href="/dashboard/clients/new">
+        <Link href="/dashboard/clients?create=1">
           Add another client <ArrowRight className="ml-1 h-3 w-3" />
         </Link>
       </Button>

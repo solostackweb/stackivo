@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { Zap } from "lucide-react";
 import { logoutAction } from "@/features/auth/actions";
 import { Button } from "@/components/ui/button";
+import { StackivoLogo } from "@/components/brand/stackivo-logo";
 
 /**
  * Onboarding layout.
@@ -30,11 +30,12 @@ export default function OnboardingLayout({
         className="sticky top-0 z-20 flex h-14 items-center justify-between border-b bg-background/70 px-4 backdrop-blur-xl sm:px-6"
         style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}
       >
-        <Link href="/" className="flex items-center gap-2.5 font-bold tracking-tight">
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-indigo-600 text-primary-foreground shadow-md shadow-primary/20">
-            <Zap className="h-4 w-4" />
-          </span>
-          <span className="text-base">Stackivo</span>
+        <Link
+          href="/"
+          className="inline-flex items-center rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          aria-label="Stackivo home"
+        >
+          <StackivoLogo className="[&>span:first-child]:h-9 [&>span:first-child]:w-9 [&>span:last-child]:text-base" />
         </Link>
         <form action={logoutAction}>
           <Button type="submit" variant="ghost" size="sm" className="font-medium">

@@ -98,6 +98,7 @@ export async function POST(req: Request): Promise<Response> {
 
   switch (payload.event) {
     case "message:send":
+    case "message:sent":
     case "message:received": {
       const subject =
         typeof payload.data?.content === "string"

@@ -3,30 +3,22 @@
 /**
  * Dashboard setup checklist.
  *
- * Surfaces the three setup tasks that used to gate onboarding
- * (invoice preferences, signature, first client) as a friendly,
- * dismissable card on the dashboard home. Each item has its own
- * deep-link to the relevant settings / dashboard area.
- *
- * The card:
- *   - Auto-hides when all three items are done.
- *   - Can be dismissed via the X button (localStorage flag).
- *   - "Invoice preferences" has no robust DB signal, so it&rsquo;s
- *     marked done when the user clicks through to settings/invoice
- *     (we set a `visited` localStorage flag).
+ * Surfaces the remaining setup tasks that used to gate onboarding
+ * (invoice preferences and signature) as a friendly, dismissable card on
+ * the dashboard home. Each item has its own deep-link to the relevant
+ * settings area.
  */
 
 import * as React from "react";
 import Link from "next/link";
 import {
+  ArrowRight,
   CheckCircle2,
   ChevronDown,
   Circle,
   FileText,
   PenLine,
-  UserPlus,
   X,
-  ArrowRight,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 
@@ -34,18 +26,14 @@ const DISMISS_KEY = "stackivo:dashboard:setup_checklist_dismissed";
 const INVOICE_VISITED_KEY = "stackivo:dashboard:invoice_prefs_visited";
 
 interface Props {
-  /** True when the user already has a saved signature (any type). */
+  /** True when the user already has a saved signature. */
   hasSignature: boolean;
-  /** True when the user has created at least one client. */
-  hasClient: boolean;
 }
 
-export function DashboardSetupChecklist({ hasSignature, hasClient }: Props) {
+export function DashboardSetupChecklist({ hasSignature }: Props) {
   const [mounted, setMounted] = React.useState(false);
   const [dismissed, setDismissed] = React.useState(false);
   const [invoiceVisited, setInvoiceVisited] = React.useState(false);
-  // Mobile pill expansion state. Defaults to collapsed so the dashboard
-  // doesn't open with a full setup card competing for the fold.
   const [mobileExpanded, setMobileExpanded] = React.useState(false);
 
   React.useEffect(() => {
@@ -54,7 +42,7 @@ export function DashboardSetupChecklist({ hasSignature, hasClient }: Props) {
       setDismissed(localStorage.getItem(DISMISS_KEY) === "1");
       setInvoiceVisited(localStorage.getItem(INVOICE_VISITED_KEY) === "1");
     } catch {
-      // ignore — localStorage unavailable
+      // ignore - localStorage unavailable
     }
   }, []);
 
@@ -76,23 +64,13 @@ export function DashboardSetupChecklist({ hasSignature, hasClient }: Props) {
     }
   };
 
-  // Defer rendering until after hydration so the server-rendered HTML
-  // and client state line up.
-  if (!mounted) return null;
-  if (dismissed) return null;
+  if (!mounted || dismissed) return null;
 
-  const items: Array<{
-    label: string;
-    description: string;
-    href: string;
-    icon: React.ReactNode;
-    done: boolean;
-    onClick?: () => void;
-  }> = [
+  const items: ChecklistItem[] = [
     {
       label: "Set your invoice defaults",
       description:
-        "Prefix, default due days, and footer notes — used on every invoice you send.",
+        "Prefix, default due days, and footer notes used on every invoice you send.",
       href: "/dashboard/settings/invoice",
       icon: <FileText className="h-4 w-4" />,
       done: invoiceVisited,
@@ -100,24 +78,14 @@ export function DashboardSetupChecklist({ hasSignature, hasClient }: Props) {
     },
     {
       label: "Add your signature",
-      description:
-        "Draw, type, or upload — appears on every PDF and contract.",
-      href: "/dashboard/settings/branding",
+      description: "Draw, type, or upload. It appears on every PDF and contract.",
+      href: "/dashboard/settings/profile#signature",
       icon: <PenLine className="h-4 w-4" />,
       done: hasSignature,
-    },
-    {
-      label: "Add your first client",
-      description:
-        "Once a client is on file, every workflow gets faster — invoices, contracts, time, all auto-link.",
-      href: "/dashboard/clients/new",
-      icon: <UserPlus className="h-4 w-4" />,
-      done: hasClient,
     },
   ];
 
   const remaining = items.filter((i) => !i.done).length;
-  // All complete — hide silently.
   if (remaining === 0) return null;
 
   const total = items.length;
@@ -126,9 +94,6 @@ export function DashboardSetupChecklist({ hasSignature, hasClient }: Props) {
 
   return (
     <>
-      {/* Mobile: compact pill. Tap to expand → shows the desktop card
-          inline. Dismiss "X" still works. Hidden on sm+ where the
-          original full card renders. */}
       <div className="sm:hidden">
         {!mobileExpanded ? (
           <div className="flex items-center gap-2 rounded-lg border bg-primary/[0.04] p-3">
@@ -149,7 +114,7 @@ export function DashboardSetupChecklist({ hasSignature, hasClient }: Props) {
                   Finish setting up
                 </p>
                 <p className="truncate text-[11px] text-muted-foreground">
-                  {remaining} {remaining === 1 ? "task" : "tasks"} left ·{" "}
+                  {remaining} {remaining === 1 ? "task" : "tasks"} left -{" "}
                   {percent}% done
                 </p>
               </span>
@@ -178,7 +143,6 @@ export function DashboardSetupChecklist({ hasSignature, hasClient }: Props) {
         )}
       </div>
 
-      {/* Desktop / tablet: full card always visible. */}
       <div className="hidden sm:block">
         <ChecklistFullCard
           items={items}
@@ -193,15 +157,17 @@ export function DashboardSetupChecklist({ hasSignature, hasClient }: Props) {
   );
 }
 
+interface ChecklistItem {
+  label: string;
+  description: string;
+  href: string;
+  icon: React.ReactNode;
+  done: boolean;
+  onClick?: () => void;
+}
+
 interface FullCardProps {
-  items: Array<{
-    label: string;
-    description: string;
-    href: string;
-    icon: React.ReactNode;
-    done: boolean;
-    onClick?: () => void;
-  }>;
+  items: ChecklistItem[];
   done: number;
   total: number;
   percent: number;

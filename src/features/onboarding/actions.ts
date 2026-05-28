@@ -30,6 +30,9 @@ export type ActionResult<T = undefined> =
   | { ok: true; data?: T; message?: string }
   | { ok: false; error: string; fieldErrors?: Record<string, string[]> };
 
+const SIGNATURE_LOCKED_ERROR =
+  "Your signature is already registered and locked. Contact support if it must be changed.";
+
 async function requireUserId(): Promise<string> {
   const supabase = await getServerSupabase();
   const {
@@ -147,7 +150,7 @@ export async function saveGstStep(
   // steps. Cutting them out should lift activation 25-40% without
   // compromising the freelancer's ability to issue a correct first invoice
   // (invoice prefix defaults to INV-, no signature is legally fine, and a
-  // client can be added inline at /dashboard/clients/new).
+  // client can be added inline from /dashboard/clients?create=1).
   //
   // Backwards compatibility: users already past `gst` (i.e. step ∈
   // {invoice, signature, first_client}) keep their saved step value and
@@ -232,6 +235,29 @@ export async function saveSignatureStepData(
 
   const userId = await requireUserId();
   const supabase = await getServerSupabase();
+  const { data: existingSignature, error: existingError } = await supabase
+    .from("user_profiles")
+    .select(
+      "signature_type, signature_image_url, signature_text_value, signature_updated_at",
+    )
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (existingError) return { ok: false, error: existingError.message };
+
+  const locked = Boolean(
+    existingSignature &&
+      ((existingSignature as { signature_type?: string | null }).signature_type ||
+        (existingSignature as { signature_image_url?: string | null })
+          .signature_image_url ||
+        (existingSignature as { signature_text_value?: string | null })
+          .signature_text_value ||
+        (existingSignature as { signature_updated_at?: string | null })
+          .signature_updated_at),
+  );
+
+  if (locked) return { ok: false, error: SIGNATURE_LOCKED_ERROR };
+
   const { error } = await supabase
     .from("user_profiles")
     .update({
