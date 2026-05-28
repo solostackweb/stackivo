@@ -49,12 +49,12 @@ export async function middleware(request: NextRequest) {
   // read it back.
   response.headers.set("x-request-id", requestId);
 
+  const pathname = request.nextUrl.pathname;
+
   // Forward the pathname so server components (e.g. requireAdmin) can
   // detect the current route without relying on x-invoke-path, which
   // is not reliably set on Vercel's Edge runtime.
   response.headers.set("x-pathname", pathname);
-
-  const pathname = request.nextUrl.pathname;
   const isClientPortalUser =
     user?.user_metadata &&
     (user.user_metadata as { auth_context?: unknown }).auth_context ===
