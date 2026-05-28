@@ -140,7 +140,7 @@ export function AdminShell({ children, adminEmail, viewingAs }: AdminShellProps)
           />
         ) : null}
 
-        <main className="flex-1 px-4 py-5 sm:px-6 md:px-8 max-w-screen-xl mx-auto w-full">
+        <main className="flex-1 px-4 py-5 sm:px-6 md:px-8 max-w-[1440px] mx-auto w-full">
           {children}
         </main>
       </div>
@@ -175,7 +175,7 @@ function TopBar({
 }) {
   return (
     <header className="sticky top-0 z-40 border-b border-border/60 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/70">
-      <div className="flex h-12 items-center gap-3 px-4 sm:px-6 md:px-8 max-w-screen-xl mx-auto w-full">
+      <div className="flex h-14 items-center gap-3 px-4 sm:px-6 md:px-8 max-w-[1440px] mx-auto w-full">
         <Button
           variant="ghost"
           size="icon"
@@ -190,16 +190,20 @@ function TopBar({
           href="/admin"
           className="flex items-center gap-2 font-semibold tracking-tight"
         >
-          <Shield className="h-4 w-4" />
-          <span>Console</span>
-          <span className="hidden text-[10px] font-medium uppercase tracking-wider text-muted-foreground sm:inline">
-            stackivo
+          <span className="flex h-8 w-8 items-center justify-center rounded-md border border-primary/20 bg-primary/10 text-primary">
+            <Shield className="h-4 w-4" />
+          </span>
+          <span className="leading-tight">
+            <span className="block text-sm">Stackivo Command</span>
+            <span className="hidden text-[10px] font-medium uppercase tracking-wider text-muted-foreground sm:block">
+              founder console
+            </span>
           </span>
         </Link>
 
         <button
           type="button"
-          className="ml-2 hidden h-7 flex-1 max-w-sm items-center gap-2 rounded border bg-muted/40 px-2 text-xs text-muted-foreground hover:bg-muted sm:flex"
+          className="ml-2 hidden h-8 flex-1 max-w-md items-center gap-2 rounded-md border bg-muted/40 px-2.5 text-xs text-muted-foreground hover:bg-muted sm:flex"
           onClick={onOpenPalette}
         >
           <Search className="h-3.5 w-3.5" />
@@ -238,7 +242,7 @@ function Sidebar({
   return (
     <aside
       className={cn(
-        "fixed inset-y-0 left-0 z-40 mt-12 w-56 shrink-0 transform border-r border-border/60 bg-background transition-transform md:relative md:mt-0 md:translate-x-0",
+        "fixed inset-y-0 left-0 z-40 mt-14 w-60 shrink-0 transform border-r border-border/60 bg-sidebar/70 backdrop-blur transition-transform md:relative md:mt-0 md:translate-x-0",
         mobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0",
       )}
     >
@@ -259,10 +263,10 @@ function Sidebar({
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    "flex items-center gap-2 rounded px-2.5 py-1.5 text-sm transition-colors",
+                    "flex items-center gap-2 rounded-md px-2.5 py-1.5 text-sm transition-colors",
                     active
-                      ? "bg-accent text-foreground font-medium"
-                      : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
+                      ? "bg-primary/10 text-primary font-medium ring-1 ring-primary/15"
+                      : "text-muted-foreground hover:bg-accent/70 hover:text-foreground",
                   )}
                 >
                   <Icon className="h-3.5 w-3.5" />
