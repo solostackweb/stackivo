@@ -147,6 +147,18 @@ export function ContractBuilderView({
     setMobileTab("preview");
   }, []);
 
+  React.useEffect(() => {
+    const stored = window.sessionStorage.getItem("stackivo.ai.contractDraft");
+    if (!stored) return;
+    try {
+      const draft = JSON.parse(stored) as AiContractDraft;
+      applyAiDraft(draft);
+      window.sessionStorage.removeItem("stackivo.ai.contractDraft");
+    } catch {
+      window.sessionStorage.removeItem("stackivo.ai.contractDraft");
+    }
+  }, [applyAiDraft]);
+
   const persist = async (status: "draft" | "sent") => {
     const safeTitle = title.trim() || template?.name || "Untitled contract";
     if (status === "sent") {

@@ -35,6 +35,7 @@ interface ManualEntryDialogProps {
   onOpenChange: (open: boolean) => void;
   projects: TimerProjectOption[];
   defaultHourlyRate?: number;
+  initialAiDraft?: AiTimeEntryDraft | null;
 }
 
 const NO_PROJECT = "__none__";
@@ -58,6 +59,7 @@ export function ManualEntryDialog({
   onOpenChange,
   projects,
   defaultHourlyRate = 0,
+  initialAiDraft,
 }: ManualEntryDialogProps) {
   const router = useRouter();
   const [pending, startTransition] = React.useTransition();
@@ -132,6 +134,11 @@ export function ManualEntryDialog({
       hourlyRate: draft.hourlyRate,
     }));
   }, []);
+
+  React.useEffect(() => {
+    if (!open || !initialAiDraft) return;
+    applyAiDraft(initialAiDraft);
+  }, [applyAiDraft, initialAiDraft, open]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

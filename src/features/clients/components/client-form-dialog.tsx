@@ -43,6 +43,7 @@ interface ClientFormDialogProps {
     businessName: string | null;
     email: string | null;
   }) => void;
+  initialAiDraft?: AiClientDraft | null;
 }
 
 /**
@@ -55,6 +56,7 @@ export function ClientFormDialog({
   onOpenChange,
   client,
   onSaved,
+  initialAiDraft,
 }: ClientFormDialogProps) {
   const router = useRouter();
   const { profile } = useProfile();
@@ -126,6 +128,12 @@ export function ClientFormDialog({
     setField("billingAddress", draft.billingAddress);
     setField("notes", draft.notes);
   }, []);
+
+  React.useEffect(() => {
+    if (!open || isEdit || !initialAiDraft) return;
+    const frame = window.requestAnimationFrame(() => applyAiDraft(initialAiDraft));
+    return () => window.cancelAnimationFrame(frame);
+  }, [applyAiDraft, initialAiDraft, isEdit, open]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

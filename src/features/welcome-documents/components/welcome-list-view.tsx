@@ -37,6 +37,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { PageHeader } from "@/components/shared/page-header";
 import { EmptyState } from "@/components/shared/empty-state";
+import { cn } from "@/lib/utils";
 
 import type { WelcomeDocumentRecord } from "../types";
 import { WelcomeStatusBadge } from "./status-badge";
@@ -51,11 +52,17 @@ import {
   welcomeDocumentDetail,
   getWelcomeShareUrl,
 } from "../routes";
+import {
+  AiWorkflowTriggerButton,
+  OperationalAiAgentWorkflow,
+} from "@/features/ai-workflows/components/operational-ai-agent-workflow";
+import type { AiWelcomeDraft } from "@/features/ai-workflows/types";
 
 type StatusFilter = "all" | "draft" | "published" | "archived";
 
 interface Props {
   documents: WelcomeDocumentRecord[];
+  clients: Array<{ id: string; name: string; email: string | null }>;
 }
 
 /**
@@ -64,9 +71,10 @@ interface Props {
  * onboarding guide is whether clients have *opened* and
  * *acknowledged* it.
  */
-export function WelcomeListView({ documents }: Props) {
+export function WelcomeListView({ documents, clients }: Props) {
   const router = useRouter();
   const [search, setSearch] = React.useState("");
+  const [aiOpen, setAiOpen] = React.useState(false);
   const [statusFilter, setStatusFilter] = React.useState<StatusFilter>("all");
   const [, startTransition] = React.useTransition();
 
@@ -178,14 +186,29 @@ export function WelcomeListView({ documents }: Props) {
         title="Welcome documents"
         description="One personalised guide per client. Duplicate any document to reuse it for the next client."
         actions={
-          <Button asChild size="sm">
-            <Link href={WELCOME_DOCUMENT_NEW}>
-              <Plus /> New welcome doc
-            </Link>
-          </Button>
+          <div className="flex items-center gap-2">
+            <AiWorkflowTriggerButton
+              active={aiOpen}
+              onClick={() => setAiOpen((value) => !value)}
+            >
+              Generate welcome doc with AI
+            </AiWorkflowTriggerButton>
+            <Button asChild size="sm">
+              <Link href={WELCOME_DOCUMENT_NEW}>
+                <Plus /> New welcome doc
+              </Link>
+            </Button>
+          </div>
         }
       />
 
+      <div
+        className={cn(
+          "grid items-start gap-6",
+          aiOpen ? "xl:grid-cols-[minmax(0,1fr)_420px]" : "grid-cols-1",
+        )}
+      >
+        <div className="min-w-0 space-y-6">
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Stat label="Total documents" value={stats.total.toString()} />
         <Stat
@@ -265,6 +288,22 @@ export function WelcomeListView({ documents }: Props) {
           </CardContent>
         </Card>
       )}
+        </div>
+
+        <OperationalAiAgentWorkflow<AiWelcomeDraft>
+          workflow="welcome_document"
+          title="Create welcome document"
+          intro="let's build a client-ready welcome document. I will draft the tone, sections, and onboarding structure, then open the editor for review."
+          clients={clients}
+          open={aiOpen}
+          onOpenChange={setAiOpen}
+          applyLabel="Continue in welcome editor"
+          onApplyDraft={(draft) => {
+            window.sessionStorage.setItem("stackivo.ai.welcomeDraft", JSON.stringify(draft));
+            router.push(WELCOME_DOCUMENT_NEW);
+          }}
+        />
+      </div>
     </div>
   );
 }

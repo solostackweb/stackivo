@@ -43,11 +43,13 @@ interface CreatePortalButtonProps {
     email: string | null;
   }>;
   activeClientIds?: string[];
+  initialAiDraft?: AiPortalDraft | null;
 }
 
 export function CreatePortalButton({
   clients,
   activeClientIds = [],
+  initialAiDraft,
 }: CreatePortalButtonProps) {
   const router = useRouter();
   const [open, setOpen] = React.useState(false);
@@ -112,6 +114,12 @@ export function CreatePortalButton({
     setBrandColor(draft.brandColor);
     if (draft.clientId) setClientId(draft.clientId);
   }, []);
+
+  React.useEffect(() => {
+    if (!initialAiDraft) return;
+    setOpen(true);
+    applyAiDraft(initialAiDraft);
+  }, [applyAiDraft, initialAiDraft]);
 
   return (
     <>

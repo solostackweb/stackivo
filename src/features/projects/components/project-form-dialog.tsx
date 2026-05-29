@@ -39,6 +39,7 @@ interface ProjectFormDialogProps {
   /** Pre-fill when editing. Omit to create. */
   project?: ProjectRecord;
   clients: Array<{ id: string; name: string }>;
+  initialAiDraft?: AiProjectDraft | null;
 }
 
 type ProjectFormResult = ActionResult<{ id: string }>;
@@ -54,6 +55,7 @@ export function ProjectFormDialog({
   onOpenChange,
   project,
   clients,
+  initialAiDraft,
 }: ProjectFormDialogProps) {
   const router = useRouter();
   const isEdit = !!project;
@@ -112,6 +114,12 @@ export function ProjectFormDialog({
     setField("dueDate", draft.dueDate);
     setClientId(draft.clientId || NO_CLIENT);
   }, []);
+
+  React.useEffect(() => {
+    if (!open || isEdit || !initialAiDraft) return;
+    const frame = window.requestAnimationFrame(() => applyAiDraft(initialAiDraft));
+    return () => window.cancelAnimationFrame(frame);
+  }, [applyAiDraft, initialAiDraft, isEdit, open]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

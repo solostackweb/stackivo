@@ -32,6 +32,11 @@ import {
 import { ProjectCard } from "./project-card";
 import { ProjectFormDialog } from "./project-form-dialog";
 import { ProjectsBulkBar } from "./projects-bulk-bar";
+import {
+  AiWorkflowTriggerButton,
+  OperationalAiAgentWorkflow,
+} from "@/features/ai-workflows/components/operational-ai-agent-workflow";
+import type { AiProjectDraft } from "@/features/ai-workflows/types";
 
 type ViewMode = "grid" | "kanban";
 
@@ -55,6 +60,8 @@ export function ProjectsListView({ projects, clients, autoCreate }: ProjectsList
     ProjectStatusRow | "all"
   >("all");
   const [createOpen, setCreateOpen] = React.useState(false);
+  const [aiOpen, setAiOpen] = React.useState(false);
+  const [aiDraft, setAiDraft] = React.useState<AiProjectDraft | null>(null);
 
   // Auto-open the create dialog when navigated from the FAB (?create=1).
   React.useEffect(() => {
@@ -96,12 +103,27 @@ export function ProjectsListView({ projects, clients, autoCreate }: ProjectsList
         title="Projects"
         description="Organize work, files, and billables by engagement."
         actions={
-          <Button size="sm" onClick={() => setCreateOpen(true)}>
-            <Plus /> New project
-          </Button>
+          <div className="flex items-center gap-2">
+            <AiWorkflowTriggerButton
+              active={aiOpen}
+              onClick={() => setAiOpen((value) => !value)}
+            >
+              Generate new project with AI
+            </AiWorkflowTriggerButton>
+            <Button size="sm" onClick={() => setCreateOpen(true)}>
+              <Plus /> New project
+            </Button>
+          </div>
         }
       />
 
+      <div
+        className={cn(
+          "grid items-start gap-6",
+          aiOpen ? "xl:grid-cols-[minmax(0,1fr)_420px]" : "grid-cols-1",
+        )}
+      >
+        <div className="min-w-0 space-y-6">
       {/* Two-row toolbar on mobile: search on its own line for full width,
           filter + view-toggle share a second line. Collapses back to a
           single inline row on sm+. */}
@@ -197,11 +219,28 @@ export function ProjectsListView({ projects, clients, autoCreate }: ProjectsList
         selectedIds={Array.from(selectedIds)}
         onClear={clearSelection}
       />
+        </div>
+
+        <OperationalAiAgentWorkflow<AiProjectDraft>
+          workflow="project"
+          title="Create project"
+          intro="let's create a project workspace. I will shape the project brief, dates, and client context, then open the project form for review."
+          clients={clients}
+          open={aiOpen}
+          onOpenChange={setAiOpen}
+          applyLabel="Review in project form"
+          onApplyDraft={(draft) => {
+            setAiDraft(draft);
+            setCreateOpen(true);
+          }}
+        />
+      </div>
 
       <ProjectFormDialog
         open={createOpen}
         onOpenChange={setCreateOpen}
         clients={clients}
+        initialAiDraft={aiDraft}
       />
     </div>
   );

@@ -325,7 +325,7 @@ export function InvoiceAiAgentWorkflow({
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: -8, scale: 0.985 }}
         transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-        className="sticky top-20 flex h-[clamp(480px,calc(100vh-14rem),650px)] w-full flex-col overflow-hidden rounded-xl border bg-background shadow-xl"
+        className="sticky top-20 flex h-[calc(100vh-11rem)] min-h-[560px] max-h-[720px] w-full flex-col overflow-hidden rounded-xl border bg-background shadow-xl"
       >
         <div className="flex items-center justify-between border-b bg-muted/20 px-4 py-3">
           <div className="flex items-center gap-2 text-base font-semibold">

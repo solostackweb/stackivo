@@ -180,6 +180,18 @@ export function WelcomeNewView({
     [defaultBrandColor],
   );
 
+  React.useEffect(() => {
+    const stored = window.sessionStorage.getItem("stackivo.ai.welcomeDraft");
+    if (!stored) return;
+    try {
+      const draft = JSON.parse(stored) as AiWelcomeDraft;
+      applyAiDraft(draft);
+      window.sessionStorage.removeItem("stackivo.ai.welcomeDraft");
+    } catch {
+      window.sessionStorage.removeItem("stackivo.ai.welcomeDraft");
+    }
+  }, [applyAiDraft]);
+
   if (aiInitial) {
     return (
       <div className="space-y-6">

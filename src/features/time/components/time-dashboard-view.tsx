@@ -15,6 +15,7 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/shared/page-header";
 import { formatINR } from "@/lib/format";
+import { cn } from "@/lib/utils";
 
 import {
   dateKeyFromISO,
@@ -32,6 +33,11 @@ import {
   TimeEntriesTable,
   type TimeEntryLookup,
 } from "./time-entries-table";
+import {
+  AiWorkflowTriggerButton,
+  OperationalAiAgentWorkflow,
+} from "@/features/ai-workflows/components/operational-ai-agent-workflow";
+import type { AiTimeEntryDraft } from "@/features/ai-workflows/types";
 
 interface TimeDashboardViewProps {
   entries: TimeEntryRecord[];
@@ -55,6 +61,8 @@ export function TimeDashboardView({
   defaultHourlyRate = 0,
 }: TimeDashboardViewProps) {
   const [manualOpen, setManualOpen] = React.useState(false);
+  const [aiOpen, setAiOpen] = React.useState(false);
+  const [aiDraft, setAiDraft] = React.useState<AiTimeEntryDraft | null>(null);
   const [search, setSearch] = React.useState("");
   const [projectFilter, setProjectFilter] = React.useState<string>("all");
 
@@ -118,6 +126,12 @@ export function TimeDashboardView({
         description="Track billable hours, log time, and see where your week went."
         actions={
           <div className="flex items-center gap-2">
+            <AiWorkflowTriggerButton
+              active={aiOpen}
+              onClick={() => setAiOpen((value) => !value)}
+            >
+              Generate time entry with AI
+            </AiWorkflowTriggerButton>
             <Button size="sm" onClick={() => setManualOpen(true)}>
               <Plus /> Log time
             </Button>
@@ -125,6 +139,13 @@ export function TimeDashboardView({
         }
       />
 
+      <div
+        className={cn(
+          "grid items-start gap-6",
+          aiOpen ? "xl:grid-cols-[minmax(0,1fr)_420px]" : "grid-cols-1",
+        )}
+      >
+        <div className="min-w-0 space-y-6">
       <TimeSummaryCards entries={thisWeek} />
 
       <ActiveTimerWidget
@@ -208,12 +229,30 @@ export function TimeDashboardView({
           </Card>
         </aside>
       </div>
+        </div>
+
+        <OperationalAiAgentWorkflow<AiTimeEntryDraft>
+          workflow="time_entry"
+          title="Log time"
+          intro="let's turn your work context into a clean time entry. I will draft the description, duration, billing state, and rate for review."
+          projects={projects}
+          defaultHourlyRate={defaultHourlyRate}
+          open={aiOpen}
+          onOpenChange={setAiOpen}
+          applyLabel="Review time entry"
+          onApplyDraft={(draft) => {
+            setAiDraft(draft);
+            setManualOpen(true);
+          }}
+        />
+      </div>
 
       <ManualEntryDialog
         open={manualOpen}
         onOpenChange={setManualOpen}
         projects={projects}
         defaultHourlyRate={defaultHourlyRate}
+        initialAiDraft={aiDraft}
       />
     </div>
   );
