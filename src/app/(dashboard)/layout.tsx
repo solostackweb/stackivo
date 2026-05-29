@@ -2,6 +2,9 @@ import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { requireOnboarded } from "@/features/onboarding/server";
 import { getCurrentSubscription } from "@/features/subscription/server";
 import { DashboardSupportLayer } from "@/features/support/dashboard-support";
+import { listClients } from "@/features/clients/server";
+import { getClientDisplayName } from "@/features/clients/utils";
+import { listProjects } from "@/features/projects/server";
 
 /**
  * Dashboard group layout.
@@ -21,13 +24,27 @@ export default async function DashboardGroupLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const [profile, subscription] = await Promise.all([
+  const [profile, subscription, clients, projects] = await Promise.all([
     requireOnboarded(),
     getCurrentSubscription(),
+    listClients({ limit: 200 }),
+    listProjects({ limit: 200 }),
   ]);
 
   return (
-    <DashboardShell profile={profile} subscription={subscription}>
+    <DashboardShell
+      profile={profile}
+      subscription={subscription}
+      aiClients={clients.map((client) => ({
+        id: client.id,
+        name: getClientDisplayName(client),
+      }))}
+      aiProjects={projects.map((project) => ({
+        id: project.id,
+        name: project.name,
+        clientId: project.clientId,
+      }))}
+    >
       {children}
       <DashboardSupportLayer
         identity={{

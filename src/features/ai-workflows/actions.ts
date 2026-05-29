@@ -90,7 +90,7 @@ const operationalDraftRequestSchema = z.object({
     "contract",
     "welcome_document",
   ]),
-  prompt: z.string().trim().min(4).max(2000),
+  prompt: z.string().trim().min(4).max(6000),
   clientId: z.string().optional().or(z.literal("")),
   projectId: z.string().optional().or(z.literal("")),
   defaultHourlyRate: z.coerce.number().nonnegative().optional(),

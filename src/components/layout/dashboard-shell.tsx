@@ -26,10 +26,14 @@ export function DashboardShell({
   children,
   profile,
   subscription,
+  aiClients = [],
+  aiProjects = [],
 }: {
   children: React.ReactNode;
   profile: BusinessProfile;
   subscription: CurrentSubscription | null;
+  aiClients?: Array<{ id: string; name: string }>;
+  aiProjects?: Array<{ id: string; name: string; clientId: string | null }>;
 }) {
   return (
     <DashboardShellProviders profile={profile} subscription={subscription}>
@@ -37,7 +41,7 @@ export function DashboardShell({
         <AppSidebar />
         <MobileNav />
         <div className="flex min-w-0 flex-1 flex-col">
-          <TopNav />
+          <TopNav aiClients={aiClients} aiProjects={aiProjects} />
           <main
             className="flex-1"
             style={{

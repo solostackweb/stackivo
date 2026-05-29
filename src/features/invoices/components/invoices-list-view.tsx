@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Plus, FileText, Sparkles } from "lucide-react";
+import { Plus, FileText } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -39,7 +39,6 @@ import {
   duplicateInvoiceAction,
 } from "../actions";
 import { sendInvoiceAction } from "../delivery";
-import { InvoiceAiAgentWorkflow } from "./invoice-ai-agent-workflow";
 
 interface InvoicesListViewProps {
   invoices: InvoiceRecord[];
@@ -56,13 +55,10 @@ interface InvoicesListViewProps {
 export function InvoicesListView({
   invoices,
   clients,
-  projects,
-  nextInvoiceNumber,
 }: InvoicesListViewProps) {
   const router = useRouter();
   const [pendingDeleteIds, setPendingDeleteIds] = React.useState<string[]>([]);
   const [bulkDeleteOpen, setBulkDeleteOpen] = React.useState(false);
-  const [aiOpen, setAiOpen] = React.useState(false);
   const [, startTransition] = React.useTransition();
 
   const lookup: InvoiceColumnLookup = React.useMemo(
@@ -187,17 +183,6 @@ export function InvoicesListView({
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            size="sm"
-            onClick={() => setAiOpen((value) => !value)}
-            className="group relative isolate overflow-hidden border border-primary/30 bg-background text-primary shadow-sm transition-colors hover:border-primary/60 hover:bg-primary/5 hover:text-primary"
-          >
-            <span className="pointer-events-none absolute inset-x-3 bottom-0 h-px bg-gradient-to-r from-blue-500 via-violet-500 to-cyan-400 opacity-70 transition-opacity group-hover:opacity-100" />
-            <span className="relative z-10 inline-flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-primary" />
-              Generate new invoice with AI
-            </span>
-          </Button>
           <Button asChild size="sm">
             <Link href="/dashboard/invoices/new">
               <Plus /> New invoice
@@ -206,16 +191,9 @@ export function InvoicesListView({
         </div>
       </div>
 
-      <div
-        className={cn(
-          "grid items-start gap-6",
-          aiOpen ? "xl:grid-cols-[minmax(0,1fr)_420px]" : "grid-cols-1",
-        )}
-      >
-        <div className="min-w-0 space-y-8">
-          <InvoicesSummary invoices={invoices} />
+      <InvoicesSummary invoices={invoices} />
 
-          <DataTable
+      <DataTable
             columns={columns}
             data={invoices}
             initialPageSize={10}
@@ -331,16 +309,6 @@ export function InvoicesListView({
               );
             }}
           />
-        </div>
-
-        <InvoiceAiAgentWorkflow
-          clients={clients}
-          projects={projects}
-          nextInvoiceNumber={nextInvoiceNumber}
-          open={aiOpen}
-          onOpenChange={setAiOpen}
-        />
-      </div>
 
       <AlertDialog open={bulkDeleteOpen} onOpenChange={setBulkDeleteOpen}>
         <AlertDialogContent>

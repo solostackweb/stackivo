@@ -6,6 +6,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { useProfile } from "@/features/profile/context";
 import { getDisplayName } from "@/features/profile/utils";
@@ -48,6 +49,8 @@ const WORKFLOW_OPTIONS: Record<
     secondOptions: string[];
     finalQuestion: string;
     finalOptions: string[];
+    detailQuestion?: string;
+    detailPlaceholder?: string;
     generating: string;
   }
 > = {
@@ -99,6 +102,9 @@ const WORKFLOW_OPTIONS: Record<
     secondOptions: ["Fixed fee", "Hourly", "Monthly retainer", "Milestone payments", "50% upfront"],
     finalQuestion: "What clauses matter most?",
     finalOptions: ["Scope control", "Payment terms", "Revision limits", "IP ownership", "Confidentiality"],
+    detailQuestion: "Add the deal specifics",
+    detailPlaceholder:
+      "Example: Fixed fee ₹1,50,000. 50% upfront, 50% before handoff. Includes landing page design, Webflow build, 2 revision rounds, client provides copy and assets. Timeline 3 weeks.",
     generating: "Drafting the agreement...",
   },
   welcome_document: {
@@ -109,9 +115,14 @@ const WORKFLOW_OPTIONS: Record<
     secondOptions: ["Process", "Communication", "Feedback rounds", "Payments", "Deliverables", "Next steps"],
     finalQuestion: "What tone should it use?",
     finalOptions: ["Warm", "Premium", "Direct", "Detailed", "Friendly"],
+    detailQuestion: "Add onboarding specifics",
+    detailPlaceholder:
+      "Example: Client is Acme Encore. Explain weekly Friday updates, feedback in one consolidated doc, invoices due in 15 days, final files via portal, kickoff call next Monday.",
     generating: "Drafting the welcome document...",
   },
 };
+
+const DETAIL_WORKFLOWS = new Set<OperationsWorkflow>(["contract", "welcome_document"]);
 
 export function OperationalAiAgentWorkflow<TDraft extends OperationsDraft>({
   workflow,
@@ -132,6 +143,7 @@ export function OperationalAiAgentWorkflow<TDraft extends OperationsDraft>({
   const [clientId, setClientId] = React.useState(selectedClientId ?? "");
   const [projectId, setProjectId] = React.useState(selectedProjectId ?? "");
   const [answers, setAnswers] = React.useState<string[]>([]);
+  const [customDetails, setCustomDetails] = React.useState("");
   const [draft, setDraft] = React.useState<TDraft | null>(null);
   const [provider, setProvider] = React.useState<"groq" | "local" | null>(null);
   const [introVisible, setIntroVisible] = React.useState(false);
@@ -147,6 +159,7 @@ export function OperationalAiAgentWorkflow<TDraft extends OperationsDraft>({
   );
   const selectedClient = clients.find((client) => client.id === clientId) ?? null;
   const selectedProject = projects.find((project) => project.id === projectId) ?? null;
+  const acceptsDetails = DETAIL_WORKFLOWS.has(workflow);
   const canDraft = answers.length >= 3 && !pending;
 
   React.useEffect(() => {
@@ -154,6 +167,7 @@ export function OperationalAiAgentWorkflow<TDraft extends OperationsDraft>({
     setClientId(selectedClientId ?? "");
     setProjectId(selectedProjectId ?? "");
     setAnswers([]);
+    setCustomDetails("");
     setDraft(null);
     setProvider(null);
     setIntroVisible(false);
@@ -194,7 +208,16 @@ export function OperationalAiAgentWorkflow<TDraft extends OperationsDraft>({
       window.cancelAnimationFrame(first);
       window.cancelAnimationFrame(second);
     };
-  }, [answers, draft, introTyping, introVisible, pending, typingQuestion, visibleQuestions]);
+  }, [
+    answers,
+    customDetails,
+    draft,
+    introTyping,
+    introVisible,
+    pending,
+    typingQuestion,
+    visibleQuestions,
+  ]);
 
   const selectAnswer = (step: number, answer: string) => {
     setDraft(null);
@@ -210,6 +233,7 @@ export function OperationalAiAgentWorkflow<TDraft extends OperationsDraft>({
       selectedClient ? `Client: ${entityName(selectedClient)}` : "",
       selectedProject ? `Project: ${entityName(selectedProject)}` : "",
       ...answers,
+      customDetails.trim() ? `Specific user details: ${customDetails.trim()}` : "",
     ]
       .filter(Boolean)
       .join(". ");
@@ -335,6 +359,30 @@ export function OperationalAiAgentWorkflow<TDraft extends OperationsDraft>({
             />
             {answers[2] && <UserBubble title="Preference">{answers[2]}</UserBubble>}
 
+            {answers.length >= 3 && acceptsDetails && !draft && (
+              <AiBubble>
+                <div className="space-y-3">
+                  <div>
+                    <p className="font-medium">{config.detailQuestion}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      This is where Groq helps most. Add scope, fees, timeline,
+                      policies, tone, or anything the client should see.
+                    </p>
+                  </div>
+                  <Textarea
+                    value={customDetails}
+                    onChange={(event) => {
+                      setCustomDetails(event.target.value);
+                      setDraft(null);
+                    }}
+                    placeholder={config.detailPlaceholder}
+                    rows={5}
+                    className="resize-none bg-background"
+                  />
+                </div>
+              </AiBubble>
+            )}
+
             {pending && (
               <AiBubble>
                 <span className="inline-flex items-center gap-2">
@@ -398,7 +446,7 @@ export function AiWorkflowTriggerButton({
       size="sm"
       onClick={onClick}
       className={cn(
-        "group relative isolate overflow-hidden border border-primary/30 bg-background text-primary shadow-sm transition-colors hover:border-primary/60 hover:bg-primary/5 hover:text-primary",
+        "hidden group relative isolate overflow-hidden border border-primary/30 bg-background text-primary shadow-sm transition-colors hover:border-primary/60 hover:bg-primary/5 hover:text-primary",
         active && "border-primary/60 bg-primary/5",
       )}
     >

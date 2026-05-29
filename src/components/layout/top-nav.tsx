@@ -9,8 +9,14 @@ import { Breadcrumbs } from "@/components/shared/breadcrumbs";
 import { CommandPaletteTrigger } from "@/components/shared/command-palette";
 import { NotificationsMenu } from "@/components/shared/notifications-menu";
 import { Separator } from "@/components/ui/separator";
+import { StackivoAiAssistant } from "@/features/ai-workflows/components/stackivo-ai-assistant";
 
-export function TopNav() {
+interface TopNavProps {
+  aiClients?: Array<{ id: string; name: string }>;
+  aiProjects?: Array<{ id: string; name: string; clientId: string | null }>;
+}
+
+export function TopNav({ aiClients = [], aiProjects = [] }: TopNavProps) {
   return (
     <header
       className="sticky top-0 z-30 flex items-center gap-2 border-b bg-background/80 px-3 shadow-sm backdrop-blur-xl md:gap-3 md:px-6"
@@ -45,6 +51,7 @@ export function TopNav() {
 
       {/* Right cluster — theme toggle hidden on mobile (lives inside user menu) */}
       <div className="flex items-center gap-0.5 md:gap-1">
+        <StackivoAiAssistant clients={aiClients} projects={aiProjects} />
         <NotificationsMenu />
         <span className="hidden md:inline-flex">
           <ThemeToggle />
