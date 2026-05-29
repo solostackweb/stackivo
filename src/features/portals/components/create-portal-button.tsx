@@ -26,6 +26,8 @@ import {
 } from "@/components/ui/dialog";
 import { createPortalAction } from "../actions";
 import { portalDashboardDetail } from "../routes";
+import { OperationalAiSheet } from "@/features/ai-workflows/components/operational-ai-sheet";
+import type { AiPortalDraft } from "@/features/ai-workflows/types";
 
 /**
  * "New portal" button + create dialog. The dialog collects only the
@@ -105,6 +107,12 @@ export function CreatePortalButton({
     router.push(portalDashboardDetail(res.data!.portalId));
   }
 
+  const applyAiDraft = React.useCallback((draft: AiPortalDraft) => {
+    setName(draft.name);
+    setBrandColor(draft.brandColor);
+    if (draft.clientId) setClientId(draft.clientId);
+  }, []);
+
   return (
     <>
       <Dialog open={open} onOpenChange={setOpen}>
@@ -115,11 +123,29 @@ export function CreatePortalButton({
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Create a client portal</DialogTitle>
-          <DialogDescription>
-            Only one active portal per client. You can attach contracts,
-            invoices, and files after creation.
-          </DialogDescription>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <DialogTitle>Create a client portal</DialogTitle>
+              <DialogDescription>
+                Only one active portal per client. You can attach contracts,
+                invoices, and files after creation.
+              </DialogDescription>
+            </div>
+            <OperationalAiSheet<AiPortalDraft>
+              workflow="portal"
+              title="Let's create your portal"
+              description="Describe the client workspace and Stackivo AI will draft the setup."
+              placeholder="Example: Portal for Acme's brand redesign project, use a clean blue brand color"
+              clients={clientOptions.map((client) => ({
+                id: client.id,
+                name: client.businessName
+                  ? `${client.businessName} · ${client.fullName}`
+                  : client.fullName,
+              }))}
+              selectedClientId={clientId}
+              onApplyDraft={applyAiDraft}
+            />
+          </div>
         </DialogHeader>
         <form onSubmit={onSubmit} className="space-y-4">
           <div className="space-y-2">

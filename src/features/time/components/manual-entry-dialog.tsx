@@ -27,6 +27,8 @@ import { manualTimeEntryAction } from "../actions";
 import { useSubscription } from "@/features/subscription/hooks/use-subscription";
 import { Sparkles } from "lucide-react";
 import type { TimerProjectOption } from "./active-timer-widget";
+import { OperationalAiSheet } from "@/features/ai-workflows/components/operational-ai-sheet";
+import type { AiTimeEntryDraft } from "@/features/ai-workflows/types";
 
 interface ManualEntryDialogProps {
   open: boolean;
@@ -118,14 +120,41 @@ export function ManualEntryDialog({
     });
   };
 
+  const applyAiDraft = React.useCallback((draft: AiTimeEntryDraft) => {
+    setValues((prev) => ({
+      ...prev,
+      description: draft.description,
+      projectId: draft.projectId || NO_PROJECT,
+      date: draft.date || prev.date,
+      hours: draft.hours,
+      minutes: draft.minutes,
+      billable: draft.billable,
+      hourlyRate: draft.hourlyRate,
+    }));
+  }, []);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Log time</DialogTitle>
-          <DialogDescription>
-            Back-date an entry or log time you forgot to track live.
-          </DialogDescription>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <DialogTitle>Log time</DialogTitle>
+              <DialogDescription>
+                Back-date an entry or log time you forgot to track live.
+              </DialogDescription>
+            </div>
+            <OperationalAiSheet<AiTimeEntryDraft>
+              workflow="time_entry"
+              title="Let's log your time"
+              description="Describe the work and Stackivo AI will draft the time entry."
+              placeholder="Example: 2 hours today on landing page revisions for the Acme website project, billable"
+              projects={projects}
+              selectedProjectId={values.projectId === NO_PROJECT ? "" : values.projectId}
+              defaultHourlyRate={defaultHourlyRate}
+              onApplyDraft={applyAiDraft}
+            />
+          </div>
         </DialogHeader>
 
         <div className="space-y-4">

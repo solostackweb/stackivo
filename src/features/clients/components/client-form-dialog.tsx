@@ -8,7 +8,6 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -19,6 +18,8 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { StateSelect } from "@/features/onboarding/components/state-select";
 import { useProfile } from "@/features/profile/context";
+import { OperationalAiSheet } from "@/features/ai-workflows/components/operational-ai-sheet";
+import type { AiClientDraft } from "@/features/ai-workflows/types";
 
 import type { ClientRecord } from "../server";
 import {
@@ -63,6 +64,7 @@ export function ClientFormDialog({
   const [gstRegistered, setGstRegistered] = React.useState<boolean>(
     client?.gstRegistered ?? false,
   );
+  const formRef = React.useRef<HTMLFormElement>(null);
 
   // Reset transient state when the dialog re-opens or switches client.
   React.useEffect(() => {
@@ -108,21 +110,56 @@ export function ClientFormDialog({
     });
   };
 
+  const applyAiDraft = React.useCallback((draft: AiClientDraft) => {
+    const form = formRef.current;
+    if (!form) return;
+    const setField = (name: string, value: string | null | undefined) => {
+      const field = form.elements.namedItem(name);
+      if (field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement) {
+        field.value = value ?? "";
+      }
+    };
+    setField("fullName", draft.fullName);
+    setField("businessName", draft.businessName);
+    setField("email", draft.email);
+    setField("phone", draft.phone);
+    setField("billingAddress", draft.billingAddress);
+    setField("notes", draft.notes);
+  }, []);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col gap-0 p-0">
         <div className="border-b px-6 py-4 flex-shrink-0">
           <DialogHeader>
-            <DialogTitle>{isEdit ? "Edit client" : "Add client"}</DialogTitle>
-            <DialogDescription>
-              {isEdit
-                ? "Update this client's contact and billing details."
-                : "Add a new client to your workspace. You can invoice them right away."}
-            </DialogDescription>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <DialogTitle>{isEdit ? "Edit client" : "Add client"}</DialogTitle>
+                <DialogDescription>
+                  {isEdit
+                    ? "Update this client's contact and billing details."
+                    : "Add a new client to your workspace. You can invoice them right away."}
+                </DialogDescription>
+              </div>
+              {!isEdit && (
+                <OperationalAiSheet<AiClientDraft>
+                  workflow="client"
+                  title="Let's add a client"
+                  description="Describe the client and Stackivo AI will fill the contact draft."
+                  placeholder="Example: Acme Digital, marketing agency in Mumbai, contact Priya, email priya@acme.example, usually pays in 15 days"
+                  onApplyDraft={applyAiDraft}
+                />
+              )}
+            </div>
           </DialogHeader>
         </div>
 
-        <form id="client-form" action={handleSubmit} className="space-y-5 px-6 py-4 overflow-y-auto flex-1">
+        <form
+          ref={formRef}
+          id="client-form"
+          action={handleSubmit}
+          className="space-y-5 px-6 py-4 overflow-y-auto flex-1"
+        >
           {state && !state.ok && (
             <p className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive">
               {state.error}

@@ -190,6 +190,13 @@ export function requireServerEnv() {
     // delivery_logs metadata but not added to a Brevo list, so subscription
     // forms succeed and the founder gets the lead in support@.
     brevoNewsletterListId: optional(process.env.BREVO_NEWSLETTER_LIST_ID),
+    // -- Stackivo AI workflows ----------------------------------------------
+    // Groq-hosted inference for contextual workflow draft generation. Optional:
+    // when unset, AI workflow actions return a deterministic local draft so the
+    // UI can still be exercised in dev without network access.
+    groqApiKey: optional(process.env.GROQ_API_KEY),
+    groqModel:
+      optional(process.env.GROQ_MODEL) ?? "qwen/qwen3-32b",
     // -- Cloudflare R2 (Client Portal file storage) -----------------------
     // S3-compatible bucket for client-portal file uploads. We use R2
     // because it has zero egress fees, which lets us host customer

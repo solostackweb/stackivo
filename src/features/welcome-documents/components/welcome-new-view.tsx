@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 
 import { PageHeader } from "@/components/shared/page-header";
 import { Card, CardContent } from "@/components/ui/card";
+import { OperationalAiSheet } from "@/features/ai-workflows/components/operational-ai-sheet";
+import type { AiWelcomeDraft } from "@/features/ai-workflows/types";
 
 import type {
   WelcomeDocumentTemplate,
@@ -150,6 +152,54 @@ export function WelcomeNewView({
 }: Props) {
   // Hook must come before any conditional return.
   const [showBlankEditor, setShowBlankEditor] = React.useState(false);
+  const [aiInitial, setAiInitial] = React.useState<{
+    title: string;
+    intro: string;
+    sections: WelcomeDocumentSection[];
+    clientId: string | null;
+    brandColor: string | null;
+    acknowledgementRequired: boolean;
+  } | null>(null);
+
+  const applyAiDraft = React.useCallback(
+    (draft: AiWelcomeDraft) => {
+      setAiInitial({
+        title: draft.title,
+        intro: draft.intro ?? "",
+        sections: draft.sections.map((section, index) => ({
+          id: `s_${index + 1}`,
+          heading: section.heading,
+          body: section.body,
+        })),
+        clientId: draft.clientId || null,
+        brandColor: defaultBrandColor ?? "#2563EB",
+        acknowledgementRequired: draft.acknowledgementRequired,
+      });
+      setShowBlankEditor(false);
+    },
+    [defaultBrandColor],
+  );
+
+  if (aiInitial) {
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          title="AI welcome document"
+          description="Review the draft, edit anything you need, then save it."
+          actions={
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setAiInitial(null)}
+            >
+              <ArrowLeft className="h-3.5 w-3.5" /> Templates
+            </Button>
+          }
+        />
+        <WelcomeEditor mode="create" clients={clients} initial={aiInitial} />
+      </div>
+    );
+  }
 
   if (preset) {
     return (
@@ -233,11 +283,21 @@ export function WelcomeNewView({
         title="Pick a starting point"
         description="Templates are fully editable — pick the closest fit and tweak as you go."
         actions={
-          <Button asChild variant="ghost" size="sm">
-            <Link href={WELCOME_DOCUMENTS_INDEX}>
-              <ArrowLeft className="h-3.5 w-3.5" /> Back
-            </Link>
-          </Button>
+          <div className="flex items-center gap-2">
+            <OperationalAiSheet<AiWelcomeDraft>
+              workflow="welcome_document"
+              title="Let's create your welcome document"
+              description="Describe the onboarding experience and Stackivo AI will draft editable sections."
+              placeholder="Example: Welcome pack for a web design client, explain process, communication, feedback rounds, payments, files, and next steps"
+              clients={clients}
+              onApplyDraft={applyAiDraft}
+            />
+            <Button asChild variant="ghost" size="sm">
+              <Link href={WELCOME_DOCUMENTS_INDEX}>
+                <ArrowLeft className="h-3.5 w-3.5" /> Back
+              </Link>
+            </Button>
+          </div>
         }
       />
 
