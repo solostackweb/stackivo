@@ -84,6 +84,7 @@ export function InvoiceAiAgentWorkflow({
   const [step, setStep] = React.useState<Step>("client");
   const [clientId, setClientId] = React.useState("");
   const [projectId, setProjectId] = React.useState("");
+  const [skippedProject, setSkippedProject] = React.useState(false);
   const [work, setWork] = React.useState("");
   const [dueDate, setDueDate] = React.useState(addDays(15));
   const [quantity, setQuantity] = React.useState(1);
@@ -96,6 +97,7 @@ export function InvoiceAiAgentWorkflow({
   const [introTyping, setIntroTyping] = React.useState(false);
   const [visibleQuestions, setVisibleQuestions] = React.useState<Step[]>([]);
   const [typingQuestion, setTypingQuestion] = React.useState<Step | null>(null);
+  const conversationRef = React.useRef<HTMLDivElement>(null);
 
   const client = clients.find((item) => item.id === clientId) ?? null;
   const projectOptions = React.useMemo(
@@ -111,6 +113,7 @@ export function InvoiceAiAgentWorkflow({
     setStep("client");
     setClientId("");
     setProjectId("");
+    setSkippedProject(false);
     setWork("");
     setDueDate(addDays(profile?.invoiceDefaultDueDays ?? 15));
     setQuantity(1);
@@ -160,6 +163,29 @@ export function InvoiceAiAgentWorkflow({
     }, 650);
     return () => window.clearTimeout(timer);
   }, [introVisible, open, step, visibleQuestions]);
+
+  React.useEffect(() => {
+    const node = conversationRef.current;
+    if (!node) return;
+    node.scrollTo({ top: node.scrollHeight, behavior: "smooth" });
+  }, [
+    introTyping,
+    introVisible,
+    typingQuestion,
+    visibleQuestions,
+    step,
+    clientId,
+    projectId,
+    skippedProject,
+    work,
+    dueDate,
+    quantity,
+    rate,
+    discount,
+    notes,
+    pending,
+    created,
+  ]);
 
   const createInvoice = () => {
     if (!clientId || !work.trim() || rate <= 0) return;
@@ -270,15 +296,23 @@ export function InvoiceAiAgentWorkflow({
     });
   }, [emailSent, openWhatsApp, sendEmail, startTransition]);
 
+  const selectedClientName = client ? getClientDisplayName(client) : "";
+  const selectedProjectName = project?.name ?? "No project";
+  const dueDateLabel = new Date(dueDate).toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
         <Button
           size="sm"
-          className="group relative isolate overflow-hidden border-0 bg-transparent p-[1px] text-foreground shadow-sm transition-transform hover:scale-[1.01] hover:bg-transparent"
+          className="group relative isolate overflow-hidden border border-primary/30 bg-background text-primary shadow-sm transition-colors hover:border-primary/60 hover:bg-primary/5 hover:text-primary"
         >
-          <span className="absolute inset-[-120%] -z-10 bg-[conic-gradient(from_90deg,#2563eb,#8b5cf6,#ec4899,#f59e0b,#22c55e,#06b6d4,#2563eb)] opacity-90 transition-transform duration-700 group-hover:rotate-180 group-focus-visible:rotate-180" />
-          <span className="relative z-10 inline-flex h-full items-center gap-2 rounded-[5px] bg-background px-3 py-1.5 text-primary transition-colors group-hover:bg-primary/5">
+          <span className="pointer-events-none absolute inset-x-3 bottom-0 h-px bg-gradient-to-r from-blue-500 via-violet-500 to-cyan-400 opacity-70 transition-opacity group-hover:opacity-100" />
+          <span className="relative z-10 inline-flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-primary" />
             Generate new invoice with AI
           </span>
@@ -297,7 +331,10 @@ export function InvoiceAiAgentWorkflow({
           </SheetTitle>
         </SheetHeader>
 
-        <div className="flex-1 space-y-5 overflow-y-auto bg-[radial-gradient(circle_at_top_left,rgba(37,99,235,0.06),transparent_32rem)] px-5 py-5">
+        <div
+          ref={conversationRef}
+          className="flex-1 space-y-5 overflow-y-auto bg-[radial-gradient(circle_at_top_left,rgba(37,99,235,0.06),transparent_32rem)] px-5 py-5"
+        >
           {introTyping && <TypingBubble />}
           {introVisible && (
             <AiBubble>
@@ -308,12 +345,17 @@ export function InvoiceAiAgentWorkflow({
           )}
 
           {typingQuestion === "client" && <TypingBubble />}
-          <AiQuestion show={visibleQuestions.includes("client")} title="Choose a client">
+          <AiQuestion
+            show={visibleQuestions.includes("client") && step === "client"}
+            title="Choose a client"
+            caption="I’ll use this client’s billing details and contact info."
+          >
             <Select
               value={clientId}
               onValueChange={(value) => {
                 setClientId(value);
                 setProjectId("");
+                setSkippedProject(false);
                 setStep("project");
               }}
             >
@@ -331,12 +373,21 @@ export function InvoiceAiAgentWorkflow({
             </Select>
           </AiQuestion>
 
+          {clientId && step !== "client" && (
+            <UserBubble title="Client selected">{selectedClientName}</UserBubble>
+          )}
+
           {typingQuestion === "project" && <TypingBubble />}
-          <AiQuestion show={visibleQuestions.includes("project")} title="Choose a project">
+          <AiQuestion
+            show={visibleQuestions.includes("project") && step === "project"}
+            title="Choose a project"
+            caption="I’ll only show projects linked to the selected client."
+          >
             <Select
               value={projectId}
               onValueChange={(value) => {
                 setProjectId(value);
+                setSkippedProject(false);
                 setStep("work");
               }}
               disabled={!clientId}
@@ -360,15 +411,26 @@ export function InvoiceAiAgentWorkflow({
               type="button"
               variant="ghost"
               size="sm"
-              onClick={() => setStep("work")}
+              onClick={() => {
+                setSkippedProject(true);
+                setStep("work");
+              }}
               className="mt-2"
             >
               Skip project
             </Button>
           </AiQuestion>
 
+          {(projectId || skippedProject) && !["client", "project"].includes(step) && (
+            <UserBubble title="Project">{selectedProjectName}</UserBubble>
+          )}
+
           {typingQuestion === "work" && <TypingBubble />}
-          <AiQuestion show={visibleQuestions.includes("work")} title="Describe the work">
+          <AiQuestion
+            show={visibleQuestions.includes("work") && step === "work"}
+            title="Describe the work"
+            caption="A short sentence is enough. I’ll polish it into an invoice line."
+          >
             <Textarea
               value={work}
               onChange={(event) => setWork(event.target.value)}
@@ -387,8 +449,16 @@ export function InvoiceAiAgentWorkflow({
             </Button>
           </AiQuestion>
 
+          {work.trim() && !["client", "project", "work"].includes(step) && (
+            <UserBubble title="Work description">{work.trim()}</UserBubble>
+          )}
+
           {typingQuestion === "due" && <TypingBubble />}
-          <AiQuestion show={visibleQuestions.includes("due")} title="Choose due date">
+          <AiQuestion
+            show={visibleQuestions.includes("due") && step === "due"}
+            title="Choose due date"
+            caption="Pick a common term or set a specific date."
+          >
             <div className="flex flex-wrap gap-2">
               {dueOptions.map((option) => (
                 <Choice
@@ -414,8 +484,16 @@ export function InvoiceAiAgentWorkflow({
             />
           </AiQuestion>
 
+          {!["client", "project", "work", "due"].includes(step) && (
+            <UserBubble title="Due date">{dueDateLabel}</UserBubble>
+          )}
+
           {typingQuestion === "amount" && <TypingBubble />}
-          <AiQuestion show={visibleQuestions.includes("amount")} title="Quantity and rate">
+          <AiQuestion
+            show={visibleQuestions.includes("amount") && step === "amount"}
+            title="Quantity and rate"
+            caption="Quantity defaults to 1. I’ll calculate the invoice value from this."
+          >
             <div className="grid gap-3 sm:grid-cols-2">
               <Input
                 type="number"
@@ -445,8 +523,19 @@ export function InvoiceAiAgentWorkflow({
             </Button>
           </AiQuestion>
 
+          {rate > 0 && !["client", "project", "work", "due", "amount"].includes(step) && (
+            <UserBubble title="Amount">
+              Qty {quantity} × {(profile?.defaultCurrency ?? "INR")}{" "}
+              {rate.toLocaleString("en-IN")}
+            </UserBubble>
+          )}
+
           {typingQuestion === "discount" && <TypingBubble />}
-          <AiQuestion show={visibleQuestions.includes("discount")} title="Any discount?">
+          <AiQuestion
+            show={visibleQuestions.includes("discount") && step === "discount"}
+            title="Any discount?"
+            caption="Leave it at zero if there’s no discount."
+          >
             <Input
               type="number"
               min="0"
@@ -460,8 +549,20 @@ export function InvoiceAiAgentWorkflow({
             </Button>
           </AiQuestion>
 
+          {!["client", "project", "work", "due", "amount", "discount"].includes(step) && (
+            <UserBubble title="Discount">
+              {discount > 0
+                ? `${profile?.defaultCurrency ?? "INR"} ${discount.toLocaleString("en-IN")}`
+                : "No discount"}
+            </UserBubble>
+          )}
+
           {typingQuestion === "notes" && <TypingBubble />}
-          <AiQuestion show={visibleQuestions.includes("notes")} title="Any extra notes or payment terms?">
+          <AiQuestion
+            show={visibleQuestions.includes("notes") && step === "notes"}
+            title="Any extra notes or payment terms?"
+            caption="Optional. I’ll include your default payment terms if you skip this."
+          >
             <Textarea
               value={notes}
               onChange={(event) => setNotes(event.target.value)}
@@ -480,6 +581,10 @@ export function InvoiceAiAgentWorkflow({
               Generate invoice
             </Button>
           </AiQuestion>
+
+          {notes.trim() && ["creating", "ready"].includes(step) && (
+            <UserBubble title="Notes">{notes.trim()}</UserBubble>
+          )}
 
           {step === "creating" && (
             <AiBubble>
@@ -537,17 +642,22 @@ export function InvoiceAiAgentWorkflow({
 function AiQuestion({
   show,
   title,
+  caption,
   children,
 }: {
   show: boolean;
   title: string;
+  caption?: string;
   children: React.ReactNode;
 }) {
   if (!show) return null;
   return (
     <AiBubble>
-      <p className="mb-3 font-medium">{title}</p>
+      <p className="font-medium">{title}</p>
+      {caption && <p className="mt-1 text-xs text-muted-foreground">{caption}</p>}
+      <div className="mt-3">
       {children}
+      </div>
     </AiBubble>
   );
 }
@@ -574,6 +684,25 @@ function TypingBubble() {
         <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-current" />
       </span>
     </AiBubble>
+  );
+}
+
+function UserBubble({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex justify-end animate-in fade-in-0 slide-in-from-bottom-1">
+      <div className="max-w-[78%] rounded-lg bg-primary px-4 py-3 text-sm leading-relaxed text-primary-foreground shadow-sm">
+        <p className="text-[10px] font-semibold uppercase tracking-wider text-primary-foreground/70">
+          {title}
+        </p>
+        <div className="mt-1 font-medium">{children}</div>
+      </div>
+    </div>
   );
 }
 
