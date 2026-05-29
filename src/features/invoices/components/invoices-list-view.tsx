@@ -22,6 +22,9 @@ import { DataTable } from "@/components/data-table/data-table";
 import { EmptyState } from "@/components/shared/empty-state";
 
 import type { InvoiceRecord } from "../server";
+import type { ClientRecord } from "@/features/clients/server";
+import type { ProjectRecord } from "@/features/projects/server";
+import { getClientDisplayName } from "@/features/clients/utils";
 import {
   buildInvoiceColumns,
   type InvoiceColumnLookup,
@@ -36,10 +39,13 @@ import {
   duplicateInvoiceAction,
 } from "../actions";
 import { sendInvoiceAction } from "../delivery";
+import { InvoiceAiAgentWorkflow } from "./invoice-ai-agent-workflow";
 
 interface InvoicesListViewProps {
   invoices: InvoiceRecord[];
-  clients: Array<{ id: string; name: string }>;
+  clients: ClientRecord[];
+  projects: ProjectRecord[];
+  nextInvoiceNumber: string;
 }
 
 /**
@@ -50,6 +56,8 @@ interface InvoicesListViewProps {
 export function InvoicesListView({
   invoices,
   clients,
+  projects,
+  nextInvoiceNumber,
 }: InvoicesListViewProps) {
   const router = useRouter();
   const [pendingDeleteIds, setPendingDeleteIds] = React.useState<string[]>([]);
@@ -57,7 +65,9 @@ export function InvoicesListView({
   const [, startTransition] = React.useTransition();
 
   const lookup: InvoiceColumnLookup = React.useMemo(
-    () => ({ clientNameById: new Map(clients.map((c) => [c.id, c.name])) }),
+    () => ({
+      clientNameById: new Map(clients.map((c) => [c.id, getClientDisplayName(c)])),
+    }),
     [clients],
   );
 
@@ -67,7 +77,7 @@ export function InvoicesListView({
     );
     return clients
       .filter((c) => present.has(c.id))
-      .map((c) => ({ value: c.id, label: c.name }))
+      .map((c) => ({ value: c.id, label: getClientDisplayName(c) }))
       .sort((a, b) => a.label.localeCompare(b.label));
   }, [invoices, clients]);
 
@@ -176,6 +186,11 @@ export function InvoicesListView({
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <InvoiceAiAgentWorkflow
+            clients={clients}
+            projects={projects}
+            nextInvoiceNumber={nextInvoiceNumber}
+          />
           <Button asChild size="sm">
             <Link href="/dashboard/invoices/new">
               <Plus /> New invoice

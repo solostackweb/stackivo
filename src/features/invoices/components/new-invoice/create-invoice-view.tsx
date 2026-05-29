@@ -51,8 +51,6 @@ import { InvoiceItemRow, InvoiceItemsHeader } from "./invoice-item-row";
 import { InvoiceSummaryCard } from "./invoice-summary-card";
 import { InvoicePreview } from "./invoice-preview";
 import { useProfile } from "@/features/profile/context";
-import { GuidedAiWorkflowSheet } from "@/features/ai-workflows/components/guided-ai-workflow-sheet";
-import type { AiInvoiceDraft } from "@/features/ai-workflows/types";
 
 function todayIso() {
   return new Date().toISOString().slice(0, 10);
@@ -130,7 +128,7 @@ export function CreateInvoiceView({
   const { control, register, handleSubmit, setValue, formState } = form;
   const { errors, isSubmitting } = formState;
 
-  const { fields, append, remove, replace } = useFieldArray({
+  const { fields, append, remove } = useFieldArray({
     control,
     name: "items",
   });
@@ -250,38 +248,6 @@ export function CreateInvoiceView({
     () => toast.error("Please fix the errors before saving the invoice"),
   );
 
-  const applyAiDraft = React.useCallback(
-    (draft: AiInvoiceDraft & { clientId: string; projectId?: string; dueDate?: string }) => {
-      setValue("clientId", draft.clientId, { shouldValidate: true, shouldDirty: true });
-      setValue("projectId", draft.projectId ?? "", {
-        shouldValidate: true,
-        shouldDirty: true,
-      });
-      if (draft.dueDate) {
-        setValue("dueDate", draft.dueDate, {
-          shouldValidate: true,
-          shouldDirty: true,
-        });
-      }
-      replace(
-        draft.items.map((item) => ({
-          id: newItemId(),
-          description: item.description,
-          quantity: item.quantity,
-          rate: item.rate,
-        })),
-      );
-      if (draft.notes !== undefined) {
-        setValue("notes", draft.notes, { shouldValidate: true, shouldDirty: true });
-      }
-      if (draft.terms !== undefined) {
-        setValue("terms", draft.terms, { shouldValidate: true, shouldDirty: true });
-      }
-      setPreviewOpen(true);
-    },
-    [replace, setValue],
-  );
-
   return (
     <FormProvider {...form}>
       <div className="-mx-4 sm:-mx-6 lg:-mx-8 -mt-4 sm:-mt-6 lg:-mt-8 flex min-h-[calc(100vh-4rem)] flex-col">
@@ -316,18 +282,6 @@ export function CreateInvoiceView({
           </div>
 
           <div className="flex items-center gap-2">
-            <div className="hidden sm:block">
-              <GuidedAiWorkflowSheet<AiInvoiceDraft & { clientId: string; projectId?: string; dueDate?: string }>
-                workflow="invoice"
-                title="Let's create your invoice"
-                description="I'll ask only the details needed, then draft the invoice for your review."
-                clients={clients}
-                projects={projects}
-                selectedClientId={watched.clientId}
-                selectedProjectId={watched.projectId}
-                onApplyDraft={applyAiDraft}
-              />
-            </div>
             <Button
               type="button"
               variant="ghost"
@@ -677,18 +631,6 @@ export function CreateInvoiceView({
           }}
         >
           <div className="flex gap-2">
-            <GuidedAiWorkflowSheet<AiInvoiceDraft & { clientId: string; projectId?: string; dueDate?: string }>
-              workflow="invoice"
-              title="Let's create your invoice"
-              description="I'll ask only the details needed, then draft the invoice for your review."
-              clients={clients}
-              projects={projects}
-              selectedClientId={watched.clientId}
-              selectedProjectId={watched.projectId}
-              triggerClassName="h-11 w-11"
-              compactTrigger
-              onApplyDraft={applyAiDraft}
-            />
             <Button
               type="button"
               variant="outline"
