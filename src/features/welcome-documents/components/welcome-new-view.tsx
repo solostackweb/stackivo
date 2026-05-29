@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 
 import { PageHeader } from "@/components/shared/page-header";
 import { Card, CardContent } from "@/components/ui/card";
-import { OperationalAiSheet } from "@/features/ai-workflows/components/operational-ai-sheet";
+import { GuidedAiWorkflowSheet } from "@/features/ai-workflows/components/guided-ai-workflow-sheet";
 import type { AiWelcomeDraft } from "@/features/ai-workflows/types";
 
 import type {
@@ -284,7 +284,7 @@ export function WelcomeNewView({
         description="Templates are fully editable — pick the closest fit and tweak as you go."
         actions={
           <div className="flex items-center gap-2">
-            <OperationalAiSheet<AiWelcomeDraft>
+            <GuidedAiWorkflowSheet<AiWelcomeDraft>
               workflow="welcome_document"
               title="Let's create your welcome document"
               description="Describe the onboarding experience and Stackivo AI will draft editable sections."

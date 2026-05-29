@@ -35,7 +35,7 @@ import {
   updateWelcomeDocumentAction,
 } from "../actions";
 import { welcomeDocumentDetail } from "../routes";
-import { OperationalAiSheet } from "@/features/ai-workflows/components/operational-ai-sheet";
+import { GuidedAiWorkflowSheet } from "@/features/ai-workflows/components/guided-ai-workflow-sheet";
 import type { AiWelcomeDraft } from "@/features/ai-workflows/types";
 
 interface ClientOption {
@@ -187,7 +187,7 @@ export function WelcomeEditor(props: Props) {
       <Card>
         <CardContent className="space-y-4 p-5">
           <div className="flex justify-end">
-            <OperationalAiSheet<AiWelcomeDraft>
+            <GuidedAiWorkflowSheet<AiWelcomeDraft>
               workflow="welcome_document"
               title="Let's create your welcome document"
               description="Describe the onboarding experience and Stackivo AI will draft editable sections."

@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/dialog";
 import { createPortalAction } from "../actions";
 import { portalDashboardDetail } from "../routes";
-import { OperationalAiSheet } from "@/features/ai-workflows/components/operational-ai-sheet";
+import { GuidedAiWorkflowSheet } from "@/features/ai-workflows/components/guided-ai-workflow-sheet";
 import type { AiPortalDraft } from "@/features/ai-workflows/types";
 
 /**
@@ -131,7 +131,7 @@ export function CreatePortalButton({
                 invoices, and files after creation.
               </DialogDescription>
             </div>
-            <OperationalAiSheet<AiPortalDraft>
+            <GuidedAiWorkflowSheet<AiPortalDraft>
               workflow="portal"
               title="Let's create your portal"
               description="Describe the client workspace and Stackivo AI will draft the setup."

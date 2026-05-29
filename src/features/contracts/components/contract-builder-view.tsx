@@ -41,7 +41,7 @@ import { createContractAction } from "../actions";
 import { sendContractAction } from "../delivery";
 import { TemplatePicker } from "./template-picker";
 import { ContractPreview } from "./contract-preview";
-import { OperationalAiSheet } from "@/features/ai-workflows/components/operational-ai-sheet";
+import { GuidedAiWorkflowSheet } from "@/features/ai-workflows/components/guided-ai-workflow-sheet";
 import type { AiContractDraft } from "@/features/ai-workflows/types";
 
 type Step = "template" | "build";
@@ -282,7 +282,7 @@ export function ContractBuilderView({
             </p>
           </div>
           <div className="ml-auto">
-            <OperationalAiSheet<AiContractDraft>
+            <GuidedAiWorkflowSheet<AiContractDraft>
               workflow="contract"
               title="Let's draft your contract"
               description="Describe the agreement and Stackivo AI will create editable sections."
@@ -329,7 +329,7 @@ export function ContractBuilderView({
           </span>
         </div>
         <div className="ml-auto flex items-center gap-2">
-          <OperationalAiSheet<AiContractDraft>
+          <GuidedAiWorkflowSheet<AiContractDraft>
             workflow="contract"
             title="Let's draft your contract"
             description="Describe the agreement and Stackivo AI will create editable sections."

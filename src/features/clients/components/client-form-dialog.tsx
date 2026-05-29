@@ -18,7 +18,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { StateSelect } from "@/features/onboarding/components/state-select";
 import { useProfile } from "@/features/profile/context";
-import { OperationalAiSheet } from "@/features/ai-workflows/components/operational-ai-sheet";
+import { GuidedAiWorkflowSheet } from "@/features/ai-workflows/components/guided-ai-workflow-sheet";
 import type { AiClientDraft } from "@/features/ai-workflows/types";
 
 import type { ClientRecord } from "../server";
@@ -142,7 +142,7 @@ export function ClientFormDialog({
                 </DialogDescription>
               </div>
               {!isEdit && (
-                <OperationalAiSheet<AiClientDraft>
+                <GuidedAiWorkflowSheet<AiClientDraft>
                   workflow="client"
                   title="Let's add a client"
                   description="Describe the client and Stackivo AI will fill the contact draft."

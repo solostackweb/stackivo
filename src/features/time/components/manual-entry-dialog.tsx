@@ -27,7 +27,7 @@ import { manualTimeEntryAction } from "../actions";
 import { useSubscription } from "@/features/subscription/hooks/use-subscription";
 import { Sparkles } from "lucide-react";
 import type { TimerProjectOption } from "./active-timer-widget";
-import { OperationalAiSheet } from "@/features/ai-workflows/components/operational-ai-sheet";
+import { GuidedAiWorkflowSheet } from "@/features/ai-workflows/components/guided-ai-workflow-sheet";
 import type { AiTimeEntryDraft } from "@/features/ai-workflows/types";
 
 interface ManualEntryDialogProps {
@@ -144,7 +144,7 @@ export function ManualEntryDialog({
                 Back-date an entry or log time you forgot to track live.
               </DialogDescription>
             </div>
-            <OperationalAiSheet<AiTimeEntryDraft>
+            <GuidedAiWorkflowSheet<AiTimeEntryDraft>
               workflow="time_entry"
               title="Let's log your time"
               description="Describe the work and Stackivo AI will draft the time entry."

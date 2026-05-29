@@ -51,7 +51,7 @@ import { InvoiceItemRow, InvoiceItemsHeader } from "./invoice-item-row";
 import { InvoiceSummaryCard } from "./invoice-summary-card";
 import { InvoicePreview } from "./invoice-preview";
 import { useProfile } from "@/features/profile/context";
-import { InvoiceAiWorkflowSheet } from "@/features/ai-workflows/components/invoice-ai-workflow-sheet";
+import { GuidedAiWorkflowSheet } from "@/features/ai-workflows/components/guided-ai-workflow-sheet";
 import type { AiInvoiceDraft } from "@/features/ai-workflows/types";
 
 function todayIso() {
@@ -317,7 +317,10 @@ export function CreateInvoiceView({
 
           <div className="flex items-center gap-2">
             <div className="hidden sm:block">
-              <InvoiceAiWorkflowSheet
+              <GuidedAiWorkflowSheet<AiInvoiceDraft & { clientId: string; projectId?: string; dueDate?: string }>
+                workflow="invoice"
+                title="Let's create your invoice"
+                description="I'll ask only the details needed, then draft the invoice for your review."
                 clients={clients}
                 projects={projects}
                 selectedClientId={watched.clientId}
@@ -674,7 +677,10 @@ export function CreateInvoiceView({
           }}
         >
           <div className="flex gap-2">
-            <InvoiceAiWorkflowSheet
+            <GuidedAiWorkflowSheet<AiInvoiceDraft & { clientId: string; projectId?: string; dueDate?: string }>
+              workflow="invoice"
+              title="Let's create your invoice"
+              description="I'll ask only the details needed, then draft the invoice for your review."
               clients={clients}
               projects={projects}
               selectedClientId={watched.clientId}

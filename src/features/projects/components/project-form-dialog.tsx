@@ -30,7 +30,7 @@ import {
   type ActionResult,
 } from "../actions";
 import type { ProjectStatusRow } from "@/lib/supabase/types";
-import { OperationalAiSheet } from "@/features/ai-workflows/components/operational-ai-sheet";
+import { GuidedAiWorkflowSheet } from "@/features/ai-workflows/components/guided-ai-workflow-sheet";
 import type { AiProjectDraft } from "@/features/ai-workflows/types";
 
 interface ProjectFormDialogProps {
@@ -129,7 +129,7 @@ export function ProjectFormDialog({
               </DialogDescription>
             </div>
             {!isEdit && (
-              <OperationalAiSheet<AiProjectDraft>
+              <GuidedAiWorkflowSheet<AiProjectDraft>
                 workflow="project"
                 title="Let's create your project"
                 description="Describe the project and Stackivo AI will draft the core fields."
