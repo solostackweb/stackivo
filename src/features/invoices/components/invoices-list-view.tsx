@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Plus, FileText } from "lucide-react";
+import { Plus, FileText, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -62,6 +62,7 @@ export function InvoicesListView({
   const router = useRouter();
   const [pendingDeleteIds, setPendingDeleteIds] = React.useState<string[]>([]);
   const [bulkDeleteOpen, setBulkDeleteOpen] = React.useState(false);
+  const [aiOpen, setAiOpen] = React.useState(false);
   const [, startTransition] = React.useTransition();
 
   const lookup: InvoiceColumnLookup = React.useMemo(
@@ -186,11 +187,17 @@ export function InvoicesListView({
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <InvoiceAiAgentWorkflow
-            clients={clients}
-            projects={projects}
-            nextInvoiceNumber={nextInvoiceNumber}
-          />
+          <Button
+            size="sm"
+            onClick={() => setAiOpen((value) => !value)}
+            className="group relative isolate overflow-hidden border border-primary/30 bg-background text-primary shadow-sm transition-colors hover:border-primary/60 hover:bg-primary/5 hover:text-primary"
+          >
+            <span className="pointer-events-none absolute inset-x-3 bottom-0 h-px bg-gradient-to-r from-blue-500 via-violet-500 to-cyan-400 opacity-70 transition-opacity group-hover:opacity-100" />
+            <span className="relative z-10 inline-flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-primary" />
+              Generate new invoice with AI
+            </span>
+          </Button>
           <Button asChild size="sm">
             <Link href="/dashboard/invoices/new">
               <Plus /> New invoice
@@ -198,6 +205,14 @@ export function InvoicesListView({
           </Button>
         </div>
       </div>
+
+      <InvoiceAiAgentWorkflow
+        clients={clients}
+        projects={projects}
+        nextInvoiceNumber={nextInvoiceNumber}
+        open={aiOpen}
+        onOpenChange={setAiOpen}
+      />
 
       <InvoicesSummary invoices={invoices} />
 

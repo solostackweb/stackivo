@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { CheckCircle2, Loader2, Mail, Send, Smartphone, Sparkles, Wand2, X } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -29,6 +30,8 @@ interface InvoiceAiAgentWorkflowProps {
   clients: ClientRecord[];
   projects: ProjectRecord[];
   nextInvoiceNumber: string;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }
 
 type Step =
@@ -69,10 +72,11 @@ export function InvoiceAiAgentWorkflow({
   clients,
   projects,
   nextInvoiceNumber,
+  open,
+  onOpenChange,
 }: InvoiceAiAgentWorkflowProps) {
   const router = useRouter();
   const { profile } = useProfile();
-  const [open, setOpen] = React.useState(false);
   const [pending, startTransition] = React.useTransition();
   const [step, setStep] = React.useState<Step>("client");
   const [clientId, setClientId] = React.useState("");
@@ -91,6 +95,7 @@ export function InvoiceAiAgentWorkflow({
   const [visibleQuestions, setVisibleQuestions] = React.useState<Step[]>([]);
   const [typingQuestion, setTypingQuestion] = React.useState<Step | null>(null);
   const conversationRef = React.useRef<HTMLDivElement>(null);
+  const conversationEndRef = React.useRef<HTMLDivElement>(null);
 
   const client = clients.find((item) => item.id === clientId) ?? null;
   const projectOptions = React.useMemo(
@@ -158,9 +163,13 @@ export function InvoiceAiAgentWorkflow({
   }, [introVisible, open, step, visibleQuestions]);
 
   React.useEffect(() => {
-    const node = conversationRef.current;
-    if (!node) return;
-    node.scrollTo({ top: node.scrollHeight, behavior: "smooth" });
+    const id = window.requestAnimationFrame(() => {
+      conversationEndRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "end",
+      });
+    });
+    return () => window.cancelAnimationFrame(id);
   }, [
     introTyping,
     introVisible,
@@ -308,20 +317,15 @@ export function InvoiceAiAgentWorkflow({
   });
 
   return (
-    <>
-      <Button
-        size="sm"
-        onClick={() => setOpen(true)}
-        className="group relative isolate overflow-hidden border border-primary/30 bg-background text-primary shadow-sm transition-colors hover:border-primary/60 hover:bg-primary/5 hover:text-primary"
-      >
-        <span className="pointer-events-none absolute inset-x-3 bottom-0 h-px bg-gradient-to-r from-blue-500 via-violet-500 to-cyan-400 opacity-70 transition-opacity group-hover:opacity-100" />
-        <span className="relative z-10 inline-flex items-center gap-2">
-          <Sparkles className="h-4 w-4 text-primary" />
-          Generate new invoice with AI
-        </span>
-      </Button>
+    <AnimatePresence initial={false}>
       {open && (
-      <aside className="fixed bottom-4 right-4 z-40 flex h-[min(720px,calc(100vh-2rem))] w-[min(440px,calc(100vw-2rem))] flex-col overflow-hidden rounded-xl border bg-background shadow-2xl">
+      <motion.aside
+        initial={{ opacity: 0, y: -10, scale: 0.985 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: -8, scale: 0.985 }}
+        transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+        className="flex h-[min(680px,calc(100vh-13rem))] min-h-[520px] w-full flex-col overflow-hidden rounded-xl border bg-background shadow-xl"
+      >
         <div className="flex items-center justify-between border-b bg-muted/20 px-4 py-3">
           <div className="flex items-center gap-2 text-base font-semibold">
             <span className="flex h-9 w-9 items-center justify-center rounded-md border bg-background text-primary shadow-sm">
@@ -334,16 +338,17 @@ export function InvoiceAiAgentWorkflow({
             variant="ghost"
             size="icon"
             className="h-8 w-8"
-            onClick={() => setOpen(false)}
+            onClick={() => onOpenChange(false)}
             aria-label="Close Stackivo AI"
           >
             <X className="h-4 w-4" />
           </Button>
         </div>
 
-        <div
+        <motion.div
           ref={conversationRef}
-          className="flex-1 space-y-5 overflow-y-auto bg-[radial-gradient(circle_at_top_left,rgba(37,99,235,0.06),transparent_32rem)] px-5 py-5"
+          className="scrollbar-modern flex-1 space-y-5 overflow-y-auto bg-[radial-gradient(circle_at_top_left,rgba(37,99,235,0.06),transparent_32rem)] px-5 py-5"
+          layoutScroll
         >
           {introTyping && <TypingBubble />}
           {introVisible && (
@@ -643,10 +648,11 @@ export function InvoiceAiAgentWorkflow({
               </div>
             </AiBubble>
           )}
-        </div>
-      </aside>
+          <div ref={conversationEndRef} aria-hidden className="h-1" />
+        </motion.div>
+      </motion.aside>
       )}
-    </>
+    </AnimatePresence>
   );
 }
 

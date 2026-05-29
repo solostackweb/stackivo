@@ -129,7 +129,7 @@ export function CrispProvider({ identity }: Props) {
           item in the navigation drawer. */}
       <style>
         {`
-          .crisp-client { margin-bottom: var(--mobile-bottom-nav-h, 0px); }
+          .crisp-client { display: none !important; }
           @media (max-width: 768px) {
             .crisp-client { display: none !important; }
           }
