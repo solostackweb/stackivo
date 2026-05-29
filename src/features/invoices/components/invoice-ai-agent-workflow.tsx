@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { CheckCircle2, Loader2, Mail, Send, Smartphone, Sparkles, Wand2 } from "lucide-react";
+import { CheckCircle2, Loader2, Mail, Send, Smartphone, Sparkles, Wand2, X } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -14,13 +14,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet";
 import type { ClientRecord } from "@/features/clients/server";
 import { getClientDisplayName } from "@/features/clients/utils";
 import type { ProjectRecord } from "@/features/projects/server";
@@ -196,76 +189,86 @@ export function InvoiceAiAgentWorkflow({
         ? `Discount applied: ${profile?.defaultCurrency ?? "INR"} ${discount.toLocaleString("en-IN")}.`
         : "";
     startTransition(async () => {
-      const aiFd = new FormData();
-      aiFd.set(
-        "payload",
-        JSON.stringify({
-          clientId,
-          projectId,
-          workDescription: work.trim(),
-          amount: rate,
-          quantity,
-          dueDate,
-          notes,
-        }),
-      );
-      const aiDraft = await generateInvoiceDraftAction(aiFd);
-      const aiLine = aiDraft.ok ? aiDraft.data.items[0] : null;
-      const aiNotes = aiDraft.ok ? aiDraft.data.notes : "";
-      const aiTerms = aiDraft.ok ? aiDraft.data.terms : "";
-      const payload = {
-        clientId,
-        projectId: projectId || undefined,
-        invoiceNumber: nextInvoiceNumber,
-        issueDate: todayIso(),
-        dueDate,
-        currency: profile?.defaultCurrency ?? "INR",
-        status: "draft",
-        notes:
-          [notes.trim(), aiNotes, discountNote]
-            .filter(Boolean)
-            .join("\n\n") || undefined,
-        terms: aiTerms || profile?.invoiceDefaultTerms || undefined,
-        lines: [
-          {
-            description: aiLine?.description || work.trim(),
+      try {
+        const aiFd = new FormData();
+        aiFd.set(
+          "payload",
+          JSON.stringify({
+            clientId,
+            projectId,
+            workDescription: work.trim(),
+            amount: rate,
             quantity,
-            unitPrice: finalRate,
-            gstRate: profile?.gstRegistered ? profile.invoiceDefaultGstRate : 0,
-            position: 0,
-          },
-        ],
-      };
-      const fd = new FormData();
-      fd.set("payload", JSON.stringify(payload));
+            dueDate,
+            notes,
+          }),
+        );
+        const aiDraft = await generateInvoiceDraftAction(aiFd);
+        const aiLine = aiDraft.ok ? aiDraft.data.items[0] : null;
+        const aiNotes = aiDraft.ok ? aiDraft.data.notes : "";
+        const aiTerms = aiDraft.ok ? aiDraft.data.terms : "";
+        const payload = {
+          clientId,
+          projectId: projectId || undefined,
+          invoiceNumber: nextInvoiceNumber,
+          issueDate: todayIso(),
+          dueDate,
+          currency: profile?.defaultCurrency ?? "INR",
+          status: "draft",
+          notes:
+            [notes.trim(), aiNotes, discountNote]
+              .filter(Boolean)
+              .join("\n\n") || undefined,
+          terms: aiTerms || profile?.invoiceDefaultTerms || undefined,
+          lines: [
+            {
+              description: aiLine?.description || work.trim(),
+              quantity,
+              unitPrice: finalRate,
+              gstRate: profile?.gstRegistered ? profile.invoiceDefaultGstRate : 0,
+              position: 0,
+            },
+          ],
+        };
+        const fd = new FormData();
+        fd.set("payload", JSON.stringify(payload));
 
-      const res = await createInvoiceAction(undefined, fd);
-      if (!res.ok || !res.data?.id) {
-        toast.error(res.ok ? "Could not create invoice." : res.error);
+        const res = await createInvoiceAction(undefined, fd);
+        if (!res.ok || !res.data?.id) {
+          toast.error(res.ok ? "Could not create invoice." : res.error);
+          setStep("notes");
+          return;
+        }
+        const tokenRes = await ensureInvoicePublicTokenAction({ invoiceId: res.data.id });
+        const publicUrl =
+          tokenRes.ok && tokenRes.data?.token
+            ? `${window.location.origin}/i/${tokenRes.data.token}`
+            : `${window.location.origin}/dashboard/invoices/${res.data.id}`;
+        setCreated({
+          id: res.data.id,
+          number: nextInvoiceNumber,
+          total: effectiveTotal,
+          publicUrl,
+        });
+        setStep("ready");
+        router.refresh();
+      } catch {
+        toast.error("Network changed while creating the invoice. Please try again.");
         setStep("notes");
-        return;
       }
-      const tokenRes = await ensureInvoicePublicTokenAction({ invoiceId: res.data.id });
-      const publicUrl =
-        tokenRes.ok && tokenRes.data?.token
-          ? `${window.location.origin}/i/${tokenRes.data.token}`
-          : `${window.location.origin}/dashboard/invoices/${res.data.id}`;
-      setCreated({
-        id: res.data.id,
-        number: nextInvoiceNumber,
-        total: effectiveTotal,
-        publicUrl,
-      });
-      setStep("ready");
-      router.refresh();
     });
   };
 
   const sendEmail = React.useCallback(async () => {
     if (!created) return false;
-    const res = await sendInvoiceAction({ invoiceId: created.id });
-    if (!res.ok) {
-      toast.error(res.error);
+    try {
+      const res = await sendInvoiceAction({ invoiceId: created.id });
+      if (!res.ok) {
+        toast.error(res.error);
+        return false;
+      }
+    } catch {
+      toast.error("Network changed while sending the email. Please try again.");
       return false;
     }
     setEmailSent(true);
@@ -305,31 +308,38 @@ export function InvoiceAiAgentWorkflow({
   });
 
   return (
-    <Sheet open={open} onOpenChange={setOpen}>
-      <SheetTrigger asChild>
-        <Button
-          size="sm"
-          className="group relative isolate overflow-hidden border border-primary/30 bg-background text-primary shadow-sm transition-colors hover:border-primary/60 hover:bg-primary/5 hover:text-primary"
-        >
-          <span className="pointer-events-none absolute inset-x-3 bottom-0 h-px bg-gradient-to-r from-blue-500 via-violet-500 to-cyan-400 opacity-70 transition-opacity group-hover:opacity-100" />
-          <span className="relative z-10 inline-flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-primary" />
-            Generate new invoice with AI
-          </span>
-        </Button>
-      </SheetTrigger>
-      <SheetContent
-        side="right"
-        className="flex w-[min(42rem,calc(100vw-1rem))] flex-col overflow-hidden bg-background p-0 sm:max-w-2xl"
+    <>
+      <Button
+        size="sm"
+        onClick={() => setOpen(true)}
+        className="group relative isolate overflow-hidden border border-primary/30 bg-background text-primary shadow-sm transition-colors hover:border-primary/60 hover:bg-primary/5 hover:text-primary"
       >
-        <SheetHeader className="border-b bg-muted/20 px-6 py-5">
-          <SheetTitle className="flex items-center gap-2 text-xl">
+        <span className="pointer-events-none absolute inset-x-3 bottom-0 h-px bg-gradient-to-r from-blue-500 via-violet-500 to-cyan-400 opacity-70 transition-opacity group-hover:opacity-100" />
+        <span className="relative z-10 inline-flex items-center gap-2">
+          <Sparkles className="h-4 w-4 text-primary" />
+          Generate new invoice with AI
+        </span>
+      </Button>
+      {open && (
+      <aside className="fixed bottom-4 right-4 z-40 flex h-[min(720px,calc(100vh-2rem))] w-[min(440px,calc(100vw-2rem))] flex-col overflow-hidden rounded-xl border bg-background shadow-2xl">
+        <div className="flex items-center justify-between border-b bg-muted/20 px-4 py-3">
+          <div className="flex items-center gap-2 text-base font-semibold">
             <span className="flex h-9 w-9 items-center justify-center rounded-md border bg-background text-primary shadow-sm">
               <Wand2 className="h-4 w-4" />
             </span>
             Stackivo AI
-          </SheetTitle>
-        </SheetHeader>
+          </div>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => setOpen(false)}
+            aria-label="Close Stackivo AI"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
 
         <div
           ref={conversationRef}
@@ -634,8 +644,9 @@ export function InvoiceAiAgentWorkflow({
             </AiBubble>
           )}
         </div>
-      </SheetContent>
-    </Sheet>
+      </aside>
+      )}
+    </>
   );
 }
 
