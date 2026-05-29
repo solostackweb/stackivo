@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import {
   ArrowUp,
@@ -105,6 +106,7 @@ function newId() {
 
 export function StackivoAiAssistant({ clients, projects }: StackivoAiAssistantProps) {
   const router = useRouter();
+  const [mounted, setMounted] = React.useState(false);
   const [open, setOpen] = React.useState(false);
   const [expanded, setExpanded] = React.useState(false);
   const [mode, setMode] = React.useState<AiMode>("general");
@@ -129,6 +131,10 @@ export function StackivoAiAssistant({ clients, projects }: StackivoAiAssistantPr
     },
   ]);
   const scrollRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const projectOptions = React.useMemo(
     () => (clientId ? projects.filter((project) => project.clientId === clientId) : projects),
@@ -338,10 +344,10 @@ export function StackivoAiAssistant({ clients, projects }: StackivoAiAssistantPr
         <Sparkles className="h-4 w-4" />
       </Button>
 
-      {open && (
+      {mounted && open && createPortal((
         <div
           className={cn(
-            "fixed inset-y-0 right-0 z-50 flex w-full flex-col border-l bg-background shadow-2xl transition-[width]",
+            "fixed inset-y-0 right-0 z-[100] flex h-dvh w-full flex-col border-l bg-background shadow-2xl transition-[width]",
             expanded ? "md:w-[min(720px,calc(100vw-18rem))]" : "md:w-[440px]",
           )}
         >
@@ -535,7 +541,7 @@ export function StackivoAiAssistant({ clients, projects }: StackivoAiAssistantPr
             </div>
           </div>
         </div>
-      )}
+      ), document.body)}
     </>
   );
 }
