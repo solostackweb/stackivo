@@ -30,8 +30,6 @@ import {
   type ActionResult,
 } from "../actions";
 import type { ProjectStatusRow } from "@/lib/supabase/types";
-import { GuidedAiWorkflowSheet } from "@/features/ai-workflows/components/guided-ai-workflow-sheet";
-import type { AiProjectDraft } from "@/features/ai-workflows/types";
 
 interface ProjectFormDialogProps {
   open: boolean;
@@ -39,7 +37,6 @@ interface ProjectFormDialogProps {
   /** Pre-fill when editing. Omit to create. */
   project?: ProjectRecord;
   clients: Array<{ id: string; name: string }>;
-  initialAiDraft?: AiProjectDraft | null;
 }
 
 type ProjectFormResult = ActionResult<{ id: string }>;
@@ -55,7 +52,6 @@ export function ProjectFormDialog({
   onOpenChange,
   project,
   clients,
-  initialAiDraft,
 }: ProjectFormDialogProps) {
   const router = useRouter();
   const isEdit = !!project;
@@ -67,7 +63,6 @@ export function ProjectFormDialog({
   const [clientId, setClientId] = React.useState<string>(
     project?.clientId ?? NO_CLIENT,
   );
-  const formRef = React.useRef<HTMLFormElement>(null);
 
   React.useEffect(() => {
     if (open) {
@@ -99,58 +94,21 @@ export function ProjectFormDialog({
     });
   };
 
-  const applyAiDraft = React.useCallback((draft: AiProjectDraft) => {
-    const form = formRef.current;
-    if (!form) return;
-    const setField = (name: string, value: string | null | undefined) => {
-      const field = form.elements.namedItem(name);
-      if (field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement) {
-        field.value = value ?? "";
-      }
-    };
-    setField("name", draft.name);
-    setField("description", draft.description);
-    setField("startDate", draft.startDate);
-    setField("dueDate", draft.dueDate);
-    setClientId(draft.clientId || NO_CLIENT);
-  }, []);
-
-  React.useEffect(() => {
-    if (!open || isEdit || !initialAiDraft) return;
-    const frame = window.requestAnimationFrame(() => applyAiDraft(initialAiDraft));
-    return () => window.cancelAnimationFrame(frame);
-  }, [applyAiDraft, initialAiDraft, isEdit, open]);
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <DialogTitle>
-                {isEdit ? "Edit project" : "Create a project"}
-              </DialogTitle>
-              <DialogDescription>
-                {isEdit
-                  ? "Update the core details for this project."
-                  : "Group related invoices, contracts, and files under one project."}
-              </DialogDescription>
-            </div>
-            {!isEdit && (
-              <GuidedAiWorkflowSheet<AiProjectDraft>
-                workflow="project"
-                title="Let's create your project"
-                description="Describe the project and Stackivo AI will draft the core fields."
-                placeholder="Example: Brand identity sprint for Acme, starts next week, due by end of month, includes logo, colors, and handoff files"
-                clients={clients}
-                selectedClientId={clientId === NO_CLIENT ? "" : clientId}
-                onApplyDraft={applyAiDraft}
-              />
-            )}
-          </div>
+          <DialogTitle>
+            {isEdit ? "Edit project" : "Create a project"}
+          </DialogTitle>
+          <DialogDescription>
+            {isEdit
+              ? "Update the core details for this project."
+              : "Group related invoices, contracts, and files under one project."}
+          </DialogDescription>
         </DialogHeader>
 
-        <form ref={formRef} action={handleSubmit} className="space-y-4">
+        <form action={handleSubmit} className="space-y-4">
           {state && !state.ok && (
             <p className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive">
               {state.error}

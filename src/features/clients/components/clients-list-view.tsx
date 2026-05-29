@@ -16,11 +16,6 @@ import { ClientFormDialog } from "./client-form-dialog";
 import { DeleteClientDialog } from "./delete-client-dialog";
 import { ClientMobileCard } from "./client-mobile-card";
 import { CsvImportDialog } from "./csv-import-dialog";
-import {
-  AiWorkflowTriggerButton,
-  OperationalAiAgentWorkflow,
-} from "@/features/ai-workflows/components/operational-ai-agent-workflow";
-import type { AiClientDraft } from "@/features/ai-workflows/types";
 
 interface ClientsListViewProps {
   clients: ClientRecord[];
@@ -39,8 +34,6 @@ export function ClientsListView({ clients, autoCreate }: ClientsListViewProps) {
     null,
   );
   const [formOpen, setFormOpen] = React.useState(false);
-  const [aiOpen, setAiOpen] = React.useState(false);
-  const [aiDraft, setAiDraft] = React.useState<AiClientDraft | null>(null);
 
   // Auto-open the create dialog when navigated from the FAB (?create=1).
   React.useEffect(() => {
@@ -91,12 +84,6 @@ export function ClientsListView({ clients, autoCreate }: ClientsListViewProps) {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <AiWorkflowTriggerButton
-            active={aiOpen}
-            onClick={() => setAiOpen((value) => !value)}
-          >
-            Generate new client with AI
-          </AiWorkflowTriggerButton>
           <Button
             onClick={() => setImportOpen(true)}
             variant="outline"
@@ -110,74 +97,50 @@ export function ClientsListView({ clients, autoCreate }: ClientsListViewProps) {
         </div>
       </div>
 
-      <div
-        className={cn(
-          "grid items-start gap-6",
-          aiOpen ? "xl:grid-cols-[minmax(0,1fr)_420px]" : "grid-cols-1",
-        )}
-      >
-        <div className="min-w-0 space-y-8">
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
-            <StatCard label="Total clients" value={stats.total} featured />
-            <StatCard label="GST registered" value={stats.gst} />
-            <StatCard label="Unregistered" value={stats.unregistered} />
-          </div>
-
-          <DataTable
-            columns={columns}
-            data={clients}
-            initialPageSize={10}
-            onRowClick={(c) => router.push(`/dashboard/clients/${c.id}`)}
-            toolbar={(table) => <ClientsToolbar table={table} />}
-            mobileCard={(client, { isSelected, toggleSelected, onOpen }) => (
-              <ClientMobileCard
-                client={client}
-                isSelected={isSelected}
-                onToggleSelected={toggleSelected}
-                onOpen={onOpen}
-                onEdit={() => handleEdit(client)}
-                onDelete={() => handleDelete(client)}
-              />
-            )}
-            emptyState={
-              <EmptyState
-                icon={Users}
-                title={
-                  clients.length === 0
-                    ? "No clients yet"
-                    : "No clients match your filters"
-                }
-                description={
-                  clients.length === 0
-                    ? "Add your first client to start sending invoices and tracking work."
-                    : "Try adjusting your search or filters, or add a new client."
-                }
-                action={{ label: "Add client", onClick: handleAdd }}
-              />
-            }
-          />
-        </div>
-
-        <OperationalAiAgentWorkflow<AiClientDraft>
-          workflow="client"
-          title="Create client"
-          intro="let's add a client profile. I will ask a few focused questions, draft the fields, then open the client form for your final review."
-          open={aiOpen}
-          onOpenChange={setAiOpen}
-          applyLabel="Review in client form"
-          onApplyDraft={(draft) => {
-            setAiDraft(draft);
-            setEditingClient(null);
-            setFormOpen(true);
-          }}
-        />
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
+        <StatCard label="Total clients" value={stats.total} featured />
+        <StatCard label="GST registered" value={stats.gst} />
+        <StatCard label="Unregistered" value={stats.unregistered} />
       </div>
+
+      <DataTable
+        columns={columns}
+        data={clients}
+        initialPageSize={10}
+        onRowClick={(c) => router.push(`/dashboard/clients/${c.id}`)}
+        toolbar={(table) => <ClientsToolbar table={table} />}
+        mobileCard={(client, { isSelected, toggleSelected, onOpen }) => (
+          <ClientMobileCard
+            client={client}
+            isSelected={isSelected}
+            onToggleSelected={toggleSelected}
+            onOpen={onOpen}
+            onEdit={() => handleEdit(client)}
+            onDelete={() => handleDelete(client)}
+          />
+        )}
+        emptyState={
+          <EmptyState
+            icon={Users}
+            title={
+              clients.length === 0
+                ? "No clients yet"
+                : "No clients match your filters"
+            }
+            description={
+              clients.length === 0
+                ? "Add your first client to start sending invoices and tracking work."
+                : "Try adjusting your search or filters, or add a new client."
+            }
+            action={{ label: "Add client", onClick: handleAdd }}
+          />
+        }
+      />
 
       <ClientFormDialog
         open={formOpen}
         onOpenChange={setFormOpen}
         client={editingClient ?? undefined}
-        initialAiDraft={aiDraft}
       />
 
       <DeleteClientDialog

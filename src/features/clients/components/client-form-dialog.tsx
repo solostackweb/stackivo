@@ -18,8 +18,6 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { StateSelect } from "@/features/onboarding/components/state-select";
 import { useProfile } from "@/features/profile/context";
-import { GuidedAiWorkflowSheet } from "@/features/ai-workflows/components/guided-ai-workflow-sheet";
-import type { AiClientDraft } from "@/features/ai-workflows/types";
 
 import type { ClientRecord } from "../server";
 import {
@@ -43,7 +41,6 @@ interface ClientFormDialogProps {
     businessName: string | null;
     email: string | null;
   }) => void;
-  initialAiDraft?: AiClientDraft | null;
 }
 
 /**
@@ -56,7 +53,6 @@ export function ClientFormDialog({
   onOpenChange,
   client,
   onSaved,
-  initialAiDraft,
 }: ClientFormDialogProps) {
   const router = useRouter();
   const { profile } = useProfile();
@@ -66,7 +62,6 @@ export function ClientFormDialog({
   const [gstRegistered, setGstRegistered] = React.useState<boolean>(
     client?.gstRegistered ?? false,
   );
-  const formRef = React.useRef<HTMLFormElement>(null);
 
   // Reset transient state when the dialog re-opens or switches client.
   React.useEffect(() => {
@@ -112,58 +107,21 @@ export function ClientFormDialog({
     });
   };
 
-  const applyAiDraft = React.useCallback((draft: AiClientDraft) => {
-    const form = formRef.current;
-    if (!form) return;
-    const setField = (name: string, value: string | null | undefined) => {
-      const field = form.elements.namedItem(name);
-      if (field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement) {
-        field.value = value ?? "";
-      }
-    };
-    setField("fullName", draft.fullName);
-    setField("businessName", draft.businessName);
-    setField("email", draft.email);
-    setField("phone", draft.phone);
-    setField("billingAddress", draft.billingAddress);
-    setField("notes", draft.notes);
-  }, []);
-
-  React.useEffect(() => {
-    if (!open || isEdit || !initialAiDraft) return;
-    const frame = window.requestAnimationFrame(() => applyAiDraft(initialAiDraft));
-    return () => window.cancelAnimationFrame(frame);
-  }, [applyAiDraft, initialAiDraft, isEdit, open]);
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col gap-0 p-0">
         <div className="border-b px-6 py-4 flex-shrink-0">
           <DialogHeader>
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <DialogTitle>{isEdit ? "Edit client" : "Add client"}</DialogTitle>
-                <DialogDescription>
-                  {isEdit
-                    ? "Update this client's contact and billing details."
-                    : "Add a new client to your workspace. You can invoice them right away."}
-                </DialogDescription>
-              </div>
-              {!isEdit && (
-                <GuidedAiWorkflowSheet<AiClientDraft>
-                  workflow="client"
-                  title="Let's add a client"
-                  description="Describe the client and Stackivo AI will fill the contact draft."
-                  placeholder="Example: Acme Digital, marketing agency in Mumbai, contact Priya, email priya@acme.example, usually pays in 15 days"
-                  onApplyDraft={applyAiDraft}
-                />
-              )}
-            </div>
+            <DialogTitle>{isEdit ? "Edit client" : "Add client"}</DialogTitle>
+            <DialogDescription>
+              {isEdit
+                ? "Update this client's contact and billing details."
+                : "Add a new client to your workspace. You can invoice them right away."}
+            </DialogDescription>
           </DialogHeader>
         </div>
 
         <form
-          ref={formRef}
           id="client-form"
           action={handleSubmit}
           className="space-y-5 px-6 py-4 overflow-y-auto flex-1"
