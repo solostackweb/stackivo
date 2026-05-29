@@ -275,11 +275,11 @@ export function InvoiceAiAgentWorkflow({
       <SheetTrigger asChild>
         <Button
           size="sm"
-          className="relative isolate overflow-hidden border-0 bg-transparent p-[1px] text-primary shadow-sm transition-transform hover:scale-[1.01] hover:bg-transparent"
+          className="group relative isolate overflow-hidden border-0 bg-transparent p-[1px] text-foreground shadow-sm transition-transform hover:scale-[1.01] hover:bg-transparent"
         >
-          <span className="absolute inset-[-120%] -z-10 animate-spin bg-[conic-gradient(from_90deg,transparent_0deg,#2563eb_90deg,#8b5cf6_180deg,#06b6d4_270deg,transparent_360deg)]" />
-          <span className="relative z-10 inline-flex h-full items-center gap-2 rounded-[5px] bg-background px-3 py-1.5">
-            <Sparkles className="h-4 w-4" />
+          <span className="absolute inset-[-120%] -z-10 bg-[conic-gradient(from_90deg,#2563eb,#8b5cf6,#ec4899,#f59e0b,#22c55e,#06b6d4,#2563eb)] opacity-90 transition-transform duration-700 group-hover:rotate-180 group-focus-visible:rotate-180" />
+          <span className="relative z-10 inline-flex h-full items-center gap-2 rounded-[5px] bg-background px-3 py-1.5 text-primary transition-colors group-hover:bg-primary/5">
+            <Sparkles className="h-4 w-4 text-primary" />
             Generate new invoice with AI
           </span>
         </Button>
@@ -288,16 +288,16 @@ export function InvoiceAiAgentWorkflow({
         side="right"
         className="flex w-[min(42rem,calc(100vw-1rem))] flex-col overflow-hidden bg-background p-0 sm:max-w-2xl"
       >
-        <SheetHeader className="border-b px-6 py-5">
+        <SheetHeader className="border-b bg-muted/20 px-6 py-5">
           <SheetTitle className="flex items-center gap-2 text-xl">
-            <span className="flex h-9 w-9 items-center justify-center rounded-md bg-primary/10 text-primary">
+            <span className="flex h-9 w-9 items-center justify-center rounded-md border bg-background text-primary shadow-sm">
               <Wand2 className="h-4 w-4" />
             </span>
             Stackivo AI
           </SheetTitle>
         </SheetHeader>
 
-        <div className="flex-1 space-y-5 overflow-y-auto px-5 py-5">
+        <div className="flex-1 space-y-5 overflow-y-auto bg-[radial-gradient(circle_at_top_left,rgba(37,99,235,0.06),transparent_32rem)] px-5 py-5">
           {introTyping && <TypingBubble />}
           {introVisible && (
             <AiBubble>
@@ -555,10 +555,10 @@ function AiQuestion({
 function AiBubble({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex gap-3">
-      <div className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+      <div className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-md border bg-background text-primary shadow-sm">
         <Sparkles className="h-4 w-4" />
       </div>
-      <div className="max-w-[88%] rounded-lg border bg-background px-4 py-3 text-sm leading-relaxed shadow-sm animate-in fade-in-0 slide-in-from-bottom-1">
+      <div className="max-w-[88%] rounded-lg border bg-background/95 px-4 py-3 text-sm leading-relaxed shadow-sm backdrop-blur animate-in fade-in-0 slide-in-from-bottom-1">
         {children}
       </div>
     </div>
