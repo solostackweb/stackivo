@@ -8,13 +8,6 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import type { ClientRecord } from "@/features/clients/server";
 import { getClientDisplayName } from "@/features/clients/utils";
 import type { ProjectRecord } from "@/features/projects/server";
@@ -163,16 +156,21 @@ export function InvoiceAiAgentWorkflow({
   }, [introVisible, open, step, visibleQuestions]);
 
   React.useEffect(() => {
+    let second = 0;
     const first = window.requestAnimationFrame(() => {
-      const second = window.requestAnimationFrame(() => {
-        conversationEndRef.current?.scrollIntoView({
+      second = window.requestAnimationFrame(() => {
+        const node = conversationRef.current;
+        if (!node) return;
+        node.scrollTo({
+          top: node.scrollHeight,
           behavior: "smooth",
-          block: "nearest",
         });
       });
-      return () => window.cancelAnimationFrame(second);
     });
-    return () => window.cancelAnimationFrame(first);
+    return () => {
+      window.cancelAnimationFrame(first);
+      window.cancelAnimationFrame(second);
+    };
   }, [
     introTyping,
     introVisible,
@@ -327,7 +325,7 @@ export function InvoiceAiAgentWorkflow({
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: -8, scale: 0.985 }}
         transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-        className="sticky top-20 flex h-[calc(100vh-6rem)] max-h-[760px] min-h-[520px] w-full flex-col overflow-hidden rounded-xl border bg-background shadow-xl"
+        className="sticky top-20 flex h-[clamp(380px,calc(100vh-16rem),600px)] w-full flex-col overflow-hidden rounded-xl border bg-background shadow-xl"
       >
         <div className="flex items-center justify-between border-b bg-muted/20 px-4 py-3">
           <div className="flex items-center gap-2 text-base font-semibold">
@@ -368,27 +366,25 @@ export function InvoiceAiAgentWorkflow({
             title="Choose a client"
             caption="I’ll use this client’s billing details and contact info."
           >
-            <Select
+            <select
               value={clientId}
-              onValueChange={(value) => {
-                setClientId(value);
+              onChange={(event) => {
+                const selected = event.target.value;
+                setClientId(selected);
                 setProjectId("");
                 setSkippedProject(false);
-                setStep("project");
+                if (selected) setStep("project");
               }}
+              className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm shadow-sm outline-none transition-colors focus:border-primary/40 focus:ring-4 focus:ring-primary/15"
             >
-              <SelectTrigger className="bg-background">
-                <SelectValue placeholder="Select a client" />
-              </SelectTrigger>
-              <SelectContent>
-                {clients.map((item) => (
-                  <SelectItem key={item.id} value={item.id}>
-                    {getClientDisplayName(item)}
-                    {item.email ? ` · ${item.email}` : ""}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              <option value="">Select a client</option>
+              {clients.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {getClientDisplayName(item)}
+                  {item.email ? ` - ${item.email}` : ""}
+                </option>
+              ))}
+            </select>
           </AiQuestion>
 
           {clientId && step !== "client" && (
@@ -401,30 +397,26 @@ export function InvoiceAiAgentWorkflow({
             title="Choose a project"
             caption="I’ll only show projects linked to the selected client."
           >
-            <Select
+            <select
               value={projectId}
-              onValueChange={(value) => {
-                setProjectId(value);
+              onChange={(event) => {
+                const selected = event.target.value;
+                setProjectId(selected);
                 setSkippedProject(false);
-                setStep("work");
+                if (selected) setStep("work");
               }}
               disabled={!clientId}
+              className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm shadow-sm outline-none transition-colors focus:border-primary/40 focus:ring-4 focus:ring-primary/15 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              <SelectTrigger className="bg-background">
-                <SelectValue
-                  placeholder={
-                    projectOptions.length ? "Select a project" : "No project for this client"
-                  }
-                />
-              </SelectTrigger>
-              <SelectContent>
-                {projectOptions.map((item) => (
-                  <SelectItem key={item.id} value={item.id}>
-                    {item.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              <option value="">
+                {projectOptions.length ? "Select a project" : "No project for this client"}
+              </option>
+              {projectOptions.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name}
+                </option>
+              ))}
+            </select>
             <Button
               type="button"
               variant="ghost"

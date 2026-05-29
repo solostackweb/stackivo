@@ -208,8 +208,8 @@ export function InvoicesListView({
 
       <div
         className={cn(
-          "grid gap-6",
-          aiOpen ? "xl:grid-cols-[minmax(0,1fr)_minmax(360px,420px)]" : "grid-cols-1",
+          "grid items-start gap-6",
+          aiOpen ? "xl:grid-cols-[minmax(0,1fr)_420px]" : "grid-cols-1",
         )}
       >
         <div className="min-w-0 space-y-8">
