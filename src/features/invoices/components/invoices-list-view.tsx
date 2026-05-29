@@ -206,132 +206,141 @@ export function InvoicesListView({
         </div>
       </div>
 
-      <InvoiceAiAgentWorkflow
-        clients={clients}
-        projects={projects}
-        nextInvoiceNumber={nextInvoiceNumber}
-        open={aiOpen}
-        onOpenChange={setAiOpen}
-      />
-
-      <InvoicesSummary invoices={invoices} />
-
-      <DataTable
-        columns={columns}
-        data={invoices}
-        initialPageSize={10}
-        onRowClick={(inv) => router.push(`/dashboard/invoices/${inv.id}`)}
-        toolbar={(table) => (
-          <InvoicesToolbar table={table} clientOptions={clientOptions} />
+      <div
+        className={cn(
+          "grid gap-6",
+          aiOpen ? "xl:grid-cols-[minmax(0,1fr)_minmax(360px,420px)]" : "grid-cols-1",
         )}
-        mobileCard={(invoice, { isSelected, toggleSelected, onOpen }) => (
-          <InvoiceMobileCard
-            invoice={invoice}
-            clientName={
-              invoice.clientId
-                ? (lookup.clientNameById.get(invoice.clientId) ?? null)
-                : null
-            }
-            isSelected={isSelected}
-            onToggleSelected={toggleSelected}
-            onOpen={onOpen}
-            onMarkPaid={() => handleMarkPaid(invoice)}
-            onDelete={() => handleDelete(invoice)}
-          />
-        )}
-        emptyState={
-          invoices.length === 0 ? (
-            <EmptyState
-              icon={FileText}
-              title="No invoices yet"
-              description="Create your first invoice to start tracking payments."
-              action={{ label: "New invoice", href: "/dashboard/invoices/new" }}
-            />
-          ) : (
-            <EmptyState
-              icon={FileText}
-              title="No invoices match your filters"
-              description="Try adjusting your search, status, or client filter."
-            />
-          )
-        }
-        bulkBar={(table) => {
-          const selected = table.getFilteredSelectedRowModel().rows;
-          const count = selected.length;
-          return (
-            <InvoicesBulkActions
-              selectedCount={count}
-              onMarkPaid={() => {
-                const targets = selected
-                  .map((r) => r.original)
-                  .filter((i) => i.status !== "paid" && i.status !== "draft");
-                if (targets.length === 0) {
-                  toast("Nothing to mark as paid");
-                  return;
+      >
+        <div className="min-w-0 space-y-8">
+          <InvoicesSummary invoices={invoices} />
+
+          <DataTable
+            columns={columns}
+            data={invoices}
+            initialPageSize={10}
+            onRowClick={(inv) => router.push(`/dashboard/invoices/${inv.id}`)}
+            toolbar={(table) => (
+              <InvoicesToolbar table={table} clientOptions={clientOptions} />
+            )}
+            mobileCard={(invoice, { isSelected, toggleSelected, onOpen }) => (
+              <InvoiceMobileCard
+                invoice={invoice}
+                clientName={
+                  invoice.clientId
+                    ? (lookup.clientNameById.get(invoice.clientId) ?? null)
+                    : null
                 }
-                startTransition(async () => {
-                  let okCount = 0;
-                  for (const inv of targets) {
-                    const fd = new FormData();
-                    fd.set("id", inv.id);
-                    fd.set("status", "paid");
-                    const res = await setInvoiceStatusAction(undefined, fd);
-                    if (res.ok) okCount += 1;
-                  }
-                  toast.success(
-                    `${okCount} invoice${okCount === 1 ? "" : "s"} marked as paid`,
-                  );
-                  table.resetRowSelection();
-                  router.refresh();
-                });
-              }}
-              onExport={() => {
-                const rows = selected.map((r) => r.original);
-                const headers = [
-                  "Invoice #",
-                  "Status",
-                  "Issue Date",
-                  "Due Date",
-                  "Currency",
-                  "Subtotal",
-                  "Tax",
-                  "Total",
-                  "Paid At",
-                ];
-                const csvRows = rows.map((inv) =>
-                  [
-                    inv.invoiceNumber,
-                    inv.status,
-                    inv.issueDate,
-                    inv.dueDate,
-                    inv.currency,
-                    inv.subtotal.toFixed(2),
-                    inv.taxTotal.toFixed(2),
-                    inv.totalAmount.toFixed(2),
-                    inv.paidAt ?? "",
-                  ]
-                    .map((v) => `"${String(v).replace(/"/g, '""')}"`)
-                    .join(","),
-                );
-                const csv = [headers.join(","), ...csvRows].join("\n");
-                const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement("a");
-                a.href = url;
-                a.download = `invoices-${new Date().toISOString().slice(0, 10)}.csv`;
-                a.click();
-                URL.revokeObjectURL(url);
-                toast.success(`Exported ${rows.length} invoice${rows.length === 1 ? "" : "s"}`);
-              }}
-              onDelete={() => {
-                setPendingDeleteIds(selected.map((r) => r.original.id));
-                setBulkDeleteOpen(true);
-              }}
-              onClear={() => table.resetRowSelection()}
-            />
-          );
-        }}
-      />
+                isSelected={isSelected}
+                onToggleSelected={toggleSelected}
+                onOpen={onOpen}
+                onMarkPaid={() => handleMarkPaid(invoice)}
+                onDelete={() => handleDelete(invoice)}
+              />
+            )}
+            emptyState={
+              invoices.length === 0 ? (
+                <EmptyState
+                  icon={FileText}
+                  title="No invoices yet"
+                  description="Create your first invoice to start tracking payments."
+                  action={{ label: "New invoice", href: "/dashboard/invoices/new" }}
+                />
+              ) : (
+                <EmptyState
+                  icon={FileText}
+                  title="No invoices match your filters"
+                  description="Try adjusting your search, status, or client filter."
+                />
+              )
+            }
+            bulkBar={(table) => {
+              const selected = table.getFilteredSelectedRowModel().rows;
+              const count = selected.length;
+              return (
+                <InvoicesBulkActions
+                  selectedCount={count}
+                  onMarkPaid={() => {
+                    const targets = selected
+                      .map((r) => r.original)
+                      .filter((i) => i.status !== "paid" && i.status !== "draft");
+                    if (targets.length === 0) {
+                      toast("Nothing to mark as paid");
+                      return;
+                    }
+                    startTransition(async () => {
+                      let okCount = 0;
+                      for (const inv of targets) {
+                        const fd = new FormData();
+                        fd.set("id", inv.id);
+                        fd.set("status", "paid");
+                        const res = await setInvoiceStatusAction(undefined, fd);
+                        if (res.ok) okCount += 1;
+                      }
+                      toast.success(
+                        `${okCount} invoice${okCount === 1 ? "" : "s"} marked as paid`,
+                      );
+                      table.resetRowSelection();
+                      router.refresh();
+                    });
+                  }}
+                  onExport={() => {
+                    const rows = selected.map((r) => r.original);
+                    const headers = [
+                      "Invoice #",
+                      "Status",
+                      "Issue Date",
+                      "Due Date",
+                      "Currency",
+                      "Subtotal",
+                      "Tax",
+                      "Total",
+                      "Paid At",
+                    ];
+                    const csvRows = rows.map((inv) =>
+                      [
+                        inv.invoiceNumber,
+                        inv.status,
+                        inv.issueDate,
+                        inv.dueDate,
+                        inv.currency,
+                        inv.subtotal.toFixed(2),
+                        inv.taxTotal.toFixed(2),
+                        inv.totalAmount.toFixed(2),
+                        inv.paidAt ?? "",
+                      ]
+                        .map((v) => `"${String(v).replace(/"/g, '""')}"`)
+                        .join(","),
+                    );
+                    const csv = [headers.join(","), ...csvRows].join("\n");
+                    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = `invoices-${new Date().toISOString().slice(0, 10)}.csv`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                    toast.success(`Exported ${rows.length} invoice${rows.length === 1 ? "" : "s"}`);
+                  }}
+                  onDelete={() => {
+                    setPendingDeleteIds(selected.map((r) => r.original.id));
+                    setBulkDeleteOpen(true);
+                  }}
+                  onClear={() => table.resetRowSelection()}
+                />
+              );
+            }}
+          />
+        </div>
+
+        <InvoiceAiAgentWorkflow
+          clients={clients}
+          projects={projects}
+          nextInvoiceNumber={nextInvoiceNumber}
+          open={aiOpen}
+          onOpenChange={setAiOpen}
+        />
+      </div>
 
       <AlertDialog open={bulkDeleteOpen} onOpenChange={setBulkDeleteOpen}>
         <AlertDialogContent>
