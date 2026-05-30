@@ -40,6 +40,7 @@ export interface InvoiceRecord {
   classification: InvoiceClassificationRow;
   currency: string;
   subtotal: number;
+  discount: number;
   cgstAmount: number;
   sgstAmount: number;
   igstAmount: number;
@@ -93,6 +94,7 @@ function mapInvoiceRow(row: InvoiceRow): InvoiceRecord {
     classification: row.classification,
     currency: row.currency,
     subtotal: row.subtotal,
+    discount: row.discount_amount ?? 0,
     cgstAmount: row.cgst_amount,
     sgstAmount: row.sgst_amount,
     igstAmount: row.igst_amount,

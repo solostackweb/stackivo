@@ -1,22 +1,31 @@
 import { defineConfig, devices } from "@playwright/test";
 
 /**
- * Playwright config for Founder Console smoke tests.
+ * Playwright config for Stackivo E2E tests.
  *
- * Strategy:
- *   - Run against a locally-spun `npm run dev` server (port 3000).
- *   - Single browser (Chromium) — these are smoke tests, not cross-
- *     browser coverage. Adding Firefox/WebKit later is one option line.
- *   - Tests live in `e2e/admin/`. The webServer option starts the dev
- *     server if it isn't already running.
+ * Test directories:
+ *   e2e/admin/  — founder console smoke tests
+ *   e2e/ai/     — Ask AI workflow tests (invoice, contract, welcome doc,
+ *                  client, project, time entry, support)
  *
- * Required env for the suite:
- *   - E2E_ADMIN_EMAIL       — pre-promoted admin account email
- *   - E2E_ADMIN_PASSWORD    — its password
- *   - E2E_BASE_URL          — optional override (default http://localhost:3000)
+ * The suite self-skips when required env vars are absent, so a fresh
+ * checkout's `npm run test:e2e` passes without any setup.
  *
- * The suite SKIPS itself when those env vars are absent, so the
- * default `npm run test:e2e` is safe to run on any dev machine.
+ * Required env (admin smoke):
+ *   E2E_ADMIN_EMAIL       — pre-promoted admin email
+ *   E2E_ADMIN_PASSWORD    — its password
+ *
+ * Required env (AI workflows):
+ *   E2E_USER_EMAIL        — non-admin user email
+ *   E2E_USER_PASSWORD     — its password
+ *   E2E_AI_CLIENT_NAME    — client display name present in that workspace
+ *                           (used by invoice, contract, welcome doc tests)
+ *
+ * Optional:
+ *   E2E_BASE_URL          — override base URL (default http://localhost:3000)
+ *
+ * AI tests call Groq and run Supabase writes; they are intentionally
+ * serial in CI (workers: 1) to avoid rate-limiting and data races.
  */
 
 const baseURL = process.env.E2E_BASE_URL ?? "http://localhost:3000";
@@ -26,13 +35,21 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
+  // AI tests hit external APIs — keep serial in CI to avoid rate limits.
+  // Cap at 2 workers locally to avoid overwhelming the dev/EC2 server with
+  // simultaneous logins (all 18 tests logging in at once causes waitForURL
+  // timeouts even on a fast machine).
+  workers: process.env.CI ? 1 : 2,
   reporter: process.env.CI ? "dot" : "list",
+  // Default timeout per test. Individual AI tests override with
+  // test.setTimeout(120_000) because Groq inference + DB writes can be slow.
+  timeout: 60_000,
   use: {
     baseURL,
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
     video: "retain-on-failure",
+    actionTimeout: 15_000,
   },
   projects: [
     {
@@ -40,8 +57,8 @@ export default defineConfig({
       use: { ...devices["Desktop Chrome"] },
     },
   ],
-  // Spin up the dev server when running against localhost. CI / staging
-  // runs should set E2E_BASE_URL to skip this.
+  // Spin up the dev server when running against localhost.
+  // CI / staging runs should set E2E_BASE_URL to skip this.
   webServer: process.env.E2E_BASE_URL
     ? undefined
     : {

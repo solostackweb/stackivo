@@ -294,6 +294,14 @@ export default async function PublicInvoicePage({ params }: Props) {
                   <dd className="text-right text-sm tabular-nums text-slate-700">
                     {fmt(viewModel.subtotal, viewModel.currency)}
                   </dd>
+                  {viewModel.discount > 0 && (
+                    <>
+                      <dt className="text-xs text-slate-500">Discount</dt>
+                      <dd className="text-right text-sm tabular-nums text-emerald-700">
+                        -{fmt(viewModel.discount, viewModel.currency)}
+                      </dd>
+                    </>
+                  )}
                   {viewModel.cgstAmount > 0 && (
                     <>
                       <dt className="text-xs text-slate-500">CGST</dt>

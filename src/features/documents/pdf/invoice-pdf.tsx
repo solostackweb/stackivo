@@ -101,6 +101,7 @@ export interface InvoicePdfData {
   taxMode: "non_gst" | "cgst_sgst" | "igst";
   classification: "standard" | "b2c" | "b2b";
   subtotal: number;
+  discount: number;
   cgstAmount: number;
   sgstAmount: number;
   igstAmount: number;
@@ -603,6 +604,9 @@ function buildTotalsRows(
   const rows: { label: string; value: string }[] = [
     { label: "Subtotal", value: formatCurrency(totals.subtotal, data.currency) },
   ];
+  if (totals.discount > 0) {
+    rows.push({ label: "Discount", value: `-${formatCurrency(totals.discount, data.currency)}` });
+  }
   if (data.taxMode === "cgst_sgst") {
     rows.push({ label: "CGST", value: formatCurrency(totals.cgstAmount, data.currency) });
     rows.push({ label: "SGST", value: formatCurrency(totals.sgstAmount, data.currency) });
@@ -660,14 +664,15 @@ function resolveTotals(data: InvoicePdfData) {
     data.items.reduce((sum, item) => sum + safe(item.amount), 0),
   );
   const subtotal = pos(data.subtotal, lineSubtotal);
+  const discount = Math.min(subtotal, safe(data.discount));
   const lineTax = computeLineTax(data);
   const cgstAmount = pos(data.cgstAmount, lineTax.cgst);
   const sgstAmount = pos(data.sgstAmount, lineTax.sgst);
   const igstAmount = pos(data.igstAmount, lineTax.igst);
   const taxTotal = pos(data.taxTotal, round(cgstAmount + sgstAmount + igstAmount));
-  const total = pos(data.totalAmount, round(subtotal + taxTotal) || subtotal);
+  const total = pos(data.totalAmount, round(subtotal - discount + taxTotal) || subtotal);
   const paidAmount = pos(data.paymentAmount, total);
-  return { subtotal, cgstAmount, sgstAmount, igstAmount, taxTotal, total, paidAmount };
+  return { subtotal, discount, cgstAmount, sgstAmount, igstAmount, taxTotal, total, paidAmount };
 }
 
 function computeLineTax(data: InvoicePdfData) {

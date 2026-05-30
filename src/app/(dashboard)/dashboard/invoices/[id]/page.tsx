@@ -297,6 +297,9 @@ export default async function InvoiceDetailPage({
 
           <dl className="ml-auto grid w-full max-w-sm grid-cols-[1fr_auto] gap-x-4 gap-y-2 border-t pt-4 sm:w-auto">
             <Row label="Subtotal" value={formatINR(invoice.subtotal)} />
+            {invoice.discount > 0 && (
+              <Row label="Discount" value={`-${formatINR(invoice.discount)}`} />
+            )}
             {invoice.cgstAmount > 0 && (
               <Row label="CGST" value={formatINR(invoice.cgstAmount)} />
             )}
@@ -320,7 +323,7 @@ export default async function InvoiceDetailPage({
             </p>
             <ol className="relative space-y-0 border-l border-border pl-5">
               {activities.map((event) => (
-                <ActivityItem key={event.id} event={event} fmtDate={fmtDate} />
+                <ActivityItem key={event.id} event={event} />
               ))}
             </ol>
           </CardContent>
@@ -365,13 +368,7 @@ const ACTIVITY_ICON: Record<string, React.ComponentType<{ className?: string }>>
   invoice_draft: FileText,
 };
 
-function ActivityItem({
-  event,
-  fmtDate,
-}: {
-  event: ActivityRecord;
-  fmtDate: (iso: string | null) => string;
-}) {
+function ActivityItem({ event }: { event: ActivityRecord }) {
   const Icon = ACTIVITY_ICON[event.kind] ?? FileText;
   return (
     <li className="relative pb-4 last:pb-0">

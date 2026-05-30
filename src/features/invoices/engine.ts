@@ -47,6 +47,7 @@ export interface InvoiceLineResult extends InvoiceLineInput {
 
 export interface InvoiceTotals {
   subtotal: number;
+  discount: number;
   cgstAmount: number;
   sgstAmount: number;
   igstAmount: number;
@@ -60,6 +61,7 @@ export interface InvoiceTotals {
 
 export interface CalculateInvoiceInput {
   lines: InvoiceLineInput[];
+  discount?: number;
   seller: { gstRegistered: boolean; stateCode: string | null };
   client: { gstRegistered: boolean; stateCode: string | null };
 }
@@ -109,14 +111,17 @@ export function calculateInvoice(input: CalculateInvoiceInput): InvoiceTotals {
   });
 
   const subtotal = round2(lines.reduce((acc, l) => acc + l.amount, 0));
-  const cgstAmount = round2(lines.reduce((acc, l) => acc + l.cgstAmount, 0));
-  const sgstAmount = round2(lines.reduce((acc, l) => acc + l.sgstAmount, 0));
-  const igstAmount = round2(lines.reduce((acc, l) => acc + l.igstAmount, 0));
+  const discount = Math.min(subtotal, round2(Math.max(0, input.discount ?? 0)));
+  const taxableRatio = subtotal > 0 ? (subtotal - discount) / subtotal : 0;
+  const cgstAmount = round2(lines.reduce((acc, l) => acc + l.cgstAmount, 0) * taxableRatio);
+  const sgstAmount = round2(lines.reduce((acc, l) => acc + l.sgstAmount, 0) * taxableRatio);
+  const igstAmount = round2(lines.reduce((acc, l) => acc + l.igstAmount, 0) * taxableRatio);
   const taxTotal = round2(cgstAmount + sgstAmount + igstAmount);
-  const total = round2(subtotal + taxTotal);
+  const total = round2(subtotal - discount + taxTotal);
 
   return {
     subtotal,
+    discount,
     cgstAmount,
     sgstAmount,
     igstAmount,

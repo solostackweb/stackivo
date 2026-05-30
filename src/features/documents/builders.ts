@@ -317,6 +317,7 @@ async function assembleInvoicePdfData(args: {
     taxMode: invoice.tax_mode,
     classification: invoice.classification,
     subtotal: Number(invoice.subtotal) || 0,
+    discount: Number(invoice.discount_amount) || 0,
     cgstAmount: Number(invoice.cgst_amount) || 0,
     sgstAmount: Number(invoice.sgst_amount) || 0,
     igstAmount: Number(invoice.igst_amount) || 0,

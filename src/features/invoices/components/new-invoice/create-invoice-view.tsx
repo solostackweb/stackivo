@@ -202,6 +202,7 @@ export function CreateInvoiceView({
         currency: profile?.defaultCurrency ?? "INR",
         // Always create as draft first; the send step below promotes to "sent".
         status: "draft",
+        discount: Number(values.discount) || 0,
         notes: values.notes || undefined,
         terms: values.terms || undefined,
         lines: totalsForLines,

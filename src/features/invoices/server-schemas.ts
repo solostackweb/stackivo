@@ -69,6 +69,7 @@ export const invoiceCrudSchema = z.object({
   dueDate: isoDate,
   currency: z.string().trim().min(3).max(3).default("INR"),
   status: invoiceStatusSchema.default("draft"),
+  discount: z.coerce.number().min(0, "Discount cannot be negative").default(0),
   notes: optionalText(2000),
   terms: optionalText(2000),
   lines: z.array(invoiceLineSchema).min(1, "Add at least one line item"),

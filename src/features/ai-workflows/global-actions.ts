@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { readFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
 import path from "node:path";
 import { z } from "zod";
 
@@ -14,14 +15,24 @@ import { createInvoiceAction, setInvoiceStatusAction } from "@/features/invoices
 import { sendInvoiceAction } from "@/features/invoices/delivery";
 import { createContractAction } from "@/features/contracts/actions";
 import { sendContractAction } from "@/features/contracts/delivery";
+import { getContractShareUrl } from "@/features/documents/urls";
 import { createClientAction } from "@/features/clients/actions";
 import { createProjectAction } from "@/features/projects/actions";
 import { INDIAN_STATES } from "@/features/gst/state-codes";
 import { ensureInvoicePublicToken } from "@/features/share/server";
 import { buildWaUrl } from "@/lib/whatsapp";
+import {
+  createWelcomeDocumentAction,
+  publishWelcomeDocumentAction,
+} from "@/features/welcome-documents/actions";
+import { sendWelcomeDocumentAction } from "@/features/welcome-documents/delivery";
+import {
+  ensureWelcomePublicToken,
+} from "@/features/welcome-documents/server";
+import { getWelcomeShareUrl } from "@/features/welcome-documents/routes";
 import { generateInvoiceDraftAction, generateOperationalDraftAction } from "./actions";
 import { generateStructuredJson } from "./groq";
-import type { AiClientDraft, AiContractDraft, AiProjectDraft } from "./types";
+import type { AiClientDraft, AiContractDraft, AiProjectDraft, AiWelcomeDraft } from "./types";
 
 const aiClientCreateSchema = z.object({
   prompt: z.string().trim().min(4).max(6000),
@@ -123,6 +134,11 @@ function discountFromAnswer(value: string, subtotal: number) {
   if (parsed > 0) return parsed;
   const number = cleaned.replace(/,/g, "").match(/\d+(?:\.\d+)?/)?.[0];
   return number ? Math.min(subtotal, Math.max(0, Number(number))) : 0;
+}
+
+function workDescriptionFromPrompt(prompt: string) {
+  const match = prompt.match(/\bfor\s+(.+?)(?=\s+(?:due|discount|offer|less|qty|quantity)\b|$)/i);
+  return cleanAiAnswer(match?.[1]) || prompt;
 }
 
 function dueDateFromPrompt(prompt: string, fallbackDays: number) {
@@ -385,7 +401,7 @@ function invoiceDraftFromWorkflowAnswers(prompt: string, fallbackDueDays: number
     const originalSubtotal = amountFromPrompt(prompt);
     const quantity = quantityFromPrompt(prompt);
     return {
-      workDescription: prompt,
+      workDescription: workDescriptionFromPrompt(prompt),
       originalSubtotal,
       quantity,
       discount: discountFromPrompt(prompt, originalSubtotal),
@@ -597,7 +613,7 @@ export async function createInvoiceFromAiAction(input: z.infer<typeof aiInvoiceC
   }
 
   const netSubtotal = Math.max(0, originalSubtotal - discount);
-  const unitPrice = quantity > 0 ? netSubtotal / quantity : netSubtotal;
+  const unitPrice = quantity > 0 ? originalSubtotal / quantity : originalSubtotal;
   const draftFd = new FormData();
   draftFd.set(
     "payload",
@@ -626,6 +642,7 @@ export async function createInvoiceFromAiAction(input: z.infer<typeof aiInvoiceC
       dueDate,
       currency: profile?.defaultCurrency ?? "INR",
       status: "draft",
+      discount,
       notes: invoiceInput.notes || draftResult.data.notes || undefined,
       terms: invoiceInput.terms || draftResult.data.terms || profile?.invoiceDefaultTerms || undefined,
       lines: [
@@ -648,7 +665,7 @@ export async function createInvoiceFromAiAction(input: z.infer<typeof aiInvoiceC
   const [{ data: invoiceRow }, { data: clientRow }] = await Promise.all([
     supabase
       .from("invoices")
-      .select("id, invoice_number, currency, subtotal, gst_amount, total_amount, due_date, status, notes, terms")
+      .select("id, invoice_number, currency, subtotal, discount_amount, gst_amount, total_amount, due_date, status, notes, terms")
       .eq("id", invoiceId)
       .eq("user_id", userId)
       .maybeSingle(),
@@ -665,6 +682,7 @@ export async function createInvoiceFromAiAction(input: z.infer<typeof aiInvoiceC
         invoice_number: string;
         currency: string;
         subtotal: number;
+        discount_amount: number;
         gst_amount: number;
         total_amount: number;
         due_date: string;
@@ -698,7 +716,7 @@ export async function createInvoiceFromAiAction(input: z.infer<typeof aiInvoiceC
         quantity,
         unitPrice,
         originalSubtotal,
-        discount,
+        discount: Number(invoice?.discount_amount ?? discount),
         subtotal: Number(invoice?.subtotal ?? netSubtotal),
         taxTotal: Number(invoice?.gst_amount ?? 0),
         totalAmount: Number(invoice?.total_amount ?? netSubtotal),
@@ -718,7 +736,7 @@ export async function approveInvoiceFromAiAction(input: z.infer<typeof aiInvoice
   if (!parsed.success) return { ok: false as const, error: "Invalid invoice." };
 
   const fd = new FormData();
-  fd.set("invoiceId", parsed.data.invoiceId);
+  fd.set("id", parsed.data.invoiceId);
   fd.set("status", "sent");
   const res = await setInvoiceStatusAction(undefined, fd);
   if (!res.ok) return res;
@@ -919,19 +937,31 @@ export async function answerFromDocsAction(input: z.infer<typeof aiDocsQuestionS
     return { ok: false as const, error: "Ask a docs or support question first." };
   }
 
-  let docsText = "";
-  try {
-    const docsPath = path.join(process.cwd(), "src", "app", "(marketing)", "docs", "page.tsx");
-    const raw = await readFile(docsPath, "utf8");
-    docsText = raw
-      .replace(/import[\s\S]*?;\n/g, "")
-      .replace(/export const[\s\S]*?;\n/g, "")
-      .replace(/[{}()<>=`"'$]/g, " ")
-      .replace(/\s+/g, " ")
-      .slice(0, 18000);
-  } catch {
-    docsText = "";
+  async function readPageText(relPath: string, limit = 10000): Promise<string> {
+    try {
+      const raw = await readFile(path.join(process.cwd(), "src", "app", relPath), "utf8");
+      return raw
+        .replace(/import[\s\S]*?;\n/g, "")
+        .replace(/export const[\s\S]*?;\n/g, "")
+        .replace(/[{}()<>=`"'$]/g, " ")
+        .replace(/\s+/g, " ")
+        .slice(0, limit);
+    } catch {
+      return "";
+    }
   }
+
+  const [docsText, privacyText, termsText] = await Promise.all([
+    readPageText("(marketing)/docs/page.tsx", 14000),
+    readPageText("(marketing)/privacy/page.tsx", 5000),
+    readPageText("(marketing)/terms/page.tsx", 5000),
+  ]);
+
+  const combinedContext = [
+    docsText ? `--- DOCS ---\n${docsText}` : "",
+    privacyText ? `--- PRIVACY POLICY ---\n${privacyText}` : "",
+    termsText ? `--- TERMS & CONDITIONS ---\n${termsText}` : "",
+  ].filter(Boolean).join("\n\n").slice(0, 22000);
 
   const ai = await generateStructuredJson({
     temperature: 0.1,
@@ -939,13 +969,13 @@ export async function answerFromDocsAction(input: z.infer<typeof aiDocsQuestionS
       {
         role: "system",
         content:
-          "You answer Stackivo product support questions from the provided docs text. Return JSON with answer and usedDocs boolean. If the docs do not contain the answer, say what is known and suggest contacting support. Keep answers concise and actionable.",
+          "You answer Stackivo product support, privacy, and terms questions from the provided page text. Return JSON with answer and usedDocs boolean. If the text does not contain the answer, say what is known and suggest contacting support. Keep answers concise and actionable. Never invent policies or features.",
       },
       {
         role: "user",
         content: JSON.stringify({
           question: parsed.data.question,
-          docsText,
+          context: combinedContext,
           requiredShape: {
             answer: "string",
             usedDocs: "boolean",
@@ -974,4 +1004,213 @@ export async function answerFromDocsAction(input: z.infer<typeof aiDocsQuestionS
   }
 
   return { ok: true as const, data: shaped.data };
+}
+
+// ---------------------------------------------------------------------------
+// Welcome document AI pipeline
+// ---------------------------------------------------------------------------
+
+const aiWelcomeDocCreateSchema = z.object({
+  prompt: z.string().trim().min(8).max(10000),
+  clientId: z.string().optional().or(z.literal("")),
+  projectId: z.string().optional().or(z.literal("")),
+});
+
+const aiWelcomeDocIdSchema = z.object({
+  welcomeDocId: z.string().uuid("Invalid welcome document id"),
+});
+
+export async function createWelcomeDocFromAiAction(
+  input: z.infer<typeof aiWelcomeDocCreateSchema>,
+) {
+  const parsed = aiWelcomeDocCreateSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false as const, error: parsed.error.issues[0]?.message ?? "Welcome doc details incomplete." };
+  }
+
+  const userId = await requireUserId();
+  const supabase = await getServerSupabase();
+  const clientId = parsed.data.clientId || undefined;
+  const projectId = parsed.data.projectId || undefined;
+
+  const [{ data: clientRow }, { data: projectRow }] = await Promise.all([
+    clientId
+      ? supabase.from("clients").select("id, full_name, business_name, email, phone").eq("id", clientId).eq("user_id", userId).maybeSingle()
+      : Promise.resolve({ data: null }),
+    projectId
+      ? supabase.from("projects").select("id, name").eq("id", projectId).eq("user_id", userId).maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
+  const client = clientRow as { id: string; full_name?: string | null; business_name?: string | null; email?: string | null; phone?: string | null } | null;
+  const project = projectRow as { id: string; name?: string | null } | null;
+
+  const fdDraft = new FormData();
+  fdDraft.set("payload", JSON.stringify({
+    workflow: "welcome_document",
+    prompt: parsed.data.prompt,
+    clientId: parsed.data.clientId,
+    projectId: parsed.data.projectId,
+  }));
+  const draftResult = await generateOperationalDraftAction(fdDraft);
+  if (!draftResult.ok || !("sections" in draftResult.data)) {
+    return { ok: false as const, error: draftResult.ok ? "Could not draft welcome document." : draftResult.error };
+  }
+
+  const draft = draftResult.data as AiWelcomeDraft;
+  const clientDisplay = client?.business_name || client?.full_name || null;
+
+  const res = await createWelcomeDocumentAction({
+    title: draft.title || (clientDisplay ? `Welcome, ${clientDisplay}` : "Welcome document"),
+    intro: draft.intro || null,
+    sections: draft.sections,
+    clientId: clientId ?? null,
+    projectId: projectId ?? null,
+    acknowledgementRequired: draft.acknowledgementRequired ?? false,
+    brandColor: null,
+  });
+  if (!res.ok || !res.data?.id) {
+    return { ok: false as const, error: res.ok ? "Welcome document was saved but id was not returned." : res.error };
+  }
+
+  return {
+    ok: true as const,
+    data: {
+      id: res.data.id,
+      title: draft.title,
+      intro: draft.intro ?? null,
+      sections: draft.sections,
+      acknowledgementRequired: draft.acknowledgementRequired,
+      clientName: clientDisplay,
+      clientEmail: client?.email ?? null,
+      clientPhone: client?.phone ?? null,
+      projectName: project?.name ?? null,
+    },
+    message: "Welcome document draft created.",
+  };
+}
+
+export async function approveWelcomeDocFromAiAction(
+  input: z.infer<typeof aiWelcomeDocIdSchema>,
+) {
+  const parsed = aiWelcomeDocIdSchema.safeParse(input);
+  if (!parsed.success) return { ok: false as const, error: "Invalid welcome document." };
+  const res = await publishWelcomeDocumentAction({ id: parsed.data.welcomeDocId });
+  if (!res.ok) return { ok: false as const, error: res.error };
+  return { ok: true as const, message: "Welcome document published." };
+}
+
+export async function sendWelcomeDocFromAiAction(
+  input: z.infer<typeof aiWelcomeDocIdSchema>,
+) {
+  const parsed = aiWelcomeDocIdSchema.safeParse(input);
+  if (!parsed.success) return { ok: false as const, error: "Invalid welcome document." };
+  return sendWelcomeDocumentAction({ documentId: parsed.data.welcomeDocId });
+}
+
+export async function welcomeDocWhatsappFromAiAction(
+  input: z.infer<typeof aiWelcomeDocIdSchema>,
+) {
+  const parsed = aiWelcomeDocIdSchema.safeParse(input);
+  if (!parsed.success) return { ok: false as const, error: "Invalid welcome document." };
+
+  const userId = await requireUserId();
+  const supabase = await getServerSupabase();
+
+  const { data: docRow } = await supabase
+    .from("welcome_documents")
+    .select("id, title, client_id, public_token")
+    .eq("id", parsed.data.welcomeDocId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  const doc = docRow as { id: string; title: string; client_id?: string | null; public_token?: string | null } | null;
+  if (!doc) return { ok: false as const, error: "Welcome document not found." };
+
+  const token = doc.public_token ?? await ensureWelcomePublicToken(doc.id);
+  if (!token) return { ok: false as const, error: "Could not create share link." };
+
+  const [{ data: clientRow }, { data: profileRow }] = await Promise.all([
+    doc.client_id
+      ? supabase.from("clients").select("full_name, business_name, phone").eq("id", doc.client_id).eq("user_id", userId).maybeSingle()
+      : Promise.resolve({ data: null }),
+    supabase.from("user_profiles").select("business_name, legal_name, full_name, display_name").eq("id", userId).maybeSingle(),
+  ]);
+  const client = clientRow as { full_name?: string | null; business_name?: string | null; phone?: string | null } | null;
+  const profile = profileRow as { business_name?: string | null; legal_name?: string | null; full_name?: string | null; display_name?: string | null } | null;
+
+  const shareUrl = getWelcomeShareUrl(token, env.appUrl);
+  const senderName = profile?.business_name || profile?.legal_name || profile?.display_name || profile?.full_name || "Stackivo";
+  const clientName = client?.business_name || client?.full_name || null;
+  const clientPhone = client?.phone ?? null;
+
+  const message = `Hi${clientName ? ` ${clientName}` : ""}! ${senderName} has shared a welcome document with you. Open it here: ${shareUrl}`;
+  const waBase = clientPhone ? `https://wa.me/${clientPhone.replace(/\D/g, "")}` : "https://wa.me/";
+  const url = `${waBase}?text=${encodeURIComponent(message)}`;
+
+  return { ok: true as const, data: { url, shareUrl } };
+}
+
+// ---------------------------------------------------------------------------
+// Contract WhatsApp delivery
+// ---------------------------------------------------------------------------
+
+const aiContractWhatsappSchema = z.object({
+  contractId: z.string().uuid("Invalid contract id"),
+});
+
+export async function contractWhatsappFromAiAction(
+  input: z.infer<typeof aiContractWhatsappSchema>,
+) {
+  const parsed = aiContractWhatsappSchema.safeParse(input);
+  if (!parsed.success) return { ok: false as const, error: "Invalid contract." };
+
+  const userId = await requireUserId();
+  const supabase = await getServerSupabase();
+
+  const { data: contractRow } = await supabase
+    .from("contracts")
+    .select("id, title, kind, client_id, value_amount, currency, public_token")
+    .eq("id", parsed.data.contractId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  const contract = contractRow as {
+    id: string;
+    title: string;
+    kind: string;
+    client_id?: string | null;
+    value_amount?: number | null;
+    currency: string;
+    public_token?: string | null;
+  } | null;
+  if (!contract) return { ok: false as const, error: "Contract not found." };
+
+  // Mint or reuse public token — mirrors requestSignatureAction
+  let token = contract.public_token ?? null;
+  if (!token) {
+    token = randomUUID();
+    await supabase
+      .from("contracts")
+      .update({ public_token: token, status: "sent", sent_at: new Date().toISOString() } as never)
+      .eq("id", contract.id);
+  }
+
+  const [{ data: clientRow }, { data: profileRow }] = await Promise.all([
+    contract.client_id
+      ? supabase.from("clients").select("full_name, business_name, phone").eq("id", contract.client_id).eq("user_id", userId).maybeSingle()
+      : Promise.resolve({ data: null }),
+    supabase.from("user_profiles").select("business_name, legal_name, full_name, display_name").eq("id", userId).maybeSingle(),
+  ]);
+  const client = clientRow as { full_name?: string | null; business_name?: string | null; phone?: string | null } | null;
+  const profile = profileRow as { business_name?: string | null; legal_name?: string | null; full_name?: string | null; display_name?: string | null } | null;
+
+  const shareUrl = getContractShareUrl(token);
+  const senderName = profile?.business_name || profile?.legal_name || profile?.display_name || profile?.full_name || "Stackivo";
+  const clientName = client?.business_name || client?.full_name || null;
+  const clientPhone = client?.phone ?? null;
+  const docLabel = contract.kind === "proposal" ? "proposal" : "contract";
+
+  const message = `Hi${clientName ? ` ${clientName}` : ""}! ${senderName} has shared a ${docLabel} with you. Review and sign here: ${shareUrl}`;
+  const waBase = clientPhone ? `https://wa.me/${clientPhone.replace(/\D/g, "")}` : "https://wa.me/";
+  const url = `${waBase}?text=${encodeURIComponent(message)}`;
+
+  return { ok: true as const, data: { url, shareUrl } };
 }

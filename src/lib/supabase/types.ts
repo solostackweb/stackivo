@@ -279,6 +279,7 @@ export interface InvoiceRow {
   issue_date: string;
   due_date: string;
   subtotal: number;
+  discount_amount: number;
   gst_amount: number;
   cgst_amount: number;
   sgst_amount: number;

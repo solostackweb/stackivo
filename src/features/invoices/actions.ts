@@ -60,6 +60,7 @@ function readPayload(formData: FormData): unknown {
     dueDate: formData.get("dueDate"),
     currency: formData.get("currency") ?? "INR",
     status: formData.get("status") ?? "draft",
+    discount: formData.get("discount") ?? 0,
     notes: formData.get("notes"),
     terms: formData.get("terms"),
     lines: [],
@@ -157,6 +158,7 @@ export async function createInvoiceAction(
   const parties = await resolveParties(userId, parsed.data.clientId);
   const totals = calculateInvoice({
     lines: parsed.data.lines,
+    discount: parsed.data.discount,
     seller: parties.seller,
     client: parties.client,
   });
@@ -176,6 +178,7 @@ export async function createInvoiceAction(
     notes: parsed.data.notes ?? null,
     terms: parsed.data.terms ?? null,
     subtotal: totals.subtotal,
+    discount_amount: totals.discount,
     cgst_amount: totals.cgstAmount,
     sgst_amount: totals.sgstAmount,
     igst_amount: totals.igstAmount,
@@ -274,6 +277,7 @@ export async function updateInvoiceAction(
   const parties = await resolveParties(userId, parsed.data.clientId);
   const totals = calculateInvoice({
     lines: parsed.data.lines,
+    discount: parsed.data.discount,
     seller: parties.seller,
     client: parties.client,
   });
@@ -289,6 +293,7 @@ export async function updateInvoiceAction(
     notes: parsed.data.notes ?? null,
     terms: parsed.data.terms ?? null,
     subtotal: totals.subtotal,
+    discount_amount: totals.discount,
     cgst_amount: totals.cgstAmount,
     sgst_amount: totals.sgstAmount,
     igst_amount: totals.igstAmount,
@@ -465,6 +470,7 @@ export async function duplicateInvoiceAction(
       notes: orig.notes,
       terms: orig.terms,
       subtotal: orig.subtotal,
+      discount_amount: orig.discount_amount,
       cgst_amount: orig.cgst_amount,
       sgst_amount: orig.sgst_amount,
       igst_amount: orig.igst_amount,

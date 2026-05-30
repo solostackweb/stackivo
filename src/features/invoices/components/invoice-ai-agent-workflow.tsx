@@ -492,9 +492,18 @@ export function InvoiceAiAgentWorkflow({
               }}
               className="mt-3"
             />
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="mt-2"
+              onClick={() => setStep("amount")}
+            >
+              Use default due date
+            </Button>
           </AiQuestion>
 
-          {!["client", "project", "work", "due"].includes(step) && (
+          {!['client', 'project', 'work', 'due'].includes(step) && (
             <UserBubble title="Due date">{dueDateLabel}</UserBubble>
           )}
 
@@ -535,8 +544,7 @@ export function InvoiceAiAgentWorkflow({
 
           {rate > 0 && !["client", "project", "work", "due", "amount"].includes(step) && (
             <UserBubble title="Amount">
-              Qty {quantity} × {(profile?.defaultCurrency ?? "INR")}{" "}
-              {rate.toLocaleString("en-IN")}
+              Qty {quantity} × {(profile?.defaultCurrency ?? "INR")} {rate.toLocaleString("en-IN")}
             </UserBubble>
           )}
 
@@ -554,12 +562,25 @@ export function InvoiceAiAgentWorkflow({
               onChange={(event) => setDiscount(Math.max(0, Number(event.target.value) || 0))}
               placeholder="0"
             />
-            <Button type="button" size="sm" className="mt-2" onClick={() => setStep("notes")}>
-              Continue
-            </Button>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <Button type="button" size="sm" onClick={() => setStep("notes")}>
+                Continue
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  setDiscount(0);
+                  setStep("notes");
+                }}
+              >
+                Skip discount
+              </Button>
+            </div>
           </AiQuestion>
 
-          {!["client", "project", "work", "due", "amount", "discount"].includes(step) && (
+          {!['client', 'project', 'work', 'due', 'amount', 'discount'].includes(step) && (
             <UserBubble title="Discount">
               {discount > 0
                 ? `${profile?.defaultCurrency ?? "INR"} ${discount.toLocaleString("en-IN")}`
@@ -580,16 +601,29 @@ export function InvoiceAiAgentWorkflow({
               className="resize-none"
               rows={3}
             />
-            <Button
-              type="button"
-              size="sm"
-              className="mt-2"
-              disabled={pending}
-              onClick={createInvoice}
-            >
-              {pending || step === "creating" ? <Loader2 className="animate-spin" /> : <Sparkles />}
-              Generate invoice
-            </Button>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <Button
+                type="button"
+                size="sm"
+                disabled={pending}
+                onClick={createInvoice}
+              >
+                {pending || step === "creating" ? <Loader2 className="animate-spin" /> : <Sparkles />}
+                Generate invoice
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                disabled={pending}
+                onClick={() => {
+                  setNotes("");
+                  createInvoice();
+                }}
+              >
+                Skip notes
+              </Button>
+            </div>
           </AiQuestion>
 
           {notes.trim() && ["creating", "ready"].includes(step) && (
