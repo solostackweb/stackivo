@@ -169,9 +169,9 @@ const WORKFLOW_STEPS: Partial<Record<AiMode, WorkflowStep[]>> = {
     },
     {
       id: "amount",
-      question: "What amount should I bill?",
+      question: "What total amount should I bill before discount?",
       kind: "text",
-      placeholder: "Example: INR 50000, quantity 1",
+      placeholder: "Example: INR 50000",
     },
     {
       id: "due",
@@ -180,11 +180,32 @@ const WORKFLOW_STEPS: Partial<Record<AiMode, WorkflowStep[]>> = {
       options: ["7 days", "15 days", "30 days", "End of month"],
     },
     {
-      id: "notes",
-      question: "Any discount, payment terms, or notes?",
+      id: "quantity",
+      question: "What quantity should I use?",
       kind: "text",
       optional: true,
-      placeholder: "Example: 10% discount, payment by bank transfer, thanks for the quick feedback",
+      placeholder: "Enter a quantity, or skip to use 1",
+    },
+    {
+      id: "discount",
+      question: "Should I apply a discount?",
+      kind: "text",
+      optional: true,
+      placeholder: "Example: 5000 or 10%. Skip if there is no discount",
+    },
+    {
+      id: "terms",
+      question: "Any payment terms to include?",
+      kind: "text",
+      optional: true,
+      placeholder: "Example: Payment by bank transfer within 15 days",
+    },
+    {
+      id: "notes",
+      question: "Any additional notes for the client?",
+      kind: "text",
+      optional: true,
+      placeholder: "Example: Thank you for the quick feedback",
     },
   ],
   contract: [

@@ -87,6 +87,16 @@ function quantityFromPrompt(prompt: string) {
   return Number.isFinite(value) && value > 0 ? value : 1;
 }
 
+function quantityFromAnswer(value: string) {
+  const cleaned = cleanAiAnswer(value);
+  if (!cleaned) return 1;
+  const explicit = quantityFromPrompt(cleaned);
+  if (explicit !== 1 || /\b1\b/.test(cleaned)) return explicit;
+  const number = cleaned.replace(/,/g, "").match(/\d+(?:\.\d+)?/)?.[0];
+  const parsed = number ? Number(number) : 1;
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+}
+
 function discountFromPrompt(prompt: string, subtotal: number) {
   const normalized = prompt.replace(/,/g, "").toLowerCase();
   const percentMatch =
@@ -104,6 +114,15 @@ function discountFromPrompt(prompt: string, subtotal: number) {
     normalized.match(/(?:discount|off)\s*(?:of\s*)?₹\s*(\d+(?:\.\d+)?)/) ??
     normalized.match(/₹\s*(\d+(?:\.\d+)?)\s*(?:discount|off)/);
   return rupeeMatch ? Math.min(subtotal, Math.max(0, Number(rupeeMatch[1]))) : 0;
+}
+
+function discountFromAnswer(value: string, subtotal: number) {
+  const cleaned = cleanAiAnswer(value);
+  if (!cleaned) return 0;
+  const parsed = discountFromPrompt(cleaned, subtotal);
+  if (parsed > 0) return parsed;
+  const number = cleaned.replace(/,/g, "").match(/\d+(?:\.\d+)?/)?.[0];
+  return number ? Math.min(subtotal, Math.max(0, Number(number))) : 0;
 }
 
 function dueDateFromPrompt(prompt: string, fallbackDays: number) {
@@ -345,6 +364,50 @@ function contractPromptFromWorkflowAnswers(prompt: string) {
   };
 }
 
+function invoiceDraftFromWorkflowAnswers(prompt: string, fallbackDueDays: number) {
+  const workDescription = answerForQuestion(prompt, "What work should I invoice for?");
+  const amountAnswer = answerForQuestion(prompt, "What total amount should I bill before discount?");
+  const dueAnswer = answerForQuestion(prompt, "When should the invoice be due?");
+  const quantityAnswer = answerForQuestion(prompt, "What quantity should I use?");
+  const discountAnswer = answerForQuestion(prompt, "Should I apply a discount?");
+  const terms = answerForQuestion(prompt, "Any payment terms to include?");
+  const notes = answerForQuestion(prompt, "Any additional notes for the client?");
+  const hasGuidedAnswers =
+    workDescription ||
+    amountAnswer ||
+    dueAnswer ||
+    quantityAnswer ||
+    discountAnswer ||
+    terms ||
+    notes;
+
+  if (!hasGuidedAnswers) {
+    const originalSubtotal = amountFromPrompt(prompt);
+    const quantity = quantityFromPrompt(prompt);
+    return {
+      workDescription: prompt,
+      originalSubtotal,
+      quantity,
+      discount: discountFromPrompt(prompt, originalSubtotal),
+      dueDate: dueDateFromPrompt(prompt, fallbackDueDays),
+      terms: "",
+      notes: "",
+    };
+  }
+
+  const originalSubtotal = amountFromPrompt(amountAnswer);
+  const quantity = quantityFromAnswer(quantityAnswer);
+  return {
+    workDescription: workDescription || "Professional services",
+    originalSubtotal,
+    quantity,
+    discount: discountFromAnswer(discountAnswer, originalSubtotal),
+    dueDate: dueDateFromPrompt(dueAnswer, fallbackDueDays),
+    terms,
+    notes,
+  };
+}
+
 export async function createClientFromAiAction(input: z.infer<typeof aiClientCreateSchema>) {
   const parsed = aiClientCreateSchema.safeParse(input);
   if (!parsed.success) return { ok: false as const, error: "Tell me about the client first." };
@@ -459,7 +522,11 @@ export async function createInvoiceFromAiAction(input: z.infer<typeof aiInvoiceC
     getProfile(),
     nextInvoiceNumber(userId),
   ]);
-  const originalSubtotal = amountFromPrompt(parsed.data.prompt);
+  const invoiceInput = invoiceDraftFromWorkflowAnswers(
+    parsed.data.prompt,
+    profile?.invoiceDefaultDueDays ?? 15,
+  );
+  const { originalSubtotal, quantity, discount, dueDate } = invoiceInput;
   if (originalSubtotal <= 0) {
     return {
       ok: false as const,
@@ -467,25 +534,19 @@ export async function createInvoiceFromAiAction(input: z.infer<typeof aiInvoiceC
     };
   }
 
-  const quantity = quantityFromPrompt(parsed.data.prompt);
-  const discount = discountFromPrompt(parsed.data.prompt, originalSubtotal);
   const netSubtotal = Math.max(0, originalSubtotal - discount);
   const unitPrice = quantity > 0 ? netSubtotal / quantity : netSubtotal;
-  const dueDate = dueDateFromPrompt(
-    parsed.data.prompt,
-    profile?.invoiceDefaultDueDays ?? 15,
-  );
   const draftFd = new FormData();
   draftFd.set(
     "payload",
     JSON.stringify({
       clientId: parsed.data.clientId,
       projectId: parsed.data.projectId,
-      workDescription: parsed.data.prompt,
+      workDescription: invoiceInput.workDescription,
       amount: netSubtotal,
       quantity,
       dueDate,
-      notes: "",
+      notes: invoiceInput.notes,
     }),
   );
   const draftResult = await generateInvoiceDraftAction(draftFd);
@@ -503,11 +564,11 @@ export async function createInvoiceFromAiAction(input: z.infer<typeof aiInvoiceC
       dueDate,
       currency: profile?.defaultCurrency ?? "INR",
       status: "draft",
-      notes: draftResult.data.notes || undefined,
-      terms: draftResult.data.terms || profile?.invoiceDefaultTerms || undefined,
+      notes: invoiceInput.notes || draftResult.data.notes || undefined,
+      terms: invoiceInput.terms || draftResult.data.terms || profile?.invoiceDefaultTerms || undefined,
       lines: [
         {
-          description: line?.description || cleanPromptTitle(parsed.data.prompt, "Professional services"),
+          description: line?.description || cleanPromptTitle(invoiceInput.workDescription, "Professional services"),
           quantity,
           unitPrice,
           gstRate: profile?.gstRegistered ? profile.invoiceDefaultGstRate : 0,
@@ -572,7 +633,7 @@ export async function createInvoiceFromAiAction(input: z.infer<typeof aiInvoiceC
         clientName: client?.business_name || client?.full_name || "Selected client",
         clientEmail: client?.email ?? null,
         clientPhone: client?.phone ?? null,
-        description: line?.description || cleanPromptTitle(parsed.data.prompt, "Professional services"),
+        description: line?.description || cleanPromptTitle(invoiceInput.workDescription, "Professional services"),
         quantity,
         unitPrice,
         originalSubtotal,
