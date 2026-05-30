@@ -101,39 +101,132 @@ const QUICK_ACTIONS: Array<{
   },
 ];
 
-const FOLLOW_UPS: Partial<Record<AiMode, string[]>> = {
+interface WorkflowStep {
+  id: string;
+  question: string;
+  kind: "text" | "client" | "project" | "choice";
+  placeholder?: string;
+  options?: string[];
+  optional?: boolean;
+}
+
+const WORKFLOW_STEPS: Partial<Record<AiMode, WorkflowStep[]>> = {
   invoice: [
-    "Which client is this for? Pick them in Workspace context too.",
-    "What work should I invoice for?",
-    "What amount and due date should I use?",
-    "Any notes, payment terms, or discount?",
+    {
+      id: "client",
+      question: "Choose the client for this invoice.",
+      kind: "client",
+    },
+    {
+      id: "project",
+      question: "Should I link this invoice to a project?",
+      kind: "project",
+      optional: true,
+    },
+    {
+      id: "work",
+      question: "What work should I invoice for?",
+      kind: "text",
+      placeholder: "Example: Landing page design, responsive build, and launch support",
+    },
+    {
+      id: "amount",
+      question: "What amount should I bill?",
+      kind: "text",
+      placeholder: "Example: INR 50000, quantity 1",
+    },
+    {
+      id: "due",
+      question: "When should the invoice be due?",
+      kind: "choice",
+      options: ["7 days", "15 days", "30 days", "End of month"],
+    },
+    {
+      id: "notes",
+      question: "Any discount, payment terms, or notes?",
+      kind: "text",
+      optional: true,
+      placeholder: "Example: 10% discount, payment by bank transfer, thanks for the quick feedback",
+    },
   ],
   contract: [
-    "Who is this agreement for, and what type of agreement is it?",
-    "What is the scope, deliverables, and timeline?",
-    "What are the fees, payment schedule, revision limits, and IP terms?",
-    "Any special clauses, exclusions, or client responsibilities?",
+    { id: "client", question: "Who is this contract or proposal for?", kind: "client", optional: true },
+    { id: "project", question: "Should it be linked to a project?", kind: "project", optional: true },
+    {
+      id: "type",
+      question: "What are we drafting?",
+      kind: "choice",
+      options: ["Service agreement", "Project proposal", "Retainer agreement", "NDA", "Maintenance contract"],
+    },
+    {
+      id: "scope",
+      question: "Describe the scope, deliverables, and timeline.",
+      kind: "text",
+      placeholder: "Example: Website redesign, 5 pages, CMS setup, 3 week timeline, client provides copy and assets",
+    },
+    {
+      id: "commercials",
+      question: "What are the fees, payment schedule, revision limits, and IP terms?",
+      kind: "text",
+      placeholder: "Example: INR 150000 fixed fee, 50% upfront, 2 revision rounds, final IP transfers after full payment",
+    },
+    {
+      id: "clauses",
+      question: "Any special clauses, exclusions, or client responsibilities?",
+      kind: "text",
+      optional: true,
+      placeholder: "Example: excludes paid plugins, client must approve milestones within 3 business days",
+    },
   ],
   welcome_document: [
-    "Who is this welcome document for?",
-    "What process, communication cadence, and feedback rules should it explain?",
-    "What should it say about payments, files, deliverables, and approvals?",
-    "What tone should it use, and what next steps should the client take?",
+    { id: "client", question: "Who is this welcome document for?", kind: "client", optional: true },
+    {
+      id: "relationship",
+      question: "What kind of client or engagement is this?",
+      kind: "choice",
+      options: ["Design client", "Development client", "Retainer client", "Consulting client", "Agency client"],
+    },
+    {
+      id: "process",
+      question: "What process, communication cadence, and feedback rules should it explain?",
+      kind: "text",
+      placeholder: "Example: Weekly Friday updates, feedback in one doc, replies within 1 business day",
+    },
+    {
+      id: "operations",
+      question: "What should it say about payments, files, deliverables, and approvals?",
+      kind: "text",
+      placeholder: "Example: Invoices due in 15 days, final files via portal, approvals in writing",
+    },
+    {
+      id: "tone",
+      question: "What tone and next steps should the client see?",
+      kind: "choice",
+      options: ["Warm and premium", "Direct and concise", "Detailed and structured", "Friendly and simple"],
+    },
   ],
   client: [
-    "What is the client name and business name?",
-    "What email, phone, billing address, or location should I save?",
-    "Any notes I should remember about this client?",
+    { id: "name", question: "What is the client/contact name?", kind: "text", placeholder: "Example: Riya Sharma" },
+    { id: "business", question: "What is the business or company name?", kind: "text", optional: true, placeholder: "Example: Acme Encore" },
+    { id: "contact", question: "What email and phone should I save?", kind: "text", optional: true, placeholder: "Example: riya@acme.com, +91..." },
+    { id: "billing", question: "What billing address or city/state should I save?", kind: "text", optional: true, placeholder: "Example: Mumbai, Maharashtra" },
+    { id: "notes", question: "Any notes about this client?", kind: "text", optional: true, placeholder: "Example: Retainer client, prefers email, fast approvals" },
   ],
   project: [
-    "What is the project name and client?",
-    "What is the goal, scope, and deliverables?",
-    "What start date, due date, and status context should I use?",
+    { id: "client", question: "Which client should this project belong to?", kind: "client", optional: true },
+    { id: "name", question: "What is the project name?", kind: "text", placeholder: "Example: Website Redesign" },
+    { id: "scope", question: "What is the goal, scope, and deliverables?", kind: "text", placeholder: "Example: Redesign landing page, CMS setup, analytics, launch support" },
+    { id: "dates", question: "What start date and due date should I use?", kind: "text", optional: true, placeholder: "Example: starts next Monday, due end of month" },
   ],
   support: [
-    "What do you need help with?",
-    "What page or workflow were you using?",
-    "Do you want a docs answer, or should I send this to support?",
+    { id: "question", question: "What do you need help with?", kind: "text", placeholder: "Ask a Stackivo docs or support question" },
+    { id: "page", question: "What page or workflow were you using?", kind: "text", optional: true, placeholder: "Example: invoices page, contract builder, payments settings" },
+    {
+      id: "route",
+      question: "Should I answer from docs first, or send this to support?",
+      kind: "choice",
+      options: ["Answer from docs first", "Send to support"],
+    },
   ],
 };
 
@@ -192,6 +285,9 @@ export function StackivoAiAssistant({ clients, projects }: StackivoAiAssistantPr
     () => (clientId ? projects.filter((project) => project.clientId === clientId) : projects),
     [clientId, projects],
   );
+  const activeSteps = WORKFLOW_STEPS[mode];
+  const activeStep =
+    workflowStep !== null && activeSteps ? activeSteps[workflowStep] : null;
 
   React.useEffect(() => {
     if (!open) return;
@@ -210,14 +306,14 @@ export function StackivoAiAssistant({ clients, projects }: StackivoAiAssistantPr
     setMode(nextMode);
     setInput("");
     setWorkflowAnswers([]);
-    const steps = FOLLOW_UPS[nextMode];
+    const steps = WORKFLOW_STEPS[nextMode];
     setWorkflowStep(steps ? 0 : null);
     push({
       role: "assistant",
       content: (
         <>
           <span className="block">{modeIntro(nextMode)}</span>
-          {steps ? <span className="mt-2 block font-medium">{steps[0]}</span> : null}
+          {steps ? <span className="mt-2 block font-medium">{steps[0].question}</span> : null}
         </>
       ),
     });
@@ -383,11 +479,11 @@ export function StackivoAiAssistant({ clients, projects }: StackivoAiAssistantPr
     [clientId, projectId, push, router],
   );
 
-  const submit = () => {
-    const text = input.trim();
+  const submit = (override?: string) => {
+    const text = (override ?? input).trim();
     if (!text || pending) return;
     const targetMode = mode === "general" ? detectMode(text) : mode;
-    const steps = FOLLOW_UPS[targetMode];
+    const steps = WORKFLOW_STEPS[targetMode];
     setMode(targetMode);
     setInput("");
     push({ role: "user", content: text });
@@ -398,12 +494,17 @@ export function StackivoAiAssistant({ clients, projects }: StackivoAiAssistantPr
       const nextStep = workflowStep + 1;
       if (nextStep < steps.length) {
         setWorkflowStep(nextStep);
-        push({ role: "assistant", content: steps[nextStep] });
+        push({ role: "assistant", content: steps[nextStep].question });
         return;
       }
       setWorkflowStep(null);
       startTransition(async () => {
-        await executeWorkflow(targetMode, nextAnswers.join("\n\n"));
+        await executeWorkflow(
+          targetMode,
+          nextAnswers
+            .map((answer, index) => `${steps[index].question}\n${answer}`)
+            .join("\n\n"),
+        );
       });
       return;
     }
@@ -417,7 +518,7 @@ export function StackivoAiAssistant({ clients, projects }: StackivoAiAssistantPr
           content: (
             <>
               <span className="block">{modeIntro(targetMode)}</span>
-              <span className="mt-2 block font-medium">{steps[1]}</span>
+              <span className="mt-2 block font-medium">{steps[1].question}</span>
             </>
           ),
         });
@@ -613,6 +714,27 @@ export function StackivoAiAssistant({ clients, projects }: StackivoAiAssistantPr
               </div>
             ))}
 
+            {activeStep && (
+              <WorkflowStepInput
+                step={activeStep}
+                clients={clients}
+                projects={projectOptions}
+                clientId={clientId}
+                projectId={projectId}
+                onClientChange={(value, label) => {
+                  setClientId(value);
+                  setProjectId("");
+                  submit(label || "No specific client");
+                }}
+                onProjectChange={(value, label) => {
+                  setProjectId(value);
+                  submit(label || "No specific project");
+                }}
+                onChoice={(value) => submit(value)}
+                onSkip={() => submit("Skip")}
+              />
+            )}
+
             {pending && (
               <div className="flex justify-start">
                 <div className="rounded-2xl border bg-background px-4 py-3 shadow-sm">
@@ -641,7 +763,7 @@ export function StackivoAiAssistant({ clients, projects }: StackivoAiAssistantPr
                     submit();
                   }
                 }}
-                placeholder={placeholderForMode(mode)}
+                placeholder={activeStep?.placeholder ?? placeholderForMode(mode)}
                 rows={3}
                 className="min-h-20 resize-none border-0 p-0 shadow-none focus-visible:ring-0"
               />
@@ -649,7 +771,7 @@ export function StackivoAiAssistant({ clients, projects }: StackivoAiAssistantPr
                 <span className="rounded-full border px-3 py-1 text-xs text-muted-foreground">
                   {mode === "general" ? "Ask" : labelForMode(mode)}
                 </span>
-                <Button type="button" size="icon" className="h-9 w-9 rounded-full" onClick={submit} disabled={pending || !input.trim()}>
+                <Button type="button" size="icon" className="h-9 w-9 rounded-full" onClick={() => submit()} disabled={pending || !input.trim()}>
                   <ArrowUp className="h-4 w-4" />
                 </Button>
               </div>
@@ -701,6 +823,112 @@ function placeholderForMode(mode: AiMode) {
 
 function labelForMode(mode: AiMode) {
   return QUICK_ACTIONS.find((action) => action.mode === mode)?.title ?? "Ask";
+}
+
+function WorkflowStepInput({
+  step,
+  clients,
+  projects,
+  clientId,
+  projectId,
+  onClientChange,
+  onProjectChange,
+  onChoice,
+  onSkip,
+}: {
+  step: WorkflowStep;
+  clients: AiEntityOption[];
+  projects: AiEntityOption[];
+  clientId: string;
+  projectId: string;
+  onClientChange: (value: string, label: string) => void;
+  onProjectChange: (value: string, label: string) => void;
+  onChoice: (value: string) => void;
+  onSkip: () => void;
+}) {
+  if (step.kind === "text") {
+    return null;
+  }
+
+  return (
+    <div className="flex justify-start">
+      <div className="w-full max-w-[88%] rounded-2xl border bg-background px-4 py-3 text-sm shadow-sm">
+        <p className="font-medium">{step.question}</p>
+
+        {step.kind === "client" && (
+          <div className="mt-3 space-y-2">
+            <select
+              value={clientId}
+              onChange={(event) => {
+                const option = event.currentTarget.selectedOptions[0];
+                onClientChange(event.target.value, option?.textContent ?? "");
+              }}
+              className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:border-primary/50 focus:ring-4 focus:ring-primary/15"
+            >
+              <option value="">Select a client</option>
+              {clients.map((client) => (
+                <option key={client.id} value={client.id}>
+                  {client.name}
+                </option>
+              ))}
+            </select>
+            {step.optional && (
+              <Button type="button" variant="ghost" size="sm" onClick={onSkip}>
+                Skip
+              </Button>
+            )}
+          </div>
+        )}
+
+        {step.kind === "project" && (
+          <div className="mt-3 space-y-2">
+            <select
+              value={projectId}
+              onChange={(event) => {
+                const option = event.currentTarget.selectedOptions[0];
+                onProjectChange(event.target.value, option?.textContent ?? "");
+              }}
+              className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:border-primary/50 focus:ring-4 focus:ring-primary/15"
+            >
+              <option value="">No specific project</option>
+              {projects.map((project) => (
+                <option key={project.id} value={project.id}>
+                  {project.name}
+                </option>
+              ))}
+            </select>
+            <Button type="button" variant="ghost" size="sm" onClick={onSkip}>
+              Skip project
+            </Button>
+          </div>
+        )}
+
+        {step.kind === "choice" && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {step.options?.map((option) => (
+              <button
+                key={option}
+                type="button"
+                onClick={() => onChoice(option)}
+                className="rounded-full border bg-background px-3 py-1.5 text-xs font-medium transition-colors hover:border-primary/50 hover:bg-primary/5"
+              >
+                {option}
+              </button>
+            ))}
+            {step.optional && (
+              <button
+                type="button"
+                onClick={onSkip}
+                className="rounded-full border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:border-primary/50 hover:bg-primary/5"
+              >
+                Skip
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 function ResultBlock({
