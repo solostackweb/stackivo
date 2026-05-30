@@ -1,6 +1,8 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 import { z } from "zod";
 
 import { AUTH_LOGIN_ROUTE } from "@/features/auth/routes";
@@ -11,6 +13,7 @@ import { createInvoiceAction } from "@/features/invoices/actions";
 import { createClientAction } from "@/features/clients/actions";
 import { createProjectAction } from "@/features/projects/actions";
 import { generateInvoiceDraftAction, generateOperationalDraftAction } from "./actions";
+import { generateStructuredJson } from "./groq";
 import type { AiClientDraft, AiProjectDraft } from "./types";
 
 const aiClientCreateSchema = z.object({
@@ -26,6 +29,10 @@ const aiInvoiceCreateSchema = z.object({
   prompt: z.string().trim().min(4).max(6000),
   clientId: z.string().min(1, "Choose a client"),
   projectId: z.string().optional().or(z.literal("")),
+});
+
+const aiDocsQuestionSchema = z.object({
+  question: z.string().trim().min(4).max(3000),
 });
 
 async function requireUserId() {
@@ -216,4 +223,67 @@ export async function createInvoiceFromAiAction(input: z.infer<typeof aiInvoiceC
     data: { ...res.data, invoiceNumber: nextNumber.formatted, draft: draftResult.data },
     message: "Invoice draft created.",
   };
+}
+
+export async function answerFromDocsAction(input: z.infer<typeof aiDocsQuestionSchema>) {
+  const parsed = aiDocsQuestionSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false as const, error: "Ask a docs or support question first." };
+  }
+
+  let docsText = "";
+  try {
+    const docsPath = path.join(process.cwd(), "src", "app", "(marketing)", "docs", "page.tsx");
+    const raw = await readFile(docsPath, "utf8");
+    docsText = raw
+      .replace(/import[\s\S]*?;\n/g, "")
+      .replace(/export const[\s\S]*?;\n/g, "")
+      .replace(/[{}()<>=`"'$]/g, " ")
+      .replace(/\s+/g, " ")
+      .slice(0, 18000);
+  } catch {
+    docsText = "";
+  }
+
+  const ai = await generateStructuredJson({
+    temperature: 0.1,
+    messages: [
+      {
+        role: "system",
+        content:
+          "You answer Stackivo product support questions from the provided docs text. Return JSON with answer and usedDocs boolean. If the docs do not contain the answer, say what is known and suggest contacting support. Keep answers concise and actionable.",
+      },
+      {
+        role: "user",
+        content: JSON.stringify({
+          question: parsed.data.question,
+          docsText,
+          requiredShape: {
+            answer: "string",
+            usedDocs: "boolean",
+          },
+        }),
+      },
+    ],
+  }).catch(() => null);
+
+  const shaped = z
+    .object({
+      answer: z.string().min(1).max(3000),
+      usedDocs: z.boolean(),
+    })
+    .safeParse(ai);
+
+  if (!shaped.success) {
+    return {
+      ok: true as const,
+      data: {
+        answer:
+          "I could not read a precise answer from the docs yet. Share a little more detail, or use support and I will send this to the Stackivo team.",
+        usedDocs: false,
+      },
+    };
+  }
+
+  return { ok: true as const, data: shaped.data };
 }

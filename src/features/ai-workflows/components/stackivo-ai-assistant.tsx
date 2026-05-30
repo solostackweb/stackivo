@@ -26,6 +26,7 @@ import {
   createClientFromAiAction,
   createInvoiceFromAiAction,
   createProjectFromAiAction,
+  answerFromDocsAction,
 } from "@/features/ai-workflows/global-actions";
 import { submitBugReportAction } from "@/features/support/actions";
 import type { AiContractDraft, AiWelcomeDraft } from "@/features/ai-workflows/types";
@@ -100,6 +101,42 @@ const QUICK_ACTIONS: Array<{
   },
 ];
 
+const FOLLOW_UPS: Partial<Record<AiMode, string[]>> = {
+  invoice: [
+    "Which client is this for? Pick them in Workspace context too.",
+    "What work should I invoice for?",
+    "What amount and due date should I use?",
+    "Any notes, payment terms, or discount?",
+  ],
+  contract: [
+    "Who is this agreement for, and what type of agreement is it?",
+    "What is the scope, deliverables, and timeline?",
+    "What are the fees, payment schedule, revision limits, and IP terms?",
+    "Any special clauses, exclusions, or client responsibilities?",
+  ],
+  welcome_document: [
+    "Who is this welcome document for?",
+    "What process, communication cadence, and feedback rules should it explain?",
+    "What should it say about payments, files, deliverables, and approvals?",
+    "What tone should it use, and what next steps should the client take?",
+  ],
+  client: [
+    "What is the client name and business name?",
+    "What email, phone, billing address, or location should I save?",
+    "Any notes I should remember about this client?",
+  ],
+  project: [
+    "What is the project name and client?",
+    "What is the goal, scope, and deliverables?",
+    "What start date, due date, and status context should I use?",
+  ],
+  support: [
+    "What do you need help with?",
+    "What page or workflow were you using?",
+    "Do you want a docs answer, or should I send this to support?",
+  ],
+};
+
 function newId() {
   return Math.random().toString(36).slice(2, 10);
 }
@@ -111,6 +148,8 @@ export function StackivoAiAssistant({ clients, projects }: StackivoAiAssistantPr
   const [expanded, setExpanded] = React.useState(false);
   const [mode, setMode] = React.useState<AiMode>("general");
   const [input, setInput] = React.useState("");
+  const [workflowStep, setWorkflowStep] = React.useState<number | null>(null);
+  const [workflowAnswers, setWorkflowAnswers] = React.useState<string[]>([]);
   const [clientId, setClientId] = React.useState("");
   const [projectId, setProjectId] = React.useState("");
   const [pending, startTransition] = React.useTransition();
@@ -136,6 +175,19 @@ export function StackivoAiAssistant({ clients, projects }: StackivoAiAssistantPr
     setMounted(true);
   }, []);
 
+  React.useEffect(() => {
+    if (!mounted) return;
+    document.documentElement.classList.toggle("stackivo-ai-open", open);
+    document.documentElement.style.setProperty(
+      "--stackivo-ai-width",
+      expanded ? "min(720px, calc(100vw - 18rem))" : "440px",
+    );
+    return () => {
+      document.documentElement.classList.remove("stackivo-ai-open");
+      document.documentElement.style.removeProperty("--stackivo-ai-width");
+    };
+  }, [expanded, mounted, open]);
+
   const projectOptions = React.useMemo(
     () => (clientId ? projects.filter((project) => project.clientId === clientId) : projects),
     [clientId, projects],
@@ -157,9 +209,17 @@ export function StackivoAiAssistant({ clients, projects }: StackivoAiAssistantPr
   const selectMode = (nextMode: AiMode) => {
     setMode(nextMode);
     setInput("");
+    setWorkflowAnswers([]);
+    const steps = FOLLOW_UPS[nextMode];
+    setWorkflowStep(steps ? 0 : null);
     push({
       role: "assistant",
-      content: modeIntro(nextMode),
+      content: (
+        <>
+          <span className="block">{modeIntro(nextMode)}</span>
+          {steps ? <span className="mt-2 block font-medium">{steps[0]}</span> : null}
+        </>
+      ),
     });
   };
 
@@ -174,15 +234,8 @@ export function StackivoAiAssistant({ clients, projects }: StackivoAiAssistantPr
     return mode;
   };
 
-  const submit = () => {
-    const text = input.trim();
-    if (!text || pending) return;
-    const targetMode = mode === "general" ? detectMode(text) : mode;
-    setMode(targetMode);
-    setInput("");
-    push({ role: "user", content: text });
-
-    startTransition(async () => {
+  const executeWorkflow = React.useCallback(
+    async (targetMode: AiMode, text: string) => {
       if (targetMode === "invoice") {
         if (!clientId) {
           push({
@@ -297,6 +350,11 @@ export function StackivoAiAssistant({ clients, projects }: StackivoAiAssistantPr
       }
 
       if (targetMode === "support") {
+        const docs = await answerFromDocsAction({ question: text });
+        if (docs.ok && docs.data.usedDocs) {
+          push({ role: "assistant", content: docs.data.answer });
+          return;
+        }
         const res = await submitBugReportAction({
           category: "how-to",
           summary: text.slice(0, 180),
@@ -304,12 +362,14 @@ export function StackivoAiAssistant({ clients, projects }: StackivoAiAssistantPr
           page: typeof window !== "undefined" ? window.location.pathname : undefined,
         });
         if (!res.ok) {
-          push({ role: "assistant", content: res.error });
+          push({ role: "assistant", content: docs.ok ? docs.data.answer : res.error });
           return;
         }
         push({
           role: "assistant",
-          content: "I sent this to Stackivo support. As the docs/help center grows, I will also answer directly from those pages here.",
+          content: docs.ok
+            ? `${docs.data.answer}\n\nI also sent this to Stackivo support so the team can follow up.`
+            : "I sent this to Stackivo support so the team can follow up.",
         });
         return;
       }
@@ -319,6 +379,54 @@ export function StackivoAiAssistant({ clients, projects }: StackivoAiAssistantPr
         content:
           "I can help with invoices, contracts, welcome docs, clients, projects, and support. Pick one of the workflow cards or describe the action more directly.",
       });
+    },
+    [clientId, projectId, push, router],
+  );
+
+  const submit = () => {
+    const text = input.trim();
+    if (!text || pending) return;
+    const targetMode = mode === "general" ? detectMode(text) : mode;
+    const steps = FOLLOW_UPS[targetMode];
+    setMode(targetMode);
+    setInput("");
+    push({ role: "user", content: text });
+
+    if (steps && workflowStep !== null) {
+      const nextAnswers = [...workflowAnswers, text];
+      setWorkflowAnswers(nextAnswers);
+      const nextStep = workflowStep + 1;
+      if (nextStep < steps.length) {
+        setWorkflowStep(nextStep);
+        push({ role: "assistant", content: steps[nextStep] });
+        return;
+      }
+      setWorkflowStep(null);
+      startTransition(async () => {
+        await executeWorkflow(targetMode, nextAnswers.join("\n\n"));
+      });
+      return;
+    }
+
+    if (steps && mode === "general") {
+      setWorkflowAnswers([text]);
+      if (steps.length > 1) {
+        setWorkflowStep(1);
+        push({
+          role: "assistant",
+          content: (
+            <>
+              <span className="block">{modeIntro(targetMode)}</span>
+              <span className="mt-2 block font-medium">{steps[1]}</span>
+            </>
+          ),
+        });
+        return;
+      }
+    }
+
+    startTransition(async () => {
+      await executeWorkflow(targetMode, text);
     });
   };
 
@@ -347,7 +455,7 @@ export function StackivoAiAssistant({ clients, projects }: StackivoAiAssistantPr
       {mounted && open && createPortal((
         <div
           className={cn(
-            "fixed inset-y-0 right-0 z-[100] flex h-dvh w-full flex-col border-l bg-background shadow-2xl transition-[width]",
+            "fixed inset-y-0 right-0 z-[100] flex h-dvh w-full flex-col border-l bg-background transition-[width]",
             expanded ? "md:w-[min(720px,calc(100vw-18rem))]" : "md:w-[440px]",
           )}
         >
@@ -355,7 +463,11 @@ export function StackivoAiAssistant({ clients, projects }: StackivoAiAssistantPr
             <button
               type="button"
               className="inline-flex items-center gap-2 text-left font-semibold"
-              onClick={() => setMode("general")}
+              onClick={() => {
+                setMode("general");
+                setWorkflowStep(null);
+                setWorkflowAnswers([]);
+              }}
             >
               <Sparkles className="h-4 w-4" />
               New conversation
@@ -366,7 +478,12 @@ export function StackivoAiAssistant({ clients, projects }: StackivoAiAssistantPr
                 variant="ghost"
                 size="icon"
                 className="h-8 w-8"
-                onClick={() => setMessages((prev) => prev.slice(0, 1))}
+                onClick={() => {
+                  setMessages((prev) => prev.slice(0, 1));
+                  setMode("general");
+                  setWorkflowStep(null);
+                  setWorkflowAnswers([]);
+                }}
                 aria-label="New conversation"
               >
                 <Plus className="h-4 w-4" />
@@ -396,7 +513,7 @@ export function StackivoAiAssistant({ clients, projects }: StackivoAiAssistantPr
 
           <div
             ref={scrollRef}
-            className="scrollbar-modern flex-1 space-y-5 overflow-y-auto bg-[radial-gradient(circle_at_center,rgba(249,115,22,0.12),transparent_15rem)] bg-[length:24px_24px] px-5 py-5"
+            className="scrollbar-modern flex-1 space-y-5 overflow-y-auto bg-[radial-gradient(circle_at_top,rgba(37,99,235,0.08),transparent_18rem)] px-5 py-5"
           >
             <div className="rounded-xl border bg-background p-3 text-sm">
               <div className="flex items-center justify-between gap-3">
@@ -408,10 +525,8 @@ export function StackivoAiAssistant({ clients, projects }: StackivoAiAssistantPr
             </div>
 
             <div className="mx-auto flex max-w-sm flex-col items-center py-2 text-center">
-              <div className="relative h-20 w-32">
-                <span className="absolute left-2 top-8 h-10 w-16 rounded-full bg-orange-300 blur-sm" />
-                <span className="absolute left-8 top-3 h-16 w-20 rounded-full bg-orange-200" />
-                <span className="absolute right-2 top-7 h-12 w-16 rounded-full bg-orange-400" />
+              <div className="relative flex h-16 w-16 items-center justify-center rounded-2xl border bg-primary/10 text-primary shadow-sm">
+                <Sparkles className="h-7 w-7" />
               </div>
               <h2 className="text-lg font-semibold">What are we doing today?</h2>
               <p className="mt-1 text-sm text-muted-foreground">

@@ -40,7 +40,10 @@ export function DashboardShell({
       <div className="flex min-h-[100dvh] w-full bg-background">
         <AppSidebar />
         <MobileNav />
-        <div className="flex min-w-0 flex-1 flex-col">
+        <div
+          data-dashboard-content
+          className="flex min-w-0 flex-1 flex-col transition-[margin] duration-200 ease-out"
+        >
           <TopNav aiClients={aiClients} aiProjects={aiProjects} />
           <main
             className="flex-1"

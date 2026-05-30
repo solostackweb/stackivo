@@ -113,6 +113,12 @@
   }
 }
 
+@media (min-width: 768px) {
+  .stackivo-ai-open [data-dashboard-content] {
+    margin-right: var(--stackivo-ai-width, 440px);
+  }
+}
+
 @layer base {
   * {
     @apply border-border;
