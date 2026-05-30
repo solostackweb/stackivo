@@ -23,10 +23,15 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { generateOperationalDraftAction } from "@/features/ai-workflows/actions";
 import {
+  approveInvoiceFromAiAction,
   createClientFromAiAction,
+  createContractFromAiAction,
   createInvoiceFromAiAction,
   createProjectFromAiAction,
+  emailInvoiceFromAiAction,
+  invoiceWhatsappFromAiAction,
   answerFromDocsAction,
+  sendContractFromAiAction,
 } from "@/features/ai-workflows/global-actions";
 import { submitBugReportAction } from "@/features/support/actions";
 import type { AiContractDraft, AiWelcomeDraft } from "@/features/ai-workflows/types";
@@ -55,6 +60,39 @@ interface Message {
   id: string;
   role: "assistant" | "user";
   content: React.ReactNode;
+}
+
+interface AiInvoicePreview {
+  id: string;
+  invoiceNumber: string;
+  clientName: string;
+  clientEmail: string | null;
+  clientPhone: string | null;
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  originalSubtotal: number;
+  discount: number;
+  subtotal: number;
+  taxTotal: number;
+  totalAmount: number;
+  currency: string;
+  dueDate: string;
+  status: string;
+  terms: string | null;
+  notes: string | null;
+}
+
+interface AiContractPreview {
+  id: string;
+  title: string;
+  kind: "contract" | "proposal";
+  clientName: string;
+  clientEmail: string | null;
+  projectName: string | null;
+  valueAmount: number | null;
+  currency: string;
+  sections: Array<{ heading: string; body: string }>;
 }
 
 const QUICK_ACTIONS: Array<{
@@ -150,13 +188,20 @@ const WORKFLOW_STEPS: Partial<Record<AiMode, WorkflowStep[]>> = {
     },
   ],
   contract: [
-    { id: "client", question: "Who is this contract or proposal for?", kind: "client", optional: true },
+    { id: "client", question: "Who is this contract or proposal for?", kind: "client" },
     { id: "project", question: "Should it be linked to a project?", kind: "project", optional: true },
     {
       id: "type",
       question: "What are we drafting?",
       kind: "choice",
       options: ["Service agreement", "Project proposal", "Retainer agreement", "NDA", "Maintenance contract"],
+    },
+    {
+      id: "amount",
+      question: "What contract value or commercial amount should I include?",
+      kind: "text",
+      optional: true,
+      placeholder: "Example: INR 150000 fixed fee, 50% upfront, or skip if not applicable",
     },
     {
       id: "scope",
@@ -216,6 +261,12 @@ const WORKFLOW_STEPS: Partial<Record<AiMode, WorkflowStep[]>> = {
     { id: "client", question: "Which client should this project belong to?", kind: "client", optional: true },
     { id: "name", question: "What is the project name?", kind: "text", placeholder: "Example: Website Redesign" },
     { id: "scope", question: "What is the goal, scope, and deliverables?", kind: "text", placeholder: "Example: Redesign landing page, CMS setup, analytics, launch support" },
+    {
+      id: "status",
+      question: "What stage should I set?",
+      kind: "choice",
+      options: ["Planning", "Active", "Waiting on client", "Review", "On hold"],
+    },
     { id: "dates", question: "What start date and due date should I use?", kind: "text", optional: true, placeholder: "Example: starts next Monday, due end of month" },
   ],
   support: [
@@ -302,6 +353,94 @@ export function StackivoAiAssistant({ clients, projects }: StackivoAiAssistantPr
     setMessages((prev) => [...prev, { ...message, id: newId() }]);
   }, []);
 
+  const handleInvoiceDelivery = React.useCallback(
+    (preview: AiInvoicePreview, channel: "email" | "whatsapp" | "both") => {
+      push({
+        role: "user",
+        content:
+          channel === "both"
+            ? "Send by email and WhatsApp"
+            : channel === "email"
+              ? "Send by email"
+              : "Open WhatsApp",
+      });
+      startTransition(async () => {
+        if (channel === "email" || channel === "both") {
+          const email = await emailInvoiceFromAiAction({ invoiceId: preview.id });
+          if (!email.ok) {
+            push({ role: "assistant", content: email.error });
+            return;
+          }
+        }
+
+        if (channel === "whatsapp" || channel === "both") {
+          const whatsapp = await invoiceWhatsappFromAiAction({ invoiceId: preview.id });
+          if (!whatsapp.ok) {
+            push({ role: "assistant", content: whatsapp.error });
+            return;
+          }
+          window.open(whatsapp.data.url, "_blank", "noopener,noreferrer");
+        }
+
+        push({
+          role: "assistant",
+          content:
+            channel === "both"
+              ? "Done. I emailed the invoice and opened WhatsApp with the invoice link ready to send."
+              : channel === "email"
+                ? "Done. I emailed the invoice to the client."
+                : "WhatsApp is open with the invoice link ready to send.",
+        });
+        router.refresh();
+      });
+    },
+    [push, router],
+  );
+
+  const handleInvoiceApprove = React.useCallback(
+    (preview: AiInvoicePreview) => {
+      push({ role: "user", content: `Approve ${preview.invoiceNumber}` });
+      startTransition(async () => {
+        const res = await approveInvoiceFromAiAction({ invoiceId: preview.id });
+        if (!res.ok) {
+          push({ role: "assistant", content: res.error });
+          return;
+        }
+        push({
+          role: "assistant",
+          content: (
+            <InvoiceDeliveryActions
+              preview={{ ...preview, status: "sent" }}
+              onDeliver={handleInvoiceDelivery}
+              onOpen={() => router.push(`/dashboard/invoices/${preview.id}`)}
+            />
+          ),
+        });
+        router.refresh();
+      });
+    },
+    [handleInvoiceDelivery, push, router],
+  );
+
+  const handleContractSend = React.useCallback(
+    (preview: AiContractPreview) => {
+      push({ role: "user", content: `Approve and send ${preview.title}` });
+      startTransition(async () => {
+        const res = await sendContractFromAiAction({ contractId: preview.id });
+        if (!res.ok) {
+          push({ role: "assistant", content: res.error });
+          return;
+        }
+        push({
+          role: "assistant",
+          content: `${preview.kind === "proposal" ? "Proposal" : "Contract"} sent to ${preview.clientEmail ?? "the selected client"}.`,
+        });
+        router.refresh();
+      });
+    },
+    [push, router],
+  );
+
   const selectMode = (nextMode: AiMode) => {
     setMode(nextMode);
     setInput("");
@@ -348,11 +487,10 @@ export function StackivoAiAssistant({ clients, projects }: StackivoAiAssistantPr
         push({
           role: "assistant",
           content: (
-            <ResultBlock
-              title={`Invoice ${res.data.invoiceNumber} created as draft`}
-              description="I saved it in Invoices. You can review, edit, send, or share it from the invoice page."
-              actionLabel="Open invoices"
-              onAction={() => router.push("/dashboard/invoices")}
+            <InvoiceDraftPreview
+              preview={res.data.preview}
+              onApprove={handleInvoiceApprove}
+              onOpen={() => router.push(`/dashboard/invoices/${res.data.preview.id}`)}
             />
           ),
         });
@@ -402,7 +540,34 @@ export function StackivoAiAssistant({ clients, projects }: StackivoAiAssistantPr
         return;
       }
 
-      if (targetMode === "contract" || targetMode === "welcome_document") {
+      if (targetMode === "contract") {
+        if (!clientId) {
+          push({
+            role: "assistant",
+            content: "Choose a client first, then I can prepare the contract draft.",
+          });
+          return;
+        }
+        const res = await createContractFromAiAction({ prompt: text, clientId, projectId });
+        if (!res.ok) {
+          push({ role: "assistant", content: res.error });
+          return;
+        }
+        push({
+          role: "assistant",
+          content: (
+            <ContractDraftPreview
+              preview={res.data}
+              onSend={handleContractSend}
+              onOpen={() => router.push(`/dashboard/contracts/${res.data.id}`)}
+            />
+          ),
+        });
+        router.refresh();
+        return;
+      }
+
+      if (targetMode === "welcome_document") {
         const fd = new FormData();
         fd.set(
           "payload",
@@ -418,25 +583,15 @@ export function StackivoAiAssistant({ clients, projects }: StackivoAiAssistantPr
           push({ role: "assistant", content: res.error });
           return;
         }
-        const key =
-          targetMode === "contract"
-            ? "stackivo.ai.contractDraft"
-            : "stackivo.ai.welcomeDraft";
-        window.sessionStorage.setItem(key, JSON.stringify(res.data));
+        window.sessionStorage.setItem("stackivo.ai.welcomeDraft", JSON.stringify(res.data));
         push({
           role: "assistant",
           content: (
             <ResultBlock
-              title={targetMode === "contract" ? "Contract draft ready" : "Welcome document ready"}
+              title="Welcome document ready"
               description="I prepared a structured draft. Continue in the editor to review the title, sections, and final content before saving."
-              actionLabel={targetMode === "contract" ? "Open contract builder" : "Open welcome editor"}
-              onAction={() =>
-                router.push(
-                  targetMode === "contract"
-                    ? "/dashboard/contracts/new"
-                    : "/dashboard/welcome/new",
-                )
-              }
+              actionLabel="Open welcome editor"
+              onAction={() => router.push("/dashboard/welcome/new")}
             >
               <DraftSummary draft={res.data as AiContractDraft | AiWelcomeDraft} />
             </ResultBlock>
@@ -476,7 +631,7 @@ export function StackivoAiAssistant({ clients, projects }: StackivoAiAssistantPr
           "I can help with invoices, contracts, welcome docs, clients, projects, and support. Pick one of the workflow cards or describe the action more directly.",
       });
     },
-    [clientId, projectId, push, router],
+    [clientId, handleContractSend, handleInvoiceApprove, projectId, push, router],
   );
 
   const submit = (override?: string) => {
@@ -926,6 +1081,185 @@ function WorkflowStepInput({
             )}
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+function formatAiMoney(value: number, currency: string) {
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency,
+    maximumFractionDigits: 2,
+  }).format(Number(value) || 0);
+}
+
+function InvoiceDraftPreview({
+  preview,
+  onApprove,
+  onOpen,
+}: {
+  preview: AiInvoicePreview;
+  onApprove: (preview: AiInvoicePreview) => void;
+  onOpen: () => void;
+}) {
+  return (
+    <div className="space-y-3">
+      <div>
+        <p className="font-semibold">Draft invoice ready for approval</p>
+        <p className="mt-1 text-muted-foreground">
+          I created {preview.invoiceNumber} as a draft. Here is the quick review before I publish it.
+        </p>
+      </div>
+      <div className="overflow-hidden rounded-xl border bg-muted/20">
+        <div className="border-b bg-background px-3 py-2">
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            {preview.invoiceNumber}
+          </p>
+          <p className="mt-0.5 font-semibold">{preview.clientName}</p>
+          <p className="text-xs text-muted-foreground">Due {preview.dueDate}</p>
+        </div>
+        <div className="space-y-2 px-3 py-3 text-xs">
+          <div className="flex items-start justify-between gap-3">
+            <span className="min-w-0 text-muted-foreground">{preview.description}</span>
+            <span className="shrink-0 font-medium">
+              {preview.quantity} x {formatAiMoney(preview.unitPrice, preview.currency)}
+            </span>
+          </div>
+          {preview.discount > 0 && (
+            <div className="flex justify-between gap-3 text-emerald-700">
+              <span>Discount applied</span>
+              <span>-{formatAiMoney(preview.discount, preview.currency)}</span>
+            </div>
+          )}
+          {preview.taxTotal > 0 && (
+            <div className="flex justify-between gap-3 text-muted-foreground">
+              <span>Tax</span>
+              <span>{formatAiMoney(preview.taxTotal, preview.currency)}</span>
+            </div>
+          )}
+          <div className="flex justify-between gap-3 border-t pt-2 text-sm font-semibold">
+            <span>Total</span>
+            <span>{formatAiMoney(preview.totalAmount, preview.currency)}</span>
+          </div>
+        </div>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <Button type="button" size="sm" onClick={() => onApprove(preview)}>
+          Approve invoice
+        </Button>
+        <Button type="button" size="sm" variant="outline" onClick={onOpen}>
+          Open invoice
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function InvoiceDeliveryActions({
+  preview,
+  onDeliver,
+  onOpen,
+}: {
+  preview: AiInvoicePreview;
+  onDeliver: (preview: AiInvoicePreview, channel: "email" | "whatsapp" | "both") => void;
+  onOpen: () => void;
+}) {
+  return (
+    <div className="space-y-3">
+      <div>
+        <p className="font-semibold">Invoice approved</p>
+        <p className="mt-1 text-muted-foreground">
+          {preview.invoiceNumber} is now ready to send. Choose how you want me to deliver it.
+        </p>
+      </div>
+      <div className="rounded-xl border bg-muted/20 p-3 text-xs">
+        <div className="flex justify-between gap-3">
+          <span className="text-muted-foreground">{preview.clientName}</span>
+          <span className="font-semibold">{formatAiMoney(preview.totalAmount, preview.currency)}</span>
+        </div>
+        <div className="mt-1 flex justify-between gap-3 text-muted-foreground">
+          <span>Email {preview.clientEmail ? "available" : "not saved"}</span>
+          <span>WhatsApp {preview.clientPhone ? "available" : "manual contact"}</span>
+        </div>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <Button type="button" size="sm" onClick={() => onDeliver(preview, "email")}>
+          Email
+        </Button>
+        <Button type="button" size="sm" variant="outline" onClick={() => onDeliver(preview, "whatsapp")}>
+          WhatsApp
+        </Button>
+        <Button type="button" size="sm" variant="outline" onClick={() => onDeliver(preview, "both")}>
+          Both
+        </Button>
+        <Button type="button" size="sm" variant="ghost" onClick={onOpen}>
+          Open invoice
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function ContractDraftPreview({
+  preview,
+  onSend,
+  onOpen,
+}: {
+  preview: AiContractPreview;
+  onSend: (preview: AiContractPreview) => void;
+  onOpen: () => void;
+}) {
+  const kindLabel = preview.kind === "proposal" ? "Proposal" : "Contract";
+  return (
+    <div className="space-y-3">
+      <div>
+        <p className="font-semibold">{kindLabel} draft ready for review</p>
+        <p className="mt-1 text-muted-foreground">
+          I saved this as a draft. Review the structure below, then open it for manual checking or approve sending to the client.
+        </p>
+      </div>
+      <div className="overflow-hidden rounded-xl border bg-muted/20">
+        <div className="border-b bg-background px-3 py-2">
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            {kindLabel}
+          </p>
+          <p className="mt-0.5 font-semibold">{preview.title}</p>
+          <p className="text-xs text-muted-foreground">
+            {preview.clientName}
+            {preview.projectName ? ` · ${preview.projectName}` : ""}
+          </p>
+        </div>
+        <div className="space-y-2 px-3 py-3 text-xs">
+          {preview.valueAmount != null && preview.valueAmount > 0 ? (
+            <div className="flex justify-between gap-3 rounded-lg bg-background px-2 py-1.5">
+              <span className="text-muted-foreground">Contract value</span>
+              <span className="font-semibold">{formatAiMoney(preview.valueAmount, preview.currency)}</span>
+            </div>
+          ) : null}
+          <div className="space-y-2">
+            {preview.sections.slice(0, 4).map((section) => (
+              <div key={section.heading} className="rounded-lg bg-background px-2 py-2">
+                <p className="font-medium">{section.heading}</p>
+                <p className="mt-1 line-clamp-2 text-muted-foreground">{section.body}</p>
+              </div>
+            ))}
+          </div>
+          {preview.sections.length > 4 ? (
+            <p className="text-muted-foreground">+ {preview.sections.length - 4} more sections in the draft</p>
+          ) : null}
+        </div>
+      </div>
+      <div className="rounded-xl border bg-background p-3 text-xs text-muted-foreground">
+        Client email: {preview.clientEmail || "not saved. Add an email before sending."}
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <Button type="button" size="sm" onClick={() => onSend(preview)}>
+          Approve and send
+        </Button>
+        <Button type="button" size="sm" variant="outline" onClick={onOpen}>
+          Open draft
+        </Button>
       </div>
     </div>
   );
