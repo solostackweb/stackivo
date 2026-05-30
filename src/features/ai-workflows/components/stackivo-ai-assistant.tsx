@@ -151,61 +151,10 @@ interface WorkflowStep {
 const WORKFLOW_STEPS: Partial<Record<AiMode, WorkflowStep[]>> = {
   invoice: [
     {
-      id: "client",
-      question: "Choose the client for this invoice.",
-      kind: "client",
-    },
-    {
-      id: "project",
-      question: "Should I link this invoice to a project?",
-      kind: "project",
-      optional: true,
-    },
-    {
-      id: "work",
-      question: "What work should I invoice for?",
+      id: "brief",
+      question: "Tell me the client, work, amount, due date, and any discount. I will fill the invoice and ask only if something important is missing.",
       kind: "text",
-      placeholder: "Example: Landing page design, responsive build, and launch support",
-    },
-    {
-      id: "amount",
-      question: "What total amount should I bill before discount?",
-      kind: "text",
-      placeholder: "Example: INR 50000",
-    },
-    {
-      id: "due",
-      question: "When should the invoice be due?",
-      kind: "choice",
-      options: ["7 days", "15 days", "30 days", "End of month"],
-    },
-    {
-      id: "quantity",
-      question: "What quantity should I use?",
-      kind: "text",
-      optional: true,
-      placeholder: "Enter a quantity, or skip to use 1",
-    },
-    {
-      id: "discount",
-      question: "Should I apply a discount?",
-      kind: "text",
-      optional: true,
-      placeholder: "Example: 5000 or 10%. Skip if there is no discount",
-    },
-    {
-      id: "terms",
-      question: "Any payment terms to include?",
-      kind: "text",
-      optional: true,
-      placeholder: "Example: Payment by bank transfer within 15 days",
-    },
-    {
-      id: "notes",
-      question: "Any additional notes for the client?",
-      kind: "text",
-      optional: true,
-      placeholder: "Example: Thank you for the quick feedback",
+      placeholder: "Example: Invoice Acme 25000 for website redesign, due in 15 days, discount 5000",
     },
   ],
   contract: [
@@ -493,13 +442,6 @@ export function StackivoAiAssistant({ clients, projects }: StackivoAiAssistantPr
   const executeWorkflow = React.useCallback(
     async (targetMode: AiMode, text: string) => {
       if (targetMode === "invoice") {
-        if (!clientId) {
-          push({
-            role: "assistant",
-            content: "Choose a client first, then send the invoice details again.",
-          });
-          return;
-        }
         const res = await createInvoiceFromAiAction({ prompt: text, clientId, projectId });
         if (!res.ok) {
           push({ role: "assistant", content: res.error });
@@ -962,7 +904,7 @@ export function StackivoAiAssistant({ clients, projects }: StackivoAiAssistantPr
 function modeIntro(mode: AiMode) {
   switch (mode) {
     case "invoice":
-      return "Tell me the client, work delivered, amount, due terms, and any notes. Choose the client from context so I can save the invoice draft.";
+      return "Describe the invoice naturally. Include the client, work, amount, due date, and any discount you already know. I will infer the fields and ask only when something essential is missing.";
     case "contract":
       return "Describe the agreement, fee model, scope, timeline, revision limits, IP terms, and client responsibilities. I will open the contract builder with a full draft.";
     case "welcome_document":
@@ -981,7 +923,7 @@ function modeIntro(mode: AiMode) {
 function placeholderForMode(mode: AiMode) {
   switch (mode) {
     case "invoice":
-      return "Example: Create invoice for landing page design, responsive build, and launch support for ₹50000 due in 15 days.";
+      return "Example: Invoice Acme 25000 for website redesign, due in 15 days, discount 5000.";
     case "contract":
       return "Example: Draft a service agreement for a website redesign, ₹150000 fixed fee, 50% upfront, 2 revisions, 3 week timeline...";
     case "welcome_document":

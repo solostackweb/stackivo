@@ -34,7 +34,7 @@ const aiProjectCreateSchema = z.object({
 
 const aiInvoiceCreateSchema = z.object({
   prompt: z.string().trim().min(4).max(6000),
-  clientId: z.string().min(1, "Choose a client"),
+  clientId: z.string().optional().or(z.literal("")),
   projectId: z.string().optional().or(z.literal("")),
 });
 
@@ -82,7 +82,7 @@ function quantityFromPrompt(prompt: string) {
   const normalized = prompt.replace(/,/g, "").toLowerCase();
   const match =
     normalized.match(/\bqty(?:uantity)?\s*[:\-]?\s*(\d+(?:\.\d+)?)\b/) ??
-    normalized.match(/\b(\d+(?:\.\d+)?)\s*(?:x|units?|hours?|days?)\b/);
+    normalized.match(/\b(\d+(?:\.\d+)?)\s*(?:x|units?|items?)\b/);
   const value = match ? Number(match[1]) : 1;
   return Number.isFinite(value) && value > 0 ? value : 1;
 }
@@ -408,6 +408,24 @@ function invoiceDraftFromWorkflowAnswers(prompt: string, fallbackDueDays: number
   };
 }
 
+function normalizedSearchText(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+function entityMatchScore(prompt: string, ...labels: Array<string | null | undefined>) {
+  const haystack = ` ${normalizedSearchText(prompt)} `;
+  return labels.reduce((best, label) => {
+    const normalized = normalizedSearchText(label ?? "");
+    if (!normalized) return best;
+    if (haystack.includes(` ${normalized} `)) return Math.max(best, normalized.length + 100);
+    const wordScore = normalized
+      .split(" ")
+      .filter((word) => word.length >= 3 && haystack.includes(` ${word} `))
+      .reduce((score, word) => score + word.length, 0);
+    return Math.max(best, wordScore);
+  }, 0);
+}
+
 export async function createClientFromAiAction(input: z.infer<typeof aiClientCreateSchema>) {
   const parsed = aiClientCreateSchema.safeParse(input);
   if (!parsed.success) return { ok: false as const, error: "Tell me about the client first." };
@@ -518,10 +536,54 @@ export async function createInvoiceFromAiAction(input: z.infer<typeof aiInvoiceC
   }
 
   const userId = await requireUserId();
-  const [profile, nextNumber] = await Promise.all([
+  const supabase = await getServerSupabase();
+  const [profile, nextNumber, { data: clientRows }, { data: projectRows }] = await Promise.all([
     getProfile(),
     nextInvoiceNumber(userId),
+    supabase
+      .from("clients")
+      .select("id, full_name, business_name")
+      .eq("user_id", userId),
+    supabase
+      .from("projects")
+      .select("id, client_id, name")
+      .eq("user_id", userId),
   ]);
+  const availableClients = (clientRows ?? []) as Array<{
+    id: string;
+    full_name?: string | null;
+    business_name?: string | null;
+  }>;
+  const inferredClient = availableClients
+    .map((client) => ({
+      client,
+      score: entityMatchScore(parsed.data.prompt, client.business_name, client.full_name),
+    }))
+    .filter((candidate) => candidate.score > 0)
+    .sort((a, b) => b.score - a.score)[0]?.client;
+  const clientId = parsed.data.clientId || inferredClient?.id || "";
+  if (!clientId) {
+    return {
+      ok: false as const,
+      error: "Which client is this invoice for? Mention the client name, or select one from workspace context.",
+    };
+  }
+
+  const availableProjects = (projectRows ?? []) as Array<{
+    id: string;
+    client_id?: string | null;
+    name?: string | null;
+  }>;
+  const inferredProject = availableProjects
+    .filter((project) => project.client_id === clientId)
+    .map((project) => ({
+      project,
+      score: entityMatchScore(parsed.data.prompt, project.name),
+    }))
+    .filter((candidate) => candidate.score > 0)
+    .sort((a, b) => b.score - a.score)[0]?.project;
+  const projectId = parsed.data.projectId || inferredProject?.id || "";
+
   const invoiceInput = invoiceDraftFromWorkflowAnswers(
     parsed.data.prompt,
     profile?.invoiceDefaultDueDays ?? 15,
@@ -540,8 +602,8 @@ export async function createInvoiceFromAiAction(input: z.infer<typeof aiInvoiceC
   draftFd.set(
     "payload",
     JSON.stringify({
-      clientId: parsed.data.clientId,
-      projectId: parsed.data.projectId,
+      clientId,
+      projectId,
       workDescription: invoiceInput.workDescription,
       amount: netSubtotal,
       quantity,
@@ -557,8 +619,8 @@ export async function createInvoiceFromAiAction(input: z.infer<typeof aiInvoiceC
   fd.set(
     "payload",
     JSON.stringify({
-      clientId: parsed.data.clientId,
-      projectId: parsed.data.projectId || undefined,
+      clientId,
+      projectId: projectId || undefined,
       invoiceNumber: nextNumber.formatted,
       issueDate: new Date().toISOString().slice(0, 10),
       dueDate,
@@ -583,7 +645,6 @@ export async function createInvoiceFromAiAction(input: z.infer<typeof aiInvoiceC
   if (!res.data?.id) return { ok: false as const, error: "Invoice was saved but its id was not returned." };
   const invoiceId = res.data.id;
 
-  const supabase = await getServerSupabase();
   const [{ data: invoiceRow }, { data: clientRow }] = await Promise.all([
     supabase
       .from("invoices")
@@ -594,7 +655,7 @@ export async function createInvoiceFromAiAction(input: z.infer<typeof aiInvoiceC
     supabase
       .from("clients")
       .select("full_name, business_name, email, phone")
-      .eq("id", parsed.data.clientId)
+      .eq("id", clientId)
       .eq("user_id", userId)
       .maybeSingle(),
   ]);
