@@ -1,13 +1,17 @@
 /**
  * Ask AI — client creation workflow E2E test.
  *
+ * Exercises the intelligence-layer flow: a single natural-language prompt is
+ * interpreted into structured fields, the client name is mapped correctly,
+ * and a missing name is asked for explicitly.
+ *
  * Required env:
  *   E2E_USER_EMAIL      -- non-admin user email
  *   E2E_USER_PASSWORD   -- its password
  */
 
 import { test, expect } from "@playwright/test";
-import { loginUser, openAiPanel, raceVisible, aiInput, aiSubmit } from "./helpers";
+import { loginUser, openAiPanel, raceVisible, aiSubmit } from "./helpers";
 
 const USER_EMAIL = process.env.E2E_USER_EMAIL;
 const USER_PASSWORD = process.env.E2E_USER_PASSWORD;
@@ -19,42 +23,61 @@ const TEST_CLIENT_NAME = `E2E Test Client ${UNIQUE_SUFFIX}`;
 test.describe("Ask AI client flow", () => {
   test.skip(!HAS_CREDS, "Set E2E_USER_EMAIL and E2E_USER_PASSWORD to run Ask AI client tests.");
 
-  test("creates a client record from chat", async ({ page }) => {
+  test("maps the client name correctly from a single prompt", async ({ page }) => {
     test.setTimeout(90_000);
 
     await loginUser(page, USER_EMAIL!, USER_PASSWORD!);
     await openAiPanel(page);
     await page.getByRole("button", { name: "Add client" }).click();
 
-    // Step 1 — name
-    await expect(page.getByText("Client or contact name?").first()).toBeVisible({ timeout: 8_000 });
-    await aiSubmit(page, TEST_CLIENT_NAME);
+    // The workflow opens with a free-form intro — no scripted question steps.
+    await expect(page.getByText(/Let's add a client/i).first()).toBeVisible({ timeout: 8_000 });
 
-    // Step 2 — business (optional)
-    await expect(page.getByText(/Business or company name/i).first()).toBeVisible({ timeout: 8_000 });
-    await aiSubmit(page, `${TEST_CLIENT_NAME} Corp`);
+    await aiSubmit(
+      page,
+      `Add ${TEST_CLIENT_NAME}, business ${TEST_CLIENT_NAME} Corp, email e2etest${UNIQUE_SUFFIX}@example.com, phone +91 9876500000, based in Mumbai. Notes: automated E2E client, can be deleted.`,
+    );
 
-    // Step 3 — contact (optional)
-    await expect(page.getByText(/Email and phone/i).first()).toBeVisible({ timeout: 8_000 });
-    await aiSubmit(page, `e2etest${UNIQUE_SUFFIX}@example.com, +91 9876500000`);
-
-    // Step 4 — billing (optional)
-    await expect(page.getByText(/Billing address/i).first()).toBeVisible({ timeout: 8_000 });
-    await aiSubmit(page, "Mumbai, Maharashtra");
-
-    // Step 5 — notes (optional)
-    await expect(page.getByText(/Notes about this client/i).first()).toBeVisible({ timeout: 8_000 });
-    await aiSubmit(page, "Automated E2E test client — can be deleted");
-
-    // Race against success vs error
-    const result = await raceVisible(page, ["Client created", "Could not", "Tell me about the client"], 60_000);
+    const result = await raceVisible(
+      page,
+      ["Client created", "Could not", "Tell me about the client", "What's the client's name"],
+      60_000,
+    );
     if (result.includes("Could not") || result.includes("Tell me about")) {
       throw new Error(`Client creation failed: "${result}"`);
     }
 
     await expect(page.getByText("Client created")).toBeVisible();
+    // The core fix: the client name is mapped from the prompt, not the question text.
+    await expect(page.getByText(new RegExp(`Added ${TEST_CLIENT_NAME}`, "i"))).toBeVisible();
+
     await page.getByRole("button", { name: "Open clients" }).click();
-    await page.waitForURL((url) => url.pathname.startsWith("/dashboard/clients"), { timeout: 10_000 });
+    await page.waitForURL((url) => url.pathname.startsWith("/dashboard/clients"), { timeout: 25_000 });
+  });
+
+  test("asks for the name explicitly when it is missing", async ({ page }) => {
+    test.setTimeout(90_000);
+
+    await loginUser(page, USER_EMAIL!, USER_PASSWORD!);
+    await openAiPanel(page);
+    await page.getByRole("button", { name: "Add client" }).click();
+
+    await expect(page.getByText(/Let's add a client/i).first()).toBeVisible({ timeout: 8_000 });
+
+    // No name in the prompt — the assistant must ask for it.
+    await aiSubmit(page, "I want to add a new client to my workspace");
+
+    await expect(page.getByText(/What's the client's name/i).first()).toBeVisible({ timeout: 30_000 });
+
+    // Answering with just the name should complete the flow with that name mapped.
+    await aiSubmit(page, TEST_CLIENT_NAME);
+
+    const result = await raceVisible(page, ["Client created", "Could not"], 60_000);
+    if (result.includes("Could not")) {
+      throw new Error(`Client creation failed after name prompt: "${result}"`);
+    }
+    await expect(page.getByText("Client created")).toBeVisible();
+    await expect(page.getByText(new RegExp(`Added ${TEST_CLIENT_NAME}`, "i"))).toBeVisible();
   });
 
   test("creates a client via free-form prompt in general mode", async ({ page }) => {
@@ -63,21 +86,24 @@ test.describe("Ask AI client flow", () => {
     await loginUser(page, USER_EMAIL!, USER_PASSWORD!);
     await openAiPanel(page);
 
+    const freeFormName = `FreeForm Client ${UNIQUE_SUFFIX}`;
     await aiSubmit(
       page,
-      `Add a new client called FreeForm Client ${UNIQUE_SUFFIX}, email ff${UNIQUE_SUFFIX}@example.com, based in Delhi`,
+      `Create a new client called ${freeFormName}, email ff${UNIQUE_SUFFIX}@example.com, based in Delhi`,
     );
 
-    // Wait for user message echo (confirms submission was processed)
+    // User message echo confirms the submission was processed.
     await expect(page.getByText(/FreeForm Client/i).first()).toBeVisible({ timeout: 10_000 });
 
-    // Wait for AI response
-    const result = await raceVisible(page, ["Client created", "Could not", "Client or contact name"], 45_000);
+    const result = await raceVisible(
+      page,
+      ["Client created", "Could not", "What's the client's name"],
+      60_000,
+    );
     if (result.includes("Could not")) {
       throw new Error(`Free-form client creation failed: "${result}"`);
     }
-
-    const assistantMessages = page.locator(".mr-auto.bg-muted\\/60");
-    expect(await assistantMessages.count()).toBeGreaterThan(1);
+    await expect(page.getByText("Client created")).toBeVisible({ timeout: 5_000 });
+    await expect(page.getByText(new RegExp(`Added ${freeFormName}`, "i"))).toBeVisible();
   });
 });

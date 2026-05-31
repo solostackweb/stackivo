@@ -114,8 +114,79 @@
 }
 
 @media (min-width: 768px) {
-  .stackivo-ai-open [data-dashboard-content] {
-    margin-right: var(--stackivo-ai-width, 440px);
+  .stackivo-ai-rail {
+    width: 0;
+    border-left: 1px solid hsl(var(--border));
+    transition: width 200ms ease-out;
+    overflow: hidden;
+    height: 100dvh;
+    position: sticky;
+    top: 0;
+    align-self: flex-start;
+  }
+
+  .stackivo-ai-open .stackivo-ai-rail {
+    width: var(--stackivo-ai-width, 480px);
+  }
+
+  .stackivo-ai-panel {
+    height: 100%;
+    transition: transform 180ms ease-out, opacity 180ms ease-out;
+    transform: translateX(16px);
+    opacity: 0;
+  }
+
+  .stackivo-ai-panel[data-open="true"] {
+    transform: translateX(0);
+    opacity: 1;
+  }
+
+  .stackivo-ai-panel .stackivo-ai-resizer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 8px;
+    cursor: col-resize;
+    z-index: 20;
+  }
+
+  .stackivo-ai-panel .stackivo-ai-resizer::after {
+    content: "";
+    position: absolute;
+    top: 12px;
+    bottom: 12px;
+    left: 3px;
+    width: 2px;
+    border-radius: 999px;
+    background: hsl(var(--border));
+    opacity: 0;
+    transition: opacity 160ms ease;
+  }
+
+  .stackivo-ai-panel .stackivo-ai-resizer:hover::after,
+  .stackivo-ai-panel .stackivo-ai-resizer:active::after {
+    opacity: 0.7;
+  }
+
+  .stackivo-ai-panel .scrollbar-modern {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--border)) transparent;
+  }
+
+  .stackivo-ai-panel .scrollbar-modern::-webkit-scrollbar {
+    width: 10px;
+  }
+
+  .stackivo-ai-panel .scrollbar-modern::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .stackivo-ai-panel .scrollbar-modern::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--border));
+    border-radius: 999px;
+    border: 3px solid transparent;
+    background-clip: content-box;
   }
 }
 

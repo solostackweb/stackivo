@@ -42,7 +42,7 @@ export function DashboardShell({
         <MobileNav />
         <div
           data-dashboard-content
-          className="flex min-w-0 flex-1 flex-col transition-[margin] duration-200 ease-out"
+          className="flex min-w-0 flex-1 flex-col"
         >
           <TopNav aiClients={aiClients} aiProjects={aiProjects} />
           <main
@@ -61,6 +61,9 @@ export function DashboardShell({
               {children}
             </div>
           </main>
+        </div>
+        <div className="stackivo-ai-rail hidden min-w-0 md:flex h-[100dvh] justify-end">
+          <div id="stackivo-ai-panel-slot" className="flex h-full w-full" />
         </div>
         <MobileBottomNav />
       </div>

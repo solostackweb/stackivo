@@ -104,3 +104,83 @@ export type AiWelcomeDraft = z.infer<typeof aiWelcomeDraftSchema>;
 export type AiWorkflowResult<T> =
   | { ok: true; data: T; provider: "groq" | "local" }
   | { ok: false; error: string; fieldErrors?: Record<string, string[]> };
+
+// ---------------------------------------------------------------------------
+// Intelligence layer: intents, structured fields, NLU interpretation
+// ---------------------------------------------------------------------------
+
+export const AI_WORKFLOWS = [
+  "invoice",
+  "contract",
+  "welcome_document",
+  "client",
+  "project",
+  "time_entry",
+  "support",
+] as const;
+
+export type AiWorkflow = (typeof AI_WORKFLOWS)[number];
+export type AiIntent = AiWorkflow | "general";
+
+/**
+ * Canonical field map collected by the assistant. Values are kept as raw
+ * strings (as the user typed them) and normalised on the server — the UI
+ * never re-parses a joined text blob.
+ */
+export type AiFields = Record<string, string>;
+
+/** A single required field that the assistant must still ask the user for. */
+export interface AiMissingField {
+  /** Canonical field key, e.g. "clientId", "fullName", "amount". */
+  field: string;
+  /** The minimal question to put to the user. */
+  question: string;
+  /** Optional short hint shown as a textarea placeholder. */
+  placeholder?: string;
+}
+
+/**
+ * Result shape for the create-from-AI actions. Either a draft is produced,
+ * or the action reports the single next missing field to ask for.
+ */
+export type AiDraftResult<T> =
+  | { ok: true; data: T; message?: string }
+  | { ok: false; error: string; missing?: AiMissingField };
+
+/** NLU interpretation of a single user message. */
+export interface AiInterpretation {
+  /** Detected intent (or "general" when nothing actionable was found). */
+  intent: AiIntent;
+  /** True when the model is confident enough to act/switch on the intent. */
+  confident: boolean;
+  /** Canonical fields extracted from the message. */
+  fields: AiFields;
+  /** Resolved client id when a known client was named. */
+  clientId?: string;
+  /** Resolved project id when a known project was named. */
+  projectId?: string;
+  /** Whether the NLU ran on Groq or the deterministic fallback. */
+  provider: "groq" | "local";
+}
+
+export const aiInterpretRequestSchema = z.object({
+  message: z.string().trim().min(1).max(6000),
+  currentWorkflow: z.enum(AI_WORKFLOWS).optional(),
+  collected: z.record(z.string()).optional(),
+});
+
+export type AiInterpretRequest = z.infer<typeof aiInterpretRequestSchema>;
+
+/**
+ * Required fields per workflow. Used both by the NLU layer (to know what to
+ * extract) and by the create actions (to know what to ask for next).
+ */
+export const AI_REQUIRED_FIELDS: Record<AiWorkflow, string[]> = {
+  invoice: ["clientId", "workDescription", "amount"],
+  contract: ["clientId", "scope"],
+  welcome_document: ["process"],
+  client: ["fullName"],
+  project: ["name"],
+  time_entry: ["description", "duration"],
+  support: ["question"],
+};

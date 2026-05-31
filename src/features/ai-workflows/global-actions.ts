@@ -18,6 +18,7 @@ import { sendContractAction } from "@/features/contracts/delivery";
 import { getContractShareUrl } from "@/features/documents/urls";
 import { createClientAction } from "@/features/clients/actions";
 import { createProjectAction } from "@/features/projects/actions";
+import { manualTimeEntryAction } from "@/features/time/actions";
 import { INDIAN_STATES } from "@/features/gst/state-codes";
 import { ensureInvoicePublicToken } from "@/features/share/server";
 import { buildWaUrl } from "@/lib/whatsapp";
@@ -30,33 +31,23 @@ import {
   ensureWelcomePublicToken,
 } from "@/features/welcome-documents/server";
 import { getWelcomeShareUrl } from "@/features/welcome-documents/routes";
+import { listClients } from "@/features/clients/server";
+import { listProjects } from "@/features/projects/server";
 import { generateInvoiceDraftAction, generateOperationalDraftAction } from "./actions";
 import { generateStructuredJson } from "./groq";
-import type { AiClientDraft, AiContractDraft, AiProjectDraft, AiWelcomeDraft } from "./types";
-
-const aiClientCreateSchema = z.object({
-  prompt: z.string().trim().min(4).max(6000),
-});
-
-const aiProjectCreateSchema = z.object({
-  prompt: z.string().trim().min(4).max(6000),
-  clientId: z.string().optional().or(z.literal("")),
-});
-
-const aiInvoiceCreateSchema = z.object({
-  prompt: z.string().trim().min(4).max(6000),
-  clientId: z.string().optional().or(z.literal("")),
-  projectId: z.string().optional().or(z.literal("")),
-});
+import { interpretMessage } from "./nlu";
+import {
+  AI_REQUIRED_FIELDS,
+  aiInterpretRequestSchema,
+  type AiContractDraft,
+  type AiFields,
+  type AiMissingField,
+  type AiWelcomeDraft,
+  type AiWorkflow,
+} from "./types";
 
 const aiInvoiceIdSchema = z.object({
   invoiceId: z.string().uuid("Invalid invoice id"),
-});
-
-const aiContractCreateSchema = z.object({
-  prompt: z.string().trim().min(8).max(10000),
-  clientId: z.string().min(1, "Choose a client"),
-  projectId: z.string().optional().or(z.literal("")),
 });
 
 const aiContractIdSchema = z.object({
@@ -74,6 +65,103 @@ async function requireUserId() {
   } = await supabase.auth.getUser();
   if (!user) redirect(AUTH_LOGIN_ROUTE);
   return user.id;
+}
+
+// ---------------------------------------------------------------------------
+// Intelligence layer: structured-field inputs + missing-field reporting
+// ---------------------------------------------------------------------------
+
+const aiFieldsSchema = z.record(z.string());
+
+const aiCreateSchema = z.object({
+  fields: aiFieldsSchema.optional(),
+  clientId: z.string().optional().or(z.literal("")),
+  projectId: z.string().optional().or(z.literal("")),
+  prompt: z.string().max(6000).optional().or(z.literal("")),
+});
+
+type AiCreateInput = z.infer<typeof aiCreateSchema>;
+
+/** Read a canonical field, trimmed; treats "skip"/"none" as empty. */
+function field(fields: AiFields | undefined, key: string): string {
+  return cleanAiAnswer(fields?.[key]);
+}
+
+const MISSING_FIELD_QUESTIONS: Record<string, AiMissingField> = {
+  clientId: { field: "clientId", question: "Which client is this for?" },
+  fullName: { field: "fullName", question: "What's the client's name?", placeholder: "Example: Riya Sharma" },
+  name: { field: "name", question: "What should I name this project?", placeholder: "Example: Website Redesign" },
+  workDescription: {
+    field: "workDescription",
+    question: "What work should I bill for?",
+    placeholder: "Example: Landing page design",
+  },
+  amount: {
+    field: "amount",
+    question: "What amount should I invoice (before tax/discount)?",
+    placeholder: "Example: 50000",
+  },
+  scope: {
+    field: "scope",
+    question: "Describe the scope, deliverables, and timeline.",
+    placeholder: "Example: 5-page website, CMS setup, 3-week timeline",
+  },
+  process: {
+    field: "process",
+    question: "What working style, communication, and process should it cover?",
+    placeholder: "Example: Weekly Friday updates, feedback in one doc, replies within a day",
+  },
+  description: {
+    field: "description",
+    question: "What work did you do?",
+    placeholder: "Example: Client call and wireframe revisions",
+  },
+  duration: {
+    field: "duration",
+    question: "How long, and is it billable?",
+    placeholder: "Example: 2h 30m, billable",
+  },
+  question: { field: "question", question: "What do you need help with?" },
+};
+
+/** Returns the first required field still missing for a workflow, or null. */
+function firstMissingField(
+  workflow: AiWorkflow,
+  fields: AiFields,
+  resolved: { clientId?: string; amount?: number },
+): AiMissingField | null {
+  for (const key of AI_REQUIRED_FIELDS[workflow]) {
+    if (key === "clientId") {
+      if (!resolved.clientId) return MISSING_FIELD_QUESTIONS.clientId;
+      continue;
+    }
+    if (key === "amount") {
+      if (!resolved.amount || resolved.amount <= 0) return MISSING_FIELD_QUESTIONS.amount;
+      continue;
+    }
+    if (!field(fields, key)) return MISSING_FIELD_QUESTIONS[key] ?? { field: key, question: `Please provide ${key}.` };
+  }
+  return null;
+}
+
+export async function interpretAiMessageAction(input: z.infer<typeof aiInterpretRequestSchema>) {
+  const parsed = aiInterpretRequestSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false as const, error: "Tell me what you'd like to do." };
+  }
+  await requireUserId();
+  const [clients, projects] = await Promise.all([
+    listClients({ limit: 200 }),
+    listProjects({ limit: 200 }),
+  ]);
+  const result = await interpretMessage({
+    message: parsed.data.message,
+    currentWorkflow: parsed.data.currentWorkflow,
+    collected: parsed.data.collected,
+    clients,
+    projects,
+  });
+  return { ok: true as const, data: result };
 }
 
 function amountFromPrompt(prompt: string) {
@@ -136,11 +224,6 @@ function discountFromAnswer(value: string, subtotal: number) {
   return number ? Math.min(subtotal, Math.max(0, Number(number))) : 0;
 }
 
-function workDescriptionFromPrompt(prompt: string) {
-  const match = prompt.match(/\bfor\s+(.+?)(?=\s+(?:due|discount|offer|less|qty|quantity)\b|$)/i);
-  return cleanAiAnswer(match?.[1]) || prompt;
-}
-
 function dueDateFromPrompt(prompt: string, fallbackDays: number) {
   const date = new Date();
   const lower = prompt.toLowerCase();
@@ -175,19 +258,6 @@ function cleanAiAnswer(value: string | undefined | null) {
   if (!cleaned) return "";
   if (/^(skip|none|no|n\/a|na|-|—)$/i.test(cleaned)) return "";
   return cleaned;
-}
-
-function answerForQuestion(prompt: string, questionIncludes: string) {
-  const blocks = prompt
-    .split(/\n{2,}/)
-    .map((block) => block.trim())
-    .filter(Boolean);
-  const match = blocks.find((block) =>
-    block.toLowerCase().startsWith(questionIncludes.toLowerCase()),
-  );
-  if (!match) return "";
-  const [, ...answerLines] = match.split(/\n/);
-  return cleanAiAnswer(answerLines.join("\n"));
 }
 
 function extractEmail(value: string) {
@@ -228,26 +298,6 @@ function stateCodeFromText(value: string, fallback: string) {
   };
   const city = Object.entries(cityMap).find(([name]) => normalized.includes(name));
   return city?.[1] ?? fallback;
-}
-
-function clientDraftFromWorkflowAnswers(prompt: string, fallbackStateCode: string) {
-  const name = answerForQuestion(prompt, "What is the client/contact name?");
-  const business = answerForQuestion(prompt, "What is the business or company name?");
-  const contact = answerForQuestion(prompt, "What email and phone should I save?");
-  const billing = answerForQuestion(prompt, "What billing address or city/state should I save?");
-  const notes = answerForQuestion(prompt, "Any notes about this client?");
-
-  if (!name && !business && !contact && !billing && !notes) return null;
-
-  return {
-    fullName: name || business || cleanPromptTitle(prompt, "New client"),
-    businessName: business,
-    email: extractEmail(contact),
-    phone: extractPhone(contact),
-    billingAddress: billing,
-    stateCode: stateCodeFromText(billing, fallbackStateCode),
-    notes,
-  };
 }
 
 function addDays(date: Date, days: number) {
@@ -328,24 +378,6 @@ function projectStatusFromText(value: string) {
   return "planning";
 }
 
-function projectDraftFromWorkflowAnswers(prompt: string, selectedClientId: string | undefined) {
-  const name = answerForQuestion(prompt, "What is the project name?");
-  const scope = answerForQuestion(prompt, "What is the goal, scope, and deliverables?");
-  const status = answerForQuestion(prompt, "What stage should I set?");
-  const dates = answerForQuestion(prompt, "What start date and due date should I use?");
-
-  if (!name && !scope && !status && !dates) return null;
-  const parsedDates = parseProjectDates(dates);
-  return {
-    name: name || cleanPromptTitle(scope || prompt, "New project"),
-    description: scope,
-    clientId: selectedClientId ?? "",
-    status: projectStatusFromText(status),
-    startDate: parsedDates.startDate,
-    dueDate: parsedDates.dueDate,
-  };
-}
-
 function contractKindFromText(value: string) {
   const lower = value.toLowerCase();
   if (lower.includes("proposal")) return "proposal" as const;
@@ -358,259 +390,232 @@ function contractTitleFromDraft(kind: "contract" | "proposal", clientName: strin
   return cleanPromptTitle(fallback, kind === "proposal" ? "Project proposal" : "Service agreement");
 }
 
-function contractPromptFromWorkflowAnswers(prompt: string) {
-  const type = answerForQuestion(prompt, "What are we drafting?");
-  const amount = answerForQuestion(prompt, "What contract value or commercial amount should I include?");
-  const scope = answerForQuestion(prompt, "Describe the scope, deliverables, and timeline.");
-  const commercials = answerForQuestion(prompt, "What are the fees, payment schedule, revision limits, and IP terms?");
-  const clauses = answerForQuestion(prompt, "Any special clauses, exclusions, or client responsibilities?");
-
-  return {
-    type,
-    scope,
-    commercials,
-    clauses,
-    combined: [
-      type ? `Document type: ${type}` : "",
-      amount ? `Contract value or commercial amount: ${amount}` : "",
-      scope ? `Scope, deliverables, and timeline: ${scope}` : "",
-      commercials ? `Commercials, payment, revisions, and IP: ${commercials}` : "",
-      clauses ? `Special clauses, exclusions, and responsibilities: ${clauses}` : "",
-    ].filter(Boolean).join("\n\n") || prompt,
-  };
+/** Parse an amount from a structured field value (handles "₹50000", "50000", "5k"). */
+function amountFromField(value: string) {
+  const cleaned = cleanAiAnswer(value);
+  if (!cleaned) return 0;
+  const viaPrompt = amountFromPrompt(cleaned);
+  if (viaPrompt > 0) return viaPrompt;
+  const number = cleaned.replace(/,/g, "").match(/\d+(?:\.\d+)?/)?.[0];
+  const parsed = number ? Number(number) : 0;
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
 }
 
-function invoiceDraftFromWorkflowAnswers(prompt: string, fallbackDueDays: number) {
-  const workDescription = answerForQuestion(prompt, "What work should I invoice for?");
-  const amountAnswer = answerForQuestion(prompt, "What total amount should I bill before discount?");
-  const dueAnswer = answerForQuestion(prompt, "When should the invoice be due?");
-  const quantityAnswer = answerForQuestion(prompt, "What quantity should I use?");
-  const discountAnswer = answerForQuestion(prompt, "Should I apply a discount?");
-  const terms = answerForQuestion(prompt, "Any payment terms to include?");
-  const notes = answerForQuestion(prompt, "Any additional notes for the client?");
-  const hasGuidedAnswers =
-    workDescription ||
-    amountAnswer ||
-    dueAnswer ||
-    quantityAnswer ||
-    discountAnswer ||
-    terms ||
-    notes;
+/** Parse a duration string like "2h 30m", "2.5 hours", "90 minutes", "45m" into seconds. */
+function durationSecondsFromText(value: string) {
+  const cleaned = cleanAiAnswer(value).toLowerCase();
+  if (!cleaned) return 0;
 
-  if (!hasGuidedAnswers) {
-    const originalSubtotal = amountFromPrompt(prompt);
-    const quantity = quantityFromPrompt(prompt);
+  let seconds = 0;
+  const hoursMatch = cleaned.match(/(\d+(?:\.\d+)?)\s*(?:h|hr|hrs|hour|hours)\b/);
+  const minutesMatch = cleaned.match(/(\d+(?:\.\d+)?)\s*(?:m|min|mins|minute|minutes)\b/);
+  if (hoursMatch) seconds += Math.round(Number(hoursMatch[1]) * 3600);
+  if (minutesMatch) seconds += Math.round(Number(minutesMatch[1]) * 60);
+  if (seconds > 0) return seconds;
+
+  // "2:30" => 2h 30m
+  const colon = cleaned.match(/\b(\d{1,2}):(\d{2})\b/);
+  if (colon) return Number(colon[1]) * 3600 + Number(colon[2]) * 60;
+
+  // Bare number — treat as hours when small, else minutes.
+  const bare = cleaned.match(/\d+(?:\.\d+)?/)?.[0];
+  if (bare) {
+    const num = Number(bare);
+    if (num > 0 && num <= 12) return Math.round(num * 3600);
+    if (num > 12) return Math.round(num * 60);
+  }
+  return 0;
+}
+
+function billableFromText(value: string) {
+  const cleaned = cleanAiAnswer(value).toLowerCase();
+  if (/\bnon[-\s]?billable\b|not billable|unbillable|free|no charge/.test(cleaned)) return false;
+  return true;
+}
+
+/** Build a clean free-text brief for Groq drafting from labelled structured fields. */
+function briefFromFields(entries: Array<[string, string]>, fallback: string) {
+  const lines = entries
+    .map(([label, value]) => {
+      const cleaned = cleanAiAnswer(value);
+      return cleaned ? `${label}: ${cleaned}` : "";
+    })
+    .filter(Boolean);
+  return lines.length > 0 ? lines.join("\n\n") : fallback;
+}
+
+export async function createClientFromAiAction(input: AiCreateInput) {
+  const parsed = aiCreateSchema.safeParse(input);
+  if (!parsed.success) return { ok: false as const, error: "Tell me about the client first." };
+  const fields = parsed.data.fields ?? {};
+
+  const fullName = field(fields, "fullName");
+  const missing = firstMissingField("client", fields, {});
+  if (!fullName || missing) {
     return {
-      workDescription: workDescriptionFromPrompt(prompt),
-      originalSubtotal,
-      quantity,
-      discount: discountFromPrompt(prompt, originalSubtotal),
-      dueDate: dueDateFromPrompt(prompt, fallbackDueDays),
-      terms: "",
-      notes: "",
+      ok: false as const,
+      error: (missing ?? MISSING_FIELD_QUESTIONS.fullName).question,
+      missing: missing ?? MISSING_FIELD_QUESTIONS.fullName,
     };
   }
-
-  const originalSubtotal = amountFromPrompt(amountAnswer);
-  const quantity = quantityFromAnswer(quantityAnswer);
-  return {
-    workDescription: workDescription || "Professional services",
-    originalSubtotal,
-    quantity,
-    discount: discountFromAnswer(discountAnswer, originalSubtotal),
-    dueDate: dueDateFromPrompt(dueAnswer, fallbackDueDays),
-    terms,
-    notes,
-  };
-}
-
-function normalizedSearchText(value: string) {
-  return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-}
-
-function entityMatchScore(prompt: string, ...labels: Array<string | null | undefined>) {
-  const haystack = ` ${normalizedSearchText(prompt)} `;
-  return labels.reduce((best, label) => {
-    const normalized = normalizedSearchText(label ?? "");
-    if (!normalized) return best;
-    if (haystack.includes(` ${normalized} `)) return Math.max(best, normalized.length + 100);
-    const wordScore = normalized
-      .split(" ")
-      .filter((word) => word.length >= 3 && haystack.includes(` ${word} `))
-      .reduce((score, word) => score + word.length, 0);
-    return Math.max(best, wordScore);
-  }, 0);
-}
-
-export async function createClientFromAiAction(input: z.infer<typeof aiClientCreateSchema>) {
-  const parsed = aiClientCreateSchema.safeParse(input);
-  if (!parsed.success) return { ok: false as const, error: "Tell me about the client first." };
 
   const profile = await getProfile();
   const fallbackStateCode = profile?.stateCode ?? "27";
-  let draft: AiClientDraft & { stateCode?: string } =
-    clientDraftFromWorkflowAnswers(parsed.data.prompt, fallbackStateCode) ?? {
-      fullName: "",
-      businessName: "",
-      email: "",
-      phone: "",
-      billingAddress: "",
-      notes: "",
-      stateCode: fallbackStateCode,
-    };
 
-  if (!draft.fullName) {
-    const fd = new FormData();
-    fd.set(
-      "payload",
-      JSON.stringify({ workflow: "client", prompt: parsed.data.prompt }),
-    );
-    const draftResult = await generateOperationalDraftAction(fd);
-    if (!draftResult.ok || !("fullName" in draftResult.data)) {
-      return { ok: false as const, error: draftResult.ok ? "Could not draft client." : draftResult.error };
-    }
-    const aiDraft = draftResult.data as AiClientDraft;
-    draft = {
-      fullName: cleanAiAnswer(aiDraft.fullName) || cleanPromptTitle(parsed.data.prompt, "New client"),
-      businessName: cleanAiAnswer(aiDraft.businessName),
-      email: extractEmail(aiDraft.email ?? parsed.data.prompt),
-      phone: extractPhone(aiDraft.phone ?? parsed.data.prompt),
-      billingAddress: cleanAiAnswer(aiDraft.billingAddress),
-      notes: cleanAiAnswer(aiDraft.notes),
-      stateCode: stateCodeFromText(aiDraft.billingAddress ?? parsed.data.prompt, fallbackStateCode),
-    };
-  }
+  const businessName = field(fields, "businessName");
+  const billingAddress = field(fields, "billingAddress");
+  const notes = field(fields, "notes");
+  const contactBlob = [field(fields, "email"), field(fields, "phone"), parsed.data.prompt ?? ""].join(" ");
+  const email = extractEmail(contactBlob);
+  const phone = extractPhone(contactBlob);
+  const stateCode = stateCodeFromText(billingAddress || parsed.data.prompt || "", fallbackStateCode);
 
   const fd = new FormData();
   fd.set("gstRegistered", "false");
-  fd.set("fullName", cleanAiAnswer(draft.fullName) || cleanPromptTitle(parsed.data.prompt, "New client"));
-  fd.set("businessName", cleanAiAnswer(draft.businessName) || "");
-  fd.set("email", extractEmail(draft.email ?? "") || "");
-  fd.set("phone", extractPhone(draft.phone ?? "") || cleanAiAnswer(draft.phone) || "");
-  fd.set("stateCode", draft.stateCode || fallbackStateCode);
-  fd.set("billingAddress", cleanAiAnswer(draft.billingAddress) || "");
-  fd.set("notes", cleanAiAnswer(draft.notes) || "");
+  fd.set("fullName", fullName);
+  fd.set("businessName", businessName);
+  fd.set("email", email);
+  fd.set("phone", phone);
+  fd.set("stateCode", stateCode);
+  fd.set("billingAddress", billingAddress);
+  fd.set("notes", notes);
   fd.set("gstin", "");
 
   const res = await createClientAction(undefined, fd);
-  if (!res.ok) return res;
-  return { ok: true as const, data: { ...res.data, draft }, message: res.message };
+  if (!res.ok) return { ok: false as const, error: res.error };
+  return {
+    ok: true as const,
+    data: { id: res.data?.id ?? "", fullName, businessName, email, phone },
+    message: res.message,
+  };
 }
 
-export async function createProjectFromAiAction(input: z.infer<typeof aiProjectCreateSchema>) {
-  const parsed = aiProjectCreateSchema.safeParse(input);
+export async function createProjectFromAiAction(input: AiCreateInput) {
+  const parsed = aiCreateSchema.safeParse(input);
   if (!parsed.success) return { ok: false as const, error: "Tell me about the project first." };
+  const fields = parsed.data.fields ?? {};
 
-  let draft: (AiProjectDraft & { status?: string }) | null = projectDraftFromWorkflowAnswers(
-    parsed.data.prompt,
-    parsed.data.clientId || undefined,
-  );
-
-  if (!draft?.name) {
-    const fdDraft = new FormData();
-    fdDraft.set(
-      "payload",
-      JSON.stringify({
-        workflow: "project",
-        prompt: parsed.data.prompt,
-        clientId: parsed.data.clientId,
-      }),
-    );
-    const draftResult = await generateOperationalDraftAction(fdDraft);
-    if (!draftResult.ok || !("name" in draftResult.data)) {
-      return { ok: false as const, error: draftResult.ok ? "Could not draft project." : draftResult.error };
-    }
-
-    const aiDraft = draftResult.data as AiProjectDraft;
-    draft = {
-      name: cleanAiAnswer(aiDraft.name) || cleanPromptTitle(parsed.data.prompt, "New project"),
-      description: cleanAiAnswer(aiDraft.description) || parsed.data.prompt,
-      clientId: parsed.data.clientId || aiDraft.clientId || "",
-      status: "planning",
-      startDate: cleanAiAnswer(aiDraft.startDate),
-      dueDate: cleanAiAnswer(aiDraft.dueDate),
+  const name = field(fields, "name");
+  const missing = firstMissingField("project", fields, {});
+  if (!name || missing) {
+    return {
+      ok: false as const,
+      error: (missing ?? MISSING_FIELD_QUESTIONS.name).question,
+      missing: missing ?? MISSING_FIELD_QUESTIONS.name,
     };
   }
 
+  const scope = field(fields, "scope");
+  const status = projectStatusFromText(field(fields, "status") || "planning");
+  const { startDate, dueDate } = parseProjectDates(field(fields, "dates"));
+
   const fd = new FormData();
-  fd.set("name", cleanAiAnswer(draft.name) || cleanPromptTitle(parsed.data.prompt, "New project"));
-  fd.set("description", cleanAiAnswer(draft.description) || "");
-  fd.set("clientId", parsed.data.clientId || cleanAiAnswer(draft.clientId) || "");
-  fd.set("status", projectStatusFromText(draft.status || "planning"));
-  fd.set("startDate", cleanAiAnswer(draft.startDate) || "");
-  fd.set("dueDate", cleanAiAnswer(draft.dueDate) || "");
+  fd.set("name", name);
+  fd.set("description", scope);
+  fd.set("clientId", parsed.data.clientId || "");
+  fd.set("status", status);
+  fd.set("startDate", startDate);
+  fd.set("dueDate", dueDate);
 
   const res = await createProjectAction(undefined, fd);
-  if (!res.ok) return res;
-  return { ok: true as const, data: { ...res.data, draft }, message: res.message };
+  if (!res.ok) return { ok: false as const, error: res.error };
+  return {
+    ok: true as const,
+    data: { id: res.data?.id ?? "", name, description: scope },
+    message: res.message,
+  };
 }
 
-export async function createInvoiceFromAiAction(input: z.infer<typeof aiInvoiceCreateSchema>) {
-  const parsed = aiInvoiceCreateSchema.safeParse(input);
-  if (!parsed.success) {
-    return { ok: false as const, error: parsed.error.issues[0]?.message ?? "Invoice details are incomplete." };
+export async function createTimeEntryFromAiAction(input: AiCreateInput) {
+  const parsed = aiCreateSchema.safeParse(input);
+  if (!parsed.success) return { ok: false as const, error: "Tell me what work to log." };
+  const fields = parsed.data.fields ?? {};
+
+  const description = field(fields, "description");
+  const durationSeconds = durationSecondsFromText(field(fields, "duration"));
+
+  if (!description) {
+    return {
+      ok: false as const,
+      error: MISSING_FIELD_QUESTIONS.description.question,
+      missing: MISSING_FIELD_QUESTIONS.description,
+    };
   }
+  if (durationSeconds <= 0) {
+    return {
+      ok: false as const,
+      error: MISSING_FIELD_QUESTIONS.duration.question,
+      missing: MISSING_FIELD_QUESTIONS.duration,
+    };
+  }
+
+  const billable = billableFromText(field(fields, "billable") || field(fields, "duration"));
+  const hourlyRate = billable ? amountFromField(field(fields, "rate") || field(fields, "hourlyRate")) : 0;
+
+  const fd = new FormData();
+  fd.set("description", description);
+  fd.set("projectId", parsed.data.projectId || "");
+  fd.set("startedAt", new Date().toISOString());
+  fd.set("durationSeconds", String(durationSeconds));
+  fd.set("billable", billable ? "true" : "false");
+  fd.set("hourlyRate", String(hourlyRate));
+
+  const res = await manualTimeEntryAction(undefined, fd);
+  if (!res.ok) return { ok: false as const, error: res.error };
+
+  const hours = Math.floor(durationSeconds / 3600);
+  const minutes = Math.round((durationSeconds % 3600) / 60);
+  return {
+    ok: true as const,
+    data: {
+      id: res.data?.id ?? "",
+      description,
+      hours,
+      minutes,
+      billable,
+      hourlyRate,
+    },
+    message: res.message ?? "Time entry logged.",
+  };
+}
+
+export async function createInvoiceFromAiAction(input: AiCreateInput) {
+  const parsed = aiCreateSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false as const, error: "Tell me about the invoice first." };
+  }
+  const fields = parsed.data.fields ?? {};
 
   const userId = await requireUserId();
   const supabase = await getServerSupabase();
-  const [profile, nextNumber, { data: clientRows }, { data: projectRows }] = await Promise.all([
-    getProfile(),
-    nextInvoiceNumber(userId),
-    supabase
-      .from("clients")
-      .select("id, full_name, business_name")
-      .eq("user_id", userId),
-    supabase
-      .from("projects")
-      .select("id, client_id, name")
-      .eq("user_id", userId),
-  ]);
-  const availableClients = (clientRows ?? []) as Array<{
-    id: string;
-    full_name?: string | null;
-    business_name?: string | null;
-  }>;
-  const inferredClient = availableClients
-    .map((client) => ({
-      client,
-      score: entityMatchScore(parsed.data.prompt, client.business_name, client.full_name),
-    }))
-    .filter((candidate) => candidate.score > 0)
-    .sort((a, b) => b.score - a.score)[0]?.client;
-  const clientId = parsed.data.clientId || inferredClient?.id || "";
-  if (!clientId) {
-    return {
-      ok: false as const,
-      error: "Which client is this invoice for? Mention the client name, or select one from workspace context.",
-    };
+  const profile = await getProfile();
+
+  const clientId = parsed.data.clientId || "";
+  const fallbackDueDays = profile?.invoiceDefaultDueDays ?? 15;
+  const originalSubtotal = amountFromField(field(fields, "amount"));
+
+  const missing = firstMissingField("invoice", fields, { clientId, amount: originalSubtotal });
+  if (missing) {
+    return { ok: false as const, error: missing.question, missing };
   }
 
-  const availableProjects = (projectRows ?? []) as Array<{
-    id: string;
-    client_id?: string | null;
-    name?: string | null;
-  }>;
-  const inferredProject = availableProjects
-    .filter((project) => project.client_id === clientId)
-    .map((project) => ({
-      project,
-      score: entityMatchScore(parsed.data.prompt, project.name),
-    }))
-    .filter((candidate) => candidate.score > 0)
-    .sort((a, b) => b.score - a.score)[0]?.project;
-  const projectId = parsed.data.projectId || inferredProject?.id || "";
-
-  const invoiceInput = invoiceDraftFromWorkflowAnswers(
-    parsed.data.prompt,
-    profile?.invoiceDefaultDueDays ?? 15,
-  );
-  const { originalSubtotal, quantity, discount, dueDate } = invoiceInput;
-  if (originalSubtotal <= 0) {
-    return {
-      ok: false as const,
-      error: "Add an invoice amount, for example: invoice Acme ₹50000 for landing page design.",
-    };
-  }
+  const nextNumber = await nextInvoiceNumber(userId);
+  const projectId = parsed.data.projectId || "";
+  const workDescription = field(fields, "workDescription") || "Professional services";
+  const quantity = field(fields, "quantity") ? quantityFromAnswer(field(fields, "quantity")) : 1;
+  const discount = field(fields, "discount")
+    ? discountFromAnswer(field(fields, "discount"), originalSubtotal)
+    : 0;
+  const dueDate = dueDateFromPrompt(field(fields, "dueDate"), fallbackDueDays);
+  const invoiceInput = {
+    workDescription,
+    originalSubtotal,
+    quantity,
+    discount,
+    dueDate,
+    terms: "",
+    notes: field(fields, "notes"),
+  };
 
   const netSubtotal = Math.max(0, originalSubtotal - discount);
   const unitPrice = quantity > 0 ? originalSubtotal / quantity : originalSubtotal;
@@ -828,10 +833,17 @@ export async function invoiceWhatsappFromAiAction(input: z.infer<typeof aiInvoic
   };
 }
 
-export async function createContractFromAiAction(input: z.infer<typeof aiContractCreateSchema>) {
-  const parsed = aiContractCreateSchema.safeParse(input);
+export async function createContractFromAiAction(input: AiCreateInput) {
+  const parsed = aiCreateSchema.safeParse(input);
   if (!parsed.success) {
-    return { ok: false as const, error: parsed.error.issues[0]?.message ?? "Contract details are incomplete." };
+    return { ok: false as const, error: "Tell me about the contract first." };
+  }
+  const fields = parsed.data.fields ?? {};
+  const clientId = parsed.data.clientId || "";
+
+  const missing = firstMissingField("contract", fields, { clientId });
+  if (missing) {
+    return { ok: false as const, error: missing.question, missing };
   }
 
   const userId = await requireUserId();
@@ -840,7 +852,7 @@ export async function createContractFromAiAction(input: z.infer<typeof aiContrac
     supabase
       .from("clients")
       .select("id, full_name, business_name, email")
-      .eq("id", parsed.data.clientId)
+      .eq("id", clientId)
       .eq("user_id", userId)
       .maybeSingle(),
     parsed.data.projectId
@@ -858,16 +870,30 @@ export async function createContractFromAiAction(input: z.infer<typeof aiContrac
     | null;
   if (!client) return { ok: false as const, error: "Choose a client you have access to." };
   const project = projectRow as { id: string; name?: string | null } | null;
-  const workflow = contractPromptFromWorkflowAnswers(parsed.data.prompt);
-  const amount = amountFromPrompt(parsed.data.prompt);
+
+  const scope = field(fields, "scope");
+  const type = field(fields, "type");
+  const commercials = field(fields, "commercials");
+  const clauses = field(fields, "clauses");
+  const amount = amountFromField(field(fields, "amount") || commercials);
+  const brief = briefFromFields(
+    [
+      ["Document type", type],
+      ["Scope, deliverables, and timeline", scope],
+      ["Commercials, payment, revisions, and IP", commercials],
+      ["Special clauses, exclusions, and responsibilities", clauses],
+      ["Contract value", amount > 0 ? String(amount) : ""],
+    ],
+    scope,
+  );
 
   const fdDraft = new FormData();
   fdDraft.set(
     "payload",
     JSON.stringify({
       workflow: "contract",
-      prompt: workflow.combined,
-      clientId: parsed.data.clientId,
+      prompt: brief,
+      clientId,
       projectId: parsed.data.projectId,
     }),
   );
@@ -877,28 +903,28 @@ export async function createContractFromAiAction(input: z.infer<typeof aiContrac
   }
 
   const draft = draftResult.data as AiContractDraft;
-  const kind = contractKindFromText(workflow.type || draft.kind);
+  const kind = contractKindFromText(type || draft.kind);
   const title =
     cleanAiAnswer(draft.title) ||
     contractTitleFromDraft(
       kind,
       client.business_name || client.full_name || "",
       project?.name || "",
-      parsed.data.prompt,
+      scope,
     );
   const sections = draft.sections.length > 0
     ? draft.sections
     : [
-        { heading: "Scope of Work", body: workflow.scope || "The service provider will deliver the agreed services." },
-        { heading: "Fees and Payment", body: workflow.commercials || "Fees and payment terms will follow the agreed commercial terms." },
-        { heading: "Responsibilities", body: workflow.clauses || "Both parties will cooperate in good faith to complete the engagement." },
+        { heading: "Scope of Work", body: scope || "The service provider will deliver the agreed services." },
+        { heading: "Fees and Payment", body: commercials || "Fees and payment terms will follow the agreed commercial terms." },
+        { heading: "Responsibilities", body: clauses || "Both parties will cooperate in good faith to complete the engagement." },
       ];
 
   const fd = new FormData();
   fd.set("kind", kind);
   fd.set("title", title);
   fd.set("content", JSON.stringify(sections));
-  fd.set("clientId", parsed.data.clientId);
+  fd.set("clientId", clientId);
   if (parsed.data.projectId) fd.set("projectId", parsed.data.projectId);
   fd.set("status", "draft");
   fd.set("currency", "INR");
@@ -1010,22 +1036,20 @@ export async function answerFromDocsAction(input: z.infer<typeof aiDocsQuestionS
 // Welcome document AI pipeline
 // ---------------------------------------------------------------------------
 
-const aiWelcomeDocCreateSchema = z.object({
-  prompt: z.string().trim().min(8).max(10000),
-  clientId: z.string().optional().or(z.literal("")),
-  projectId: z.string().optional().or(z.literal("")),
-});
-
 const aiWelcomeDocIdSchema = z.object({
   welcomeDocId: z.string().uuid("Invalid welcome document id"),
 });
 
-export async function createWelcomeDocFromAiAction(
-  input: z.infer<typeof aiWelcomeDocCreateSchema>,
-) {
-  const parsed = aiWelcomeDocCreateSchema.safeParse(input);
+export async function createWelcomeDocFromAiAction(input: AiCreateInput) {
+  const parsed = aiCreateSchema.safeParse(input);
   if (!parsed.success) {
-    return { ok: false as const, error: parsed.error.issues[0]?.message ?? "Welcome doc details incomplete." };
+    return { ok: false as const, error: "Tell me what the welcome doc should cover." };
+  }
+  const fields = parsed.data.fields ?? {};
+
+  const missing = firstMissingField("welcome_document", fields, {});
+  if (missing) {
+    return { ok: false as const, error: missing.question, missing };
   }
 
   const userId = await requireUserId();
@@ -1044,10 +1068,20 @@ export async function createWelcomeDocFromAiAction(
   const client = clientRow as { id: string; full_name?: string | null; business_name?: string | null; email?: string | null; phone?: string | null } | null;
   const project = projectRow as { id: string; name?: string | null } | null;
 
+  const brief = briefFromFields(
+    [
+      ["Working relationship and what to expect", field(fields, "relationship")],
+      ["Working style, communication, and process", field(fields, "process")],
+      ["Payments, operations, and logistics", field(fields, "operations")],
+      ["Tone", field(fields, "tone")],
+    ],
+    field(fields, "process"),
+  );
+
   const fdDraft = new FormData();
   fdDraft.set("payload", JSON.stringify({
     workflow: "welcome_document",
-    prompt: parsed.data.prompt,
+    prompt: brief,
     clientId: parsed.data.clientId,
     projectId: parsed.data.projectId,
   }));

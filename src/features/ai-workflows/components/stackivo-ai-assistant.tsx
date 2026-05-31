@@ -2,12 +2,12 @@
 
 import * as React from "react";
 import { createPortal } from "react-dom";
+
 import { useRouter } from "next/navigation";
 import {
   ArrowUp,
   Check,
   Clock,
-  Copy,
   ExternalLink,
   FileSignature,
   FileText,
@@ -19,17 +19,15 @@ import {
   Minimize2,
   Plus,
   ReceiptText,
-  RefreshCw,
   Sparkles,
   Users,
   X,
-  Zap,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { StackivoMark } from "@/components/brand/stackivo-logo";
 import { cn } from "@/lib/utils";
-import { generateOperationalDraftAction } from "@/features/ai-workflows/actions";
 import {
   approveInvoiceFromAiAction,
   approveWelcomeDocFromAiAction,
@@ -38,8 +36,10 @@ import {
   createContractFromAiAction,
   createInvoiceFromAiAction,
   createProjectFromAiAction,
+  createTimeEntryFromAiAction,
   createWelcomeDocFromAiAction,
   emailInvoiceFromAiAction,
+  interpretAiMessageAction,
   invoiceWhatsappFromAiAction,
   sendContractFromAiAction,
   sendWelcomeDocFromAiAction,
@@ -47,7 +47,11 @@ import {
   answerFromDocsAction,
 } from "@/features/ai-workflows/global-actions";
 import { submitBugReportAction } from "@/features/support/actions";
-import type { AiContractDraft, AiWelcomeDraft } from "@/features/ai-workflows/types";
+import type {
+  AiFields,
+  AiInterpretation,
+  AiMissingField,
+} from "@/features/ai-workflows/types";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -125,10 +129,6 @@ interface AiWelcomeDocPreview {
   projectName: string | null;
 }
 
-interface PendingInvoiceRetry {
-  prompt: string;
-}
-
 // ---------------------------------------------------------------------------
 // Quick actions
 // ---------------------------------------------------------------------------
@@ -184,219 +184,17 @@ const QUICK_ACTIONS: Array<{
 ];
 
 // ---------------------------------------------------------------------------
-// Workflow steps
+// Per-mode placeholder hints (free-form; the NLU extracts and asks for gaps)
 // ---------------------------------------------------------------------------
 
-interface WorkflowStep {
-  id: string;
-  question: string;
-  kind: "text" | "client" | "project" | "choice";
-  placeholder?: string;
-  options?: string[];
-  optional?: boolean;
-}
-
-const WORKFLOW_STEPS: Partial<Record<AiMode, WorkflowStep[]>> = {
-  invoice: [
-    {
-      id: "brief",
-      question:
-        "Tell me the client, work, amount, due date, and any discount — I'll fill the rest.",
-      kind: "text",
-      placeholder:
-        "Example: Invoice Acme 25000 for website redesign, due in 15 days, discount 5000",
-    },
-  ],
-  contract: [
-    { id: "client", question: "Who is this contract or proposal for?", kind: "client" },
-    { id: "project", question: "Link to a project? (optional)", kind: "project", optional: true },
-    {
-      id: "type",
-      question: "What kind of document?",
-      kind: "choice",
-      options: [
-        "Service agreement",
-        "Project proposal",
-        "Retainer agreement",
-        "NDA",
-        "Maintenance contract",
-      ],
-    },
-    {
-      id: "scope",
-      question: "Describe the scope, deliverables, and timeline.",
-      kind: "text",
-      placeholder:
-        "Example: Website redesign — 5 pages, CMS setup, 3-week timeline, client provides copy",
-    },
-    {
-      id: "commercials",
-      question: "Fees, payment schedule, revisions, and IP terms?",
-      kind: "text",
-      placeholder:
-        "Example: INR 150000 fixed, 50% upfront, 2 revision rounds, IP transfers on full payment",
-    },
-    {
-      id: "clauses",
-      question: "Any special clauses, exclusions, or client responsibilities? (optional)",
-      kind: "text",
-      optional: true,
-      placeholder:
-        "Example: Excludes paid plugins, client must approve milestones within 3 business days",
-    },
-  ],
-  welcome_document: [
-    { id: "client", question: "Who is this welcome document for?", kind: "client", optional: true },
-    {
-      id: "relationship",
-      question: "What kind of engagement?",
-      kind: "choice",
-      options: [
-        "Design client",
-        "Development client",
-        "Retainer client",
-        "Consulting client",
-        "Agency client",
-      ],
-    },
-    {
-      id: "process",
-      question: "What process, communication cadence, and feedback rules should it explain?",
-      kind: "text",
-      placeholder:
-        "Example: Weekly Friday updates, feedback in one doc, replies within 1 business day",
-    },
-    {
-      id: "operations",
-      question: "What about payments, files, deliverables, and approvals?",
-      kind: "text",
-      placeholder:
-        "Example: Invoices due in 15 days, final files via portal, approvals in writing",
-    },
-    {
-      id: "tone",
-      question: "Tone and style?",
-      kind: "choice",
-      options: [
-        "Warm and premium",
-        "Direct and concise",
-        "Detailed and structured",
-        "Friendly and simple",
-      ],
-    },
-  ],
-  client: [
-    {
-      id: "name",
-      question: "Client or contact name?",
-      kind: "text",
-      placeholder: "Example: Riya Sharma",
-    },
-    {
-      id: "business",
-      question: "Business or company name? (optional)",
-      kind: "text",
-      optional: true,
-      placeholder: "Example: Acme Encore",
-    },
-    {
-      id: "contact",
-      question: "Email and phone? (optional)",
-      kind: "text",
-      optional: true,
-      placeholder: "Example: riya@acme.com, +91 9876543210",
-    },
-    {
-      id: "billing",
-      question: "Billing address or city/state? (optional)",
-      kind: "text",
-      optional: true,
-      placeholder: "Example: Mumbai, Maharashtra",
-    },
-    {
-      id: "notes",
-      question: "Notes about this client? (optional)",
-      kind: "text",
-      optional: true,
-      placeholder: "Example: Retainer client, prefers email, fast approvals",
-    },
-  ],
-  project: [
-    {
-      id: "client",
-      question: "Which client should this project belong to? (optional)",
-      kind: "client",
-      optional: true,
-    },
-    {
-      id: "name",
-      question: "Project name?",
-      kind: "text",
-      placeholder: "Example: Website Redesign",
-    },
-    {
-      id: "scope",
-      question: "Goal, scope, and deliverables?",
-      kind: "text",
-      placeholder:
-        "Example: Redesign landing page, CMS setup, analytics, launch support",
-    },
-    {
-      id: "status",
-      question: "What stage?",
-      kind: "choice",
-      options: ["Planning", "Active", "Waiting on client", "Review", "On hold"],
-    },
-    {
-      id: "dates",
-      question: "Start and due date? (optional)",
-      kind: "text",
-      optional: true,
-      placeholder: "Example: starts next Monday, due end of month",
-    },
-  ],
-  time_entry: [
-    {
-      id: "project",
-      question: "Which project should I log this against? (optional)",
-      kind: "project",
-      optional: true,
-    },
-    {
-      id: "description",
-      question: "What work did you do?",
-      kind: "text",
-      placeholder: "Example: Client calls, wireframe revisions, API integration",
-    },
-    {
-      id: "duration",
-      question: "How long? And is this billable?",
-      kind: "text",
-      placeholder: "Example: 2h 30m, billable — or: 45 minutes, non-billable",
-    },
-  ],
-  support: [
-    {
-      id: "question",
-      question: "What do you need help with?",
-      kind: "text",
-      placeholder:
-        "Ask anything — docs, privacy, terms, or raise a support ticket",
-    },
-    {
-      id: "page",
-      question: "Which page or workflow were you using? (optional)",
-      kind: "text",
-      optional: true,
-      placeholder: "Example: invoices page, contract builder",
-    },
-    {
-      id: "route",
-      question: "Should I answer from docs, or send to support?",
-      kind: "choice",
-      options: ["Answer from docs first", "Send to support"],
-    },
-  ],
+const MODE_PLACEHOLDERS: Partial<Record<AiMode, string>> = {
+  invoice: "Example: Invoice Acme 25000 for website redesign, due in 15 days, 5000 off",
+  contract: "Example: Service agreement for Acme — 5-page site, INR 150000, 50% upfront, 2 revisions",
+  welcome_document: "Example: Welcome doc for Acme — weekly Friday updates, feedback in one doc, warm tone",
+  client: "Example: Add Riya Sharma, Acme Encore, riya@acme.com, +91 9876543210, Mumbai",
+  project: "Example: Website Redesign for Acme — landing page + CMS, starts Monday, due end of month",
+  time_entry: "Example: Logged 2h 30m on wireframe revisions for Acme, billable",
+  support: "Ask anything — docs, privacy, terms, or raise a support ticket",
 };
 
 // ---------------------------------------------------------------------------
@@ -444,16 +242,6 @@ function modeIntro(mode: AiMode): string {
 // ---------------------------------------------------------------------------
 // Sub-components
 // ---------------------------------------------------------------------------
-
-function ProviderBadge({ provider }: { provider?: "groq" | "local" }) {
-  if (!provider || provider === "groq") return null;
-  return (
-    <span className="inline-flex items-center gap-1 rounded-full border border-amber-200/60 bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:border-amber-800/40 dark:bg-amber-950/30 dark:text-amber-400">
-      <RefreshCw className="h-2.5 w-2.5" />
-      Local draft — AI unavailable
-    </span>
-  );
-}
 
 function SectionList({
   sections,
@@ -511,21 +299,6 @@ function ResultBlock({
       <Button type="button" size="sm" onClick={onAction}>
         {actionLabel}
       </Button>
-    </div>
-  );
-}
-
-function DraftSummary({ draft }: { draft: AiContractDraft | AiWelcomeDraft }) {
-  const sections = "sections" in draft ? draft.sections : [];
-  return (
-    <div className="space-y-1.5 rounded-lg border bg-muted/20 p-3 text-xs">
-      {"title" in draft && <p className="font-medium">{draft.title}</p>}
-      {"intro" in draft && draft.intro && (
-        <p className="text-muted-foreground">{draft.intro}</p>
-      )}
-      <p className="text-muted-foreground">
-        {sections.length} section{sections.length !== 1 ? "s" : ""} generated
-      </p>
     </div>
   );
 }
@@ -855,18 +628,18 @@ function WelcomeDocDeliveryActions({
 export function StackivoAiAssistant({ clients, projects }: StackivoAiAssistantProps) {
   const router = useRouter();
   const [mounted, setMounted] = React.useState(false);
+  const [panelSlot, setPanelSlot] = React.useState<HTMLElement | null>(null);
   const [open, setOpen] = React.useState(false);
   const [expanded, setExpanded] = React.useState(false);
+  const [panelWidth, setPanelWidth] = React.useState(440);
   const [mode, setMode] = React.useState<AiMode>("general");
   const [input, setInput] = React.useState("");
-  const [workflowStep, setWorkflowStep] = React.useState<number | null>(null);
-  const [workflowAnswers, setWorkflowAnswers] = React.useState<string[]>([]);
+  const [collected, setCollected] = React.useState<AiFields>({});
+  const [pendingField, setPendingField] = React.useState<AiMissingField | null>(null);
   const [clientId, setClientId] = React.useState("");
   const [projectId, setProjectId] = React.useState("");
   const [lastInvoicePreview, setLastInvoicePreview] =
     React.useState<AiInvoicePreview | null>(null);
-  const [pendingInvoiceRetry, setPendingInvoiceRetry] =
-    React.useState<PendingInvoiceRetry | null>(null);
   const [pending, startTransition] = React.useTransition();
   const [messages, setMessages] = React.useState<Message[]>(() => [
     {
@@ -886,45 +659,96 @@ export function StackivoAiAssistant({ clients, projects }: StackivoAiAssistantPr
   ]);
   const scrollRef = React.useRef<HTMLDivElement>(null);
   const lastInvoicePreviewRef = React.useRef<AiInvoicePreview | null>(null);
-  const pendingInvoiceRetryRef = React.useRef<PendingInvoiceRetry | null>(null);
+  const runWorkflowRef = React.useRef<
+    (workflow: AiMode, fields: AiFields, cId: string, pId: string, text: string) => Promise<void>
+  >(async () => {});
+  const resizeActiveRef = React.useRef(false);
+  const resizeStartXRef = React.useRef(0);
+  const resizeStartWidthRef = React.useRef(440);
+  const panelWidthRef = React.useRef(440);
+
+  const RESIZE_MIN = 420;
+  const RESIZE_MAX = 720;
+  const RESIZE_DEFAULT = 440;
+  const RESIZE_EXPANDED = 700;
+
+  const handleNewConversation = React.useCallback(() => {
+    setMode("general");
+    setCollected({});
+    setPendingField(null);
+    setInput("");
+    setClientId("");
+    setProjectId("");
+    setLastInvoicePreview(null);
+    setMessages((prev) => prev.slice(0, 1));
+  }, []);
 
   React.useEffect(() => { setMounted(true); }, []);
+
+  React.useEffect(() => {
+    if (!mounted) return;
+    setPanelSlot(document.getElementById("stackivo-ai-panel-slot"));
+  }, [mounted]);
 
   React.useEffect(() => {
     lastInvoicePreviewRef.current = lastInvoicePreview;
   }, [lastInvoicePreview]);
 
   React.useEffect(() => {
-    pendingInvoiceRetryRef.current = pendingInvoiceRetry;
-  }, [pendingInvoiceRetry]);
+    panelWidthRef.current = panelWidth;
+  }, [panelWidth]);
+
+  React.useEffect(() => {
+    if (!resizeActiveRef.current) return;
+    const handleMove = (event: PointerEvent) => {
+      const delta = resizeStartXRef.current - event.clientX;
+      const next = Math.max(RESIZE_MIN, Math.min(RESIZE_MAX, resizeStartWidthRef.current + delta));
+      setPanelWidth(next);
+      setExpanded(false);
+    };
+    const handleUp = () => {
+      resizeActiveRef.current = false;
+      window.removeEventListener("pointermove", handleMove);
+      window.removeEventListener("pointerup", handleUp);
+    };
+    window.addEventListener("pointermove", handleMove);
+    window.addEventListener("pointerup", handleUp);
+    return () => {
+      window.removeEventListener("pointermove", handleMove);
+      window.removeEventListener("pointerup", handleUp);
+    };
+  }, [RESIZE_MAX, RESIZE_MIN]);
 
   React.useEffect(() => {
     if (!mounted) return;
     document.documentElement.classList.toggle("stackivo-ai-open", open);
     document.documentElement.style.setProperty(
       "--stackivo-ai-width",
-      expanded ? "min(720px, calc(100vw - 18rem))" : "440px",
+      `${panelWidth}px`,
     );
     return () => {
       document.documentElement.classList.remove("stackivo-ai-open");
       document.documentElement.style.removeProperty("--stackivo-ai-width");
     };
-  }, [expanded, mounted, open]);
+  }, [expanded, mounted, open, panelWidth]);
 
   const projectOptions = React.useMemo(
     () => (clientId ? projects.filter((p) => p.clientId === clientId) : projects),
     [clientId, projects],
   );
 
-  const activeSteps = WORKFLOW_STEPS[mode];
-  const activeStep =
-    workflowStep !== null && activeSteps ? activeSteps[workflowStep] : null;
-
   React.useEffect(() => {
     if (!open) return;
     const frame = window.requestAnimationFrame(() => {
       const node = scrollRef.current;
-      if (node) node.scrollTo({ top: node.scrollHeight, behavior: "smooth" });
+      if (!node) return;
+      // On initial open (no conversation yet), show the top (greeting + quick actions).
+      // Only auto-scroll to bottom once a real conversation is underway.
+      if (messages.length > 1 || pending) {
+        node.scrollTo({ top: node.scrollHeight, behavior: "smooth" });
+      } else {
+        node.scrollTo({ top: 0, behavior: "instant" });
+      }
     });
     return () => window.cancelAnimationFrame(frame);
   }, [messages, open, pending]);
@@ -994,36 +818,6 @@ export function StackivoAiAssistant({ clients, projects }: StackivoAiAssistantPr
       });
     },
     [handleInvoiceDelivery, push, router],
-  );
-
-  const retryInvoiceDraftWithClient = React.useCallback(
-    (selectedClientId: string) => {
-      const retry = pendingInvoiceRetryRef.current;
-      if (!retry?.prompt) return;
-      setClientId(selectedClientId);
-      setProjectId("");
-      setPendingInvoiceRetry(null);
-      startTransition(async () => {
-        const res = await createInvoiceFromAiAction({
-          prompt: retry.prompt,
-          clientId: selectedClientId,
-        });
-        if (!res.ok) { push({ role: "assistant", content: res.error }); return; }
-        setLastInvoicePreview(res.data.preview);
-        push({
-          role: "assistant",
-          content: (
-            <InvoiceDraftPreview
-              preview={res.data.preview}
-              onApprove={handleInvoiceApprove}
-              onOpen={() => router.push(`/dashboard/invoices/${res.data.preview.id}`)}
-            />
-          ),
-        });
-        router.refresh();
-      });
-    },
-    [handleInvoiceApprove, push, router],
   );
 
   // ----- Welcome doc handlers -----
@@ -1102,238 +896,290 @@ export function StackivoAiAssistant({ clients, projects }: StackivoAiAssistantPr
     [push, router],
   );
 
-  // ----- Mode selection -----
+  // ----- Conversational support / docs answering -----
 
-  const selectMode = (nextMode: AiMode) => {
-    setMode(nextMode);
-    setInput("");
-    setWorkflowAnswers([]);
-    const steps = WORKFLOW_STEPS[nextMode];
-    setWorkflowStep(steps ? 0 : null);
-    push({
-      role: "assistant",
-      content: (
-        <>
-          <span className="block">{modeIntro(nextMode)}</span>
-          {steps ? (
-            <span className="mt-2 block font-medium">{steps[0].question}</span>
-          ) : null}
-        </>
-      ),
-    });
-  };
-
-  // Smart intent detection from keyword patterns
-  const detectMode = (text: string): AiMode => {
-    const t = text.toLowerCase();
-    if (/invoice|bill\s|receipt|charge/.test(t)) return "invoice";
-    if (/contract|agreement|proposal|nda|retainer/.test(t)) return "contract";
-    if (/welcome|onboard|kickoff/.test(t)) return "welcome_document";
-    if (/\bproject\b/.test(t)) return "project";
-    if (/\bclient\b|\bcustomer\b|\bcontact\b/.test(t)) return "client";
-    if (/\btime\b|\bhours?\b|\bminutes?\b|\blog\b|\bbillable\b/.test(t)) return "time_entry";
-    if (/support|bug|issue|help|how do|what is|privacy|terms/.test(t)) return "support";
-    return mode;
-  };
-
-  // ----- Core workflow executor -----
-
-  const executeWorkflow = React.useCallback(
-    async (targetMode: AiMode, text: string) => {
-      // ---- Invoice ----
-      if (targetMode === "invoice") {
-        const res = await createInvoiceFromAiAction({ prompt: text, clientId, projectId });
-        if (!res.ok) {
-          if (res.error.includes("Which client is this invoice for?")) {
-            setPendingInvoiceRetry({ prompt: text });
-            push({
-              role: "assistant",
-              content: (
-                <InvoiceClientPicker
-                  clients={clients}
-                  onSelect={retryInvoiceDraftWithClient}
-                />
-              ),
-            });
-            return;
-          }
-          push({ role: "assistant", content: res.error });
-          return;
-        }
-        setLastInvoicePreview(res.data.preview);
-        push({
-          role: "assistant",
-          content: (
-            <InvoiceDraftPreview
-              preview={res.data.preview}
-              onApprove={handleInvoiceApprove}
-              onOpen={() => router.push(`/dashboard/invoices/${res.data.preview.id}`)}
-            />
-          ),
-        });
-        router.refresh();
+  const runSupport = React.useCallback(
+    async (text: string, fileTicket: boolean) => {
+      if (text.trim().length < 4) {
+        push({ role: "assistant", content: "Tell me a little more about what you need." });
         return;
       }
+      const docs = await answerFromDocsAction({ question: text });
+      const answer = docs.ok
+        ? docs.data.answer
+        : "I could not read a precise answer from the docs.";
+      const usedDocs = docs.ok && docs.data.usedDocs;
 
-      // ---- Client ----
-      if (targetMode === "client") {
-        const res = await createClientFromAiAction({ prompt: text });
-        if (!res.ok) { push({ role: "assistant", content: res.error }); return; }
-        push({
-          role: "assistant",
-          content: (
-            <ResultBlock
-              title="Client created"
-              description={`Added ${("draft" in res.data && res.data.draft && "fullName" in res.data.draft) ? res.data.draft.fullName : "the client"} to your workspace.`}
-              actionLabel="Open clients"
-              onAction={() => router.push("/dashboard/clients")}
-            />
-          ),
-        });
-        router.refresh();
-        return;
-      }
-
-      // ---- Project ----
-      if (targetMode === "project") {
-        const res = await createProjectFromAiAction({ prompt: text, clientId });
-        if (!res.ok) { push({ role: "assistant", content: res.error }); return; }
-        push({
-          role: "assistant",
-          content: (
-            <ResultBlock
-              title="Project created"
-              description={`${("draft" in res.data && res.data.draft && "name" in res.data.draft) ? res.data.draft.name : "The project"} is ready.`}
-              actionLabel="Open projects"
-              onAction={() => router.push("/dashboard/projects")}
-            />
-          ),
-        });
-        router.refresh();
-        return;
-      }
-
-      // ---- Contract ----
-      if (targetMode === "contract") {
-        if (!clientId) {
-          push({
-            role: "assistant",
-            content: "Choose a client first — select one above, then I can prepare the contract.",
-          });
-          return;
-        }
-        const res = await createContractFromAiAction({ prompt: text, clientId, projectId });
-        if (!res.ok) { push({ role: "assistant", content: res.error }); return; }
-        push({
-          role: "assistant",
-          content: (
-            <ContractDraftPreview
-              preview={res.data}
-              onApproveAndSend={handleContractApproveAndSend}
-              onWhatsApp={handleContractWhatsApp}
-              onOpen={() => router.push(`/dashboard/contracts/${res.data.id}`)}
-            />
-          ),
-        });
-        router.refresh();
-        return;
-      }
-
-      // ---- Welcome document ----
-      if (targetMode === "welcome_document") {
-        const res = await createWelcomeDocFromAiAction({ prompt: text, clientId, projectId });
-        if (!res.ok) { push({ role: "assistant", content: res.error }); return; }
-        push({
-          role: "assistant",
-          content: (
-            <WelcomeDocDraftPreview
-              preview={res.data}
-              onApprove={handleWelcomeDocApprove}
-              onOpen={() => router.push(`/dashboard/welcome/${res.data.id}`)}
-            />
-          ),
-        });
-        router.refresh();
-        return;
-      }
-
-      // ---- Time entry ----
-      if (targetMode === "time_entry") {
-        const fd = new FormData();
-        fd.set("payload", JSON.stringify({
-          workflow: "time_entry",
-          prompt: text,
-          clientId,
-          projectId,
-        }));
-        const res = await generateOperationalDraftAction(fd);
-        if (!res.ok) { push({ role: "assistant", content: res.error }); return; }
-        const draft = res.data as {
-          description?: string;
-          hours?: number;
-          minutes?: number;
-          billable?: boolean;
-          hourlyRate?: number;
-          date?: string;
-        };
-        push({
-          role: "assistant",
-          content: (
-            <ResultBlock
-              title="Time entry drafted"
-              description={`${draft.description ?? text} — ${draft.hours ?? 0}h ${draft.minutes ?? 0}m${draft.billable ? " · billable" : " · non-billable"}. Open the time tracker to review and save.`}
-              actionLabel="Open time tracker"
-              onAction={() => router.push("/dashboard/time")}
-            />
-          ),
-        });
-        return;
-      }
-
-      // ---- Support ----
-      if (targetMode === "support") {
-        const docs = await answerFromDocsAction({ question: text });
-        if (docs.ok && docs.data.usedDocs) {
-          push({ role: "assistant", content: docs.data.answer });
-          return;
-        }
-        const res = await submitBugReportAction({
+      if (fileTicket && !usedDocs) {
+        const ticket = await submitBugReportAction({
           category: "how-to",
           summary: text.slice(0, 180),
           details: text,
           page: typeof window !== "undefined" ? window.location.pathname : undefined,
         });
-        if (!res.ok) {
-          push({ role: "assistant", content: docs.ok ? docs.data.answer : res.error });
-          return;
-        }
         push({
           role: "assistant",
-          content: docs.ok
-            ? `${docs.data.answer}\n\nI also sent this to Stackivo support for follow-up.`
-            : "Sent to Stackivo support — the team will follow up.",
+          content: ticket.ok
+            ? `${answer}\n\nI also sent this to Stackivo support for follow-up.`
+            : answer,
         });
         return;
       }
+      push({ role: "assistant", content: answer });
+    },
+    [push],
+  );
 
-      push({
-        role: "assistant",
-        content:
-          "I can create invoices, contracts, welcome docs, clients, projects, log time, and answer support questions. Describe what you need or pick a workflow.",
-      });
+  // ----- Core workflow executor (structured fields → action → preview) -----
+
+  const runWorkflow = React.useCallback(
+    async (workflow: AiMode, fields: AiFields, cId: string, pId: string, text: string) => {
+      const actionInput = {
+        fields,
+        clientId: cId || undefined,
+        projectId: pId || undefined,
+        prompt: text || undefined,
+      };
+
+      const askMissing = (missing: AiMissingField) => {
+        setPendingField(missing);
+        if (missing.field === "clientId") {
+          push({
+            role: "assistant",
+            content: (
+              <InvoiceClientPicker
+                clients={clients}
+                onSelect={(id) => {
+                  const name = clients.find((c) => c.id === id)?.name ?? "Selected client";
+                  setClientId(id);
+                  setPendingField(null);
+                  push({ role: "user", content: name });
+                  startTransition(async () => {
+                    await runWorkflowRef.current(workflow, fields, id, pId, "");
+                  });
+                }}
+              />
+            ),
+          });
+        } else {
+          push({
+            role: "assistant",
+            content: (
+              <>
+                <span className="block">{missing.question}</span>
+                {missing.placeholder ? (
+                  <span className="mt-1 block text-xs text-muted-foreground">
+                    {missing.placeholder}
+                  </span>
+                ) : null}
+              </>
+            ),
+          });
+        }
+      };
+
+      const finish = () => {
+        setMode("general");
+        setCollected({});
+        setPendingField(null);
+      };
+
+      switch (workflow) {
+        case "invoice": {
+          const res = await createInvoiceFromAiAction(actionInput);
+          if (!res.ok) {
+            if ("missing" in res && res.missing) askMissing(res.missing);
+            else push({ role: "assistant", content: res.error });
+            return;
+          }
+          const preview = res.data.preview;
+          setLastInvoicePreview(preview);
+          finish();
+          push({
+            role: "assistant",
+            content: (
+              <InvoiceDraftPreview
+                preview={preview}
+                onApprove={handleInvoiceApprove}
+                onOpen={() => router.push(`/dashboard/invoices/${preview.id}`)}
+              />
+            ),
+          });
+          router.refresh();
+          return;
+        }
+
+        case "client": {
+          const res = await createClientFromAiAction(actionInput);
+          if (!res.ok) {
+            if ("missing" in res && res.missing) askMissing(res.missing);
+            else push({ role: "assistant", content: res.error });
+            return;
+          }
+          finish();
+          push({
+            role: "assistant",
+            content: (
+              <ResultBlock
+                title="Client created"
+                description={`Added ${res.data.fullName} to your workspace.`}
+                actionLabel="Open clients"
+                onAction={() => router.push("/dashboard/clients")}
+              />
+            ),
+          });
+          router.refresh();
+          return;
+        }
+
+        case "project": {
+          const res = await createProjectFromAiAction(actionInput);
+          if (!res.ok) {
+            if ("missing" in res && res.missing) askMissing(res.missing);
+            else push({ role: "assistant", content: res.error });
+            return;
+          }
+          finish();
+          push({
+            role: "assistant",
+            content: (
+              <ResultBlock
+                title="Project created"
+                description={`${res.data.name} is ready.`}
+                actionLabel="Open projects"
+                onAction={() => router.push("/dashboard/projects")}
+              />
+            ),
+          });
+          router.refresh();
+          return;
+        }
+
+        case "contract": {
+          const res = await createContractFromAiAction(actionInput);
+          if (!res.ok) {
+            if ("missing" in res && res.missing) askMissing(res.missing);
+            else push({ role: "assistant", content: res.error });
+            return;
+          }
+          finish();
+          push({
+            role: "assistant",
+            content: (
+              <ContractDraftPreview
+                preview={res.data}
+                onApproveAndSend={handleContractApproveAndSend}
+                onWhatsApp={handleContractWhatsApp}
+                onOpen={() => router.push(`/dashboard/contracts/${res.data.id}`)}
+              />
+            ),
+          });
+          router.refresh();
+          return;
+        }
+
+        case "welcome_document": {
+          const res = await createWelcomeDocFromAiAction(actionInput);
+          if (!res.ok) {
+            if ("missing" in res && res.missing) askMissing(res.missing);
+            else push({ role: "assistant", content: res.error });
+            return;
+          }
+          finish();
+          push({
+            role: "assistant",
+            content: (
+              <WelcomeDocDraftPreview
+                preview={res.data}
+                onApprove={handleWelcomeDocApprove}
+                onOpen={() => router.push(`/dashboard/welcome/${res.data.id}`)}
+              />
+            ),
+          });
+          router.refresh();
+          return;
+        }
+
+        case "time_entry": {
+          const res = await createTimeEntryFromAiAction(actionInput);
+          if (!res.ok) {
+            if ("missing" in res && res.missing) askMissing(res.missing);
+            else push({ role: "assistant", content: res.error });
+            return;
+          }
+          const entry = res.data;
+          finish();
+          push({
+            role: "assistant",
+            content: (
+              <ResultBlock
+                title="Time entry logged"
+                description={`${entry.description} — ${entry.hours}h ${entry.minutes}m${entry.billable ? " · billable" : " · non-billable"}.`}
+                actionLabel="Open time tracker"
+                onAction={() => router.push("/dashboard/time")}
+              />
+            ),
+          });
+          router.refresh();
+          return;
+        }
+
+        case "support": {
+          await runSupport(text, true);
+          finish();
+          return;
+        }
+
+        default: {
+          // General free-form chat — answer from docs without filing a ticket.
+          await runSupport(text, false);
+          return;
+        }
+      }
     },
     [
-      clientId,
-      projectId,
       clients,
+      push,
+      router,
+      runSupport,
       handleInvoiceApprove,
       handleContractApproveAndSend,
       handleContractWhatsApp,
       handleWelcomeDocApprove,
-      push,
-      retryInvoiceDraftWithClient,
-      router,
     ],
+  );
+
+  React.useEffect(() => {
+    runWorkflowRef.current = runWorkflow;
+  }, [runWorkflow]);
+
+  // ----- Mode selection -----
+
+  const selectMode = React.useCallback(
+    (nextMode: AiMode) => {
+      setMode(nextMode);
+      setInput("");
+      setCollected({});
+      setPendingField(null);
+      push({ role: "assistant", content: <span className="block">{modeIntro(nextMode)}</span> });
+    },
+    [push],
+  );
+
+  // Keyword fallback intent detection (used only when the NLU is unavailable).
+  const detectMode = React.useCallback(
+    (text: string): AiMode => {
+      const t = text.toLowerCase();
+      if (/invoice|bill\s|receipt|charge/.test(t)) return "invoice";
+      if (/contract|agreement|proposal|nda|retainer/.test(t)) return "contract";
+      if (/welcome|onboard|kickoff/.test(t)) return "welcome_document";
+      if (/\bproject\b/.test(t)) return "project";
+      if (/\bclient\b|\bcustomer\b|\bcontact\b/.test(t)) return "client";
+      if (/\btime\b|\bhours?\b|\bminutes?\b|\blog\b|\bbillable\b/.test(t)) return "time_entry";
+      if (/support|bug|issue|help|how do|what is|privacy|terms/.test(t)) return "support";
+      return mode;
+    },
+    [mode],
   );
 
   // ----- Submit handler -----
@@ -1345,348 +1191,345 @@ export function StackivoAiAssistant({ clients, projects }: StackivoAiAssistantPr
     push({ role: "user", content: text });
 
     startTransition(async () => {
-      // Multi-step workflow answer
-      if (workflowStep !== null && activeSteps) {
-        const currentStep = activeSteps[workflowStep];
+      // 1. Interpret the message (intent + structured fields + resolved ids).
+      const interpreted = await interpretAiMessageAction({
+        message: text,
+        currentWorkflow: mode === "general" ? undefined : mode,
+        collected,
+      });
+      const nlu: AiInterpretation | null = interpreted.ok ? interpreted.data : null;
 
-        // Capture client/project selections from choice steps
-        if (currentStep?.kind === "client") {
-          const match = clients.find(
-            (c) => c.name.toLowerCase().includes(text.toLowerCase()),
-          );
-          if (match) setClientId(match.id);
+      // 2. Decide the target workflow, honouring confident context switches.
+      let targetMode: AiMode = mode;
+      if (nlu) {
+        const isSwitch =
+          nlu.confident && nlu.intent !== "general" && nlu.intent !== mode;
+        if (mode === "general" || isSwitch) {
+          targetMode = nlu.intent === "general" ? mode : nlu.intent;
         }
-        if (currentStep?.kind === "project") {
-          const match = projectOptions.find(
-            (p) => p.name.toLowerCase().includes(text.toLowerCase()),
-          );
-          if (match) setProjectId(match.id);
-        }
-
-        const nextAnswers = [...workflowAnswers, `${currentStep?.question}\n${text}`];
-        const nextStep = workflowStep + 1;
-
-        if (nextStep < activeSteps.length) {
-          setWorkflowAnswers(nextAnswers);
-          setWorkflowStep(nextStep);
-          push({
-            role: "assistant",
-            content: activeSteps[nextStep].question,
-          });
-          return;
-        }
-
-        // All steps answered — execute
-        setWorkflowAnswers([]);
-        setWorkflowStep(null);
-        const fullPrompt = nextAnswers.join("\n\n");
-        await executeWorkflow(mode, fullPrompt);
-        return;
+      }
+      if (targetMode === "general") {
+        targetMode = detectMode(text);
       }
 
-      // Free-form / general mode — detect intent and execute
-      const detectedMode = detectMode(text);
-      if (detectedMode !== mode && mode === "general") {
-        setMode(detectedMode);
-        await executeWorkflow(detectedMode, text);
-        return;
+      const switching = targetMode !== mode;
+      if (switching) setMode(targetMode);
+
+      // 3. Merge newly extracted fields onto what we already collected.
+      const baseFields: AiFields = switching ? {} : { ...collected };
+      const merged: AiFields = { ...baseFields, ...(nlu?.fields ?? {}) };
+
+      // If we were waiting on a specific field and the NLU did not capture it,
+      // treat the whole message as that field's answer.
+      if (
+        pendingField &&
+        pendingField.field !== "clientId" &&
+        !merged[pendingField.field]
+      ) {
+        merged[pendingField.field] = text;
       }
 
-      await executeWorkflow(mode === "general" ? detectedMode : mode, text);
+      setCollected(merged);
+      setPendingField(null);
+
+      // 4. Resolve client/project — prefer the NLU match, else the dropdown.
+      const cId = nlu?.clientId || clientId;
+      const pId = nlu?.projectId || projectId;
+      if (nlu?.clientId && nlu.clientId !== clientId) setClientId(nlu.clientId);
+      if (nlu?.projectId && nlu.projectId !== projectId) setProjectId(nlu.projectId);
+
+      await runWorkflow(targetMode, merged, cId, pId, text);
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [input, pending, workflowStep, activeSteps, workflowAnswers, mode, executeWorkflow, clients, projectOptions, push]);
+  }, [
+    input,
+    pending,
+    mode,
+    collected,
+    pendingField,
+    clientId,
+    projectId,
+    push,
+    detectMode,
+    runWorkflow,
+  ]);
 
   // ----- Render -----
 
-  if (!mounted) return null;
-
-  const panel = (
+  return (
     <>
-      {/* Trigger button */}
-      {!open && (
-        <button
+      {/* Top bar trigger — desktop */}
+      <div className="hidden items-center gap-1 md:flex">
+        <Button
           type="button"
+          variant="ghost"
+          size="sm"
+          className="gap-1.5 text-sm font-semibold"
           onClick={() => setOpen(true)}
-          className="fixed bottom-6 right-6 z-50 flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg ring-1 ring-black/10 transition-transform hover:scale-105 active:scale-95"
+        >
+          <Sparkles className="h-4 w-4" /> Ask AI
+        </Button>
+      </div>
+      {/* Top bar trigger — mobile */}
+      {!open && (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="md:hidden"
+          onClick={() => setOpen(true)}
           aria-label="Ask AI"
         >
-          <Sparkles className="h-5 w-5" />
-        </button>
+          <Sparkles className="h-4 w-4" />
+        </Button>
+      )}
+      {open && (
+        <div className="md:hidden flex items-center gap-1">
+          <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => setOpen(false)} aria-label="Close AI panel">
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
       )}
 
-      {/* Panel */}
-      {open && (
+      {/* Full-height right-side panel */}
+      {mounted ? createPortal((
         <div
+          data-open={open ? "true" : "false"}
           className={cn(
-            "fixed bottom-0 right-0 z-50 flex flex-col bg-background shadow-2xl ring-1 ring-border/60",
-            "h-[calc(100dvh-4rem)] sm:bottom-6 sm:right-6 sm:h-[calc(100dvh-6rem)] sm:max-h-[720px] sm:rounded-2xl",
+            "stackivo-ai-panel flex h-full w-full flex-col bg-background shadow-[inset_1px_0_0_hsl(var(--border))]",
+            !open && "pointer-events-none",
           )}
-          style={{ width: "var(--stackivo-ai-width, 440px)" }}
         >
           {/* Header */}
-          <div className="flex items-center gap-2 border-b px-4 py-3">
-            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10">
-              <Sparkles className="h-3.5 w-3.5 text-primary" />
-            </div>
-            <span className="flex-1 text-sm font-semibold">Ask AI</span>
-            {mode !== "general" && (
-              <button
+          <div className="sticky top-0 z-10 flex h-14 items-center justify-between border-b bg-background px-4">
+            <button
+              type="button"
+              className="inline-flex items-center gap-2 text-left font-semibold"
+              onClick={() => setMode("general")}
+            >
+              <StackivoMark className="h-6 w-6" bare />
+              New conversation
+            </button>
+            <div className="flex items-center gap-1">
+              <Button
                 type="button"
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={handleNewConversation}
+                aria-label="New conversation"
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="hidden h-8 w-8 md:inline-flex"
                 onClick={() => {
-                  setMode("general");
-                  setWorkflowStep(null);
-                  setWorkflowAnswers([]);
-                  setClientId("");
-                  setProjectId("");
+                  setExpanded((value) => {
+                    const next = !value;
+                    setPanelWidth(next ? RESIZE_EXPANDED : RESIZE_DEFAULT);
+                    return next;
+                  });
                 }}
-                className="rounded px-2 py-0.5 text-xs text-muted-foreground hover:bg-muted"
+                aria-label={expanded ? "Collapse AI panel" : "Expand AI panel"}
               >
-                ← Back
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={() => setExpanded((e) => !e)}
-              className="rounded p-1 text-muted-foreground hover:bg-muted"
-              aria-label={expanded ? "Collapse" : "Expand"}
-            >
-              {expanded ? (
-                <Minimize2 className="h-4 w-4" />
-              ) : (
-                <Maximize2 className="h-4 w-4" />
-              )}
-            </button>
-            <button
-              type="button"
-              onClick={() => setOpen(false)}
-              className="rounded p-1 text-muted-foreground hover:bg-muted"
-              aria-label="Close"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-
-          {/* Context selectors (client + project) */}
-          {(mode === "invoice" || mode === "contract" || mode === "welcome_document" || mode === "project" || mode === "time_entry") && (
-            <div className="flex gap-2 border-b px-4 py-2">
-              <select
-                className="flex-1 rounded-md border bg-background px-2 py-1.5 text-xs text-muted-foreground focus:text-foreground"
-                value={clientId}
-                onChange={(e) => {
-                  setClientId(e.target.value);
-                  setProjectId("");
-                }}
+                {expanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => setOpen(false)}
+                aria-label="Close AI panel"
               >
-                <option value="">No client</option>
-                {clients.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-              <select
-                className="flex-1 rounded-md border bg-background px-2 py-1.5 text-xs text-muted-foreground focus:text-foreground"
-                value={projectId}
-                onChange={(e) => setProjectId(e.target.value)}
-              >
-                <option value="">No project</option>
-                {projectOptions.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
+                <X className="h-4 w-4" />
+              </Button>
             </div>
-          )}
+          </div>
+          <div
+            className="stackivo-ai-resizer"
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Resize AI panel"
+            onPointerDown={(event) => {
+              resizeActiveRef.current = true;
+              resizeStartXRef.current = event.clientX;
+              resizeStartWidthRef.current = panelWidthRef.current;
+              event.preventDefault();
+            }}
+          />
 
-          {/* Messages */}
+          {/* Scrollable messages area */}
           <div
             ref={scrollRef}
-            className="flex-1 overflow-y-auto px-4 py-4 space-y-4"
+            className="scrollbar-modern min-h-0 flex-1 space-y-6 overflow-y-auto bg-muted/15 [background-image:radial-gradient(hsl(var(--border)/0.35)_1px,transparent_1px)] [background-size:18px_18px] px-5 py-5 md:px-6"
           >
-            {messages.map((msg) => (
+            {/* Greeting + quick actions (general mode, no conversation yet) */}
+            {mode === "general" && messages.length <= 1 && (
+              <>
+                <div className="grid gap-4 md:grid-cols-[1.1fr_0.9fr] md:items-center">
+                  <div className="space-y-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-primary/70">
+                      Stackivo AI
+                    </p>
+                    <h2 className="text-2xl font-semibold tracking-tight">What are we doing today?</h2>
+                    <p className="max-w-md text-sm leading-relaxed text-muted-foreground">
+                      Chat freely, pick a workflow, or let AI draft the document or action you need.
+                    </p>
+                  </div>
+                  <div className="flex justify-center md:justify-end">
+                    <div className="relative flex h-28 w-full max-w-[240px] items-center justify-center overflow-hidden rounded-3xl border bg-[linear-gradient(180deg,hsl(var(--primary)/0.08),hsl(var(--background))_75%)]">
+                      <span className="absolute left-10 top-8 h-14 w-14 rounded-full bg-primary/20 blur-sm" />
+                      <span className="absolute left-16 top-5 h-16 w-16 rounded-full bg-primary/15" />
+                      <span className="absolute right-10 top-8 h-14 w-14 rounded-full bg-primary/80 shadow-[0_0_30px_rgba(59,130,246,0.18)]" />
+                      <StackivoMark className="relative h-14 w-14 shadow-lg" />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-2">
+                  {QUICK_ACTIONS.map((action) => (
+                    <button
+                      key={action.mode}
+                      type="button"
+                      onClick={() => selectMode(action.mode)}
+                      className={cn(
+                        "flex min-h-24 items-start gap-3 rounded-2xl border bg-background/95 p-4 text-left transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:bg-primary/5",
+                        mode === action.mode && "border-primary/50 bg-primary/5 ring-1 ring-primary/20",
+                      )}
+                    >
+                      <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                        <action.icon className="h-4 w-4" />
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block text-sm font-medium leading-5">{action.title}</span>
+                        <span className="mt-0.5 block text-xs leading-5 text-muted-foreground">{action.description}</span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {/* Workspace context selectors */}
+            {mode !== "general" && mode !== "support" && (
+              <div className="rounded-xl border bg-background p-3">
+                <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Workspace context
+                </p>
+                <div className="grid gap-2">
+                  <select
+                    value={clientId}
+                    onChange={(event) => {
+                      setClientId(event.target.value);
+                      setProjectId("");
+                    }}
+                    className="h-10 rounded-md border bg-background px-3 text-sm"
+                  >
+                    <option value="">No specific client</option>
+                    {clients.map((client) => (
+                      <option key={client.id} value={client.id}>
+                        {client.name}
+                      </option>
+                    ))}
+                  </select>
+                  {(mode === "invoice" || mode === "contract") && (
+                    <select
+                      value={projectId}
+                      onChange={(event) => setProjectId(event.target.value)}
+                      className="h-10 rounded-md border bg-background px-3 text-sm"
+                    >
+                      <option value="">No specific project</option>
+                      {projectOptions.map((project) => (
+                        <option key={project.id} value={project.id}>
+                          {project.name}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Message bubbles */}
+            {messages.map((message) => (
               <div
-                key={msg.id}
-                className={cn(
-                  "max-w-[92%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed",
-                  msg.role === "user"
-                    ? "ml-auto bg-primary text-primary-foreground"
-                    : "mr-auto bg-muted/60",
-                )}
+                key={message.id}
+                className={cn("flex", message.role === "user" ? "justify-end" : "justify-start")}
               >
-                {msg.content}
+                <div
+                  className={cn(
+                    "max-w-[88%] rounded-2xl border px-4 py-3 text-sm leading-relaxed shadow-sm",
+                    message.role === "user"
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "mr-auto bg-muted/60",
+                  )}
+                >
+                  {message.content}
+                </div>
               </div>
             ))}
 
-            {/* Quick actions (general mode, no messages beyond greeting) */}
-            {mode === "general" && messages.length <= 1 && (
-              <div className="grid grid-cols-2 gap-2">
-                {QUICK_ACTIONS.map((action) => (
-                  <button
-                    key={action.mode}
-                    type="button"
-                    onClick={() => selectMode(action.mode)}
-                    className="group flex flex-col gap-1.5 rounded-xl border bg-muted/30 p-3 text-left transition-colors hover:bg-muted/60"
-                  >
-                    <div className="flex h-6 w-6 items-center justify-center rounded-md bg-primary/10 text-primary">
-                      <action.icon className="h-3.5 w-3.5" />
-                    </div>
-                    <p className="text-xs font-semibold">{action.title}</p>
-                    <p className="text-[11px] leading-snug text-muted-foreground">
-                      {action.description}
-                    </p>
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {/* Multi-step client picker */}
-            {activeStep?.kind === "client" && (
-              <div className="rounded-xl border bg-muted/20 p-3">
-                <p className="mb-2 text-xs font-medium text-muted-foreground">
-                  Choose a client
-                </p>
-                <select
-                  className="w-full rounded-md border bg-background px-2 py-1.5 text-sm"
-                  value={clientId}
-                  onChange={(e) => setClientId(e.target.value)}
-                >
-                  <option value="">No client selected</option>
-                  {clients.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-                {activeStep.optional && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      push({ role: "user", content: "Skip" });
-                      const nextStep = (workflowStep ?? 0) + 1;
-                      if (activeSteps && nextStep < activeSteps.length) {
-                        setWorkflowAnswers((a) => [...a, `${activeStep.question}\nSkip`]);
-                        setWorkflowStep(nextStep);
-                        push({ role: "assistant", content: activeSteps[nextStep].question });
-                      }
-                    }}
-                    className="mt-2 text-xs text-muted-foreground underline-offset-2 hover:underline"
-                  >
-                    Skip
-                  </button>
-                )}
-              </div>
-            )}
-
-            {/* Multi-step project picker */}
-            {activeStep?.kind === "project" && (
-              <div className="rounded-xl border bg-muted/20 p-3">
-                <p className="mb-2 text-xs font-medium text-muted-foreground">
-                  Choose a project
-                </p>
-                <select
-                  className="w-full rounded-md border bg-background px-2 py-1.5 text-sm"
-                  value={projectId}
-                  onChange={(e) => setProjectId(e.target.value)}
-                >
-                  <option value="">No project</option>
-                  {projectOptions.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
-                  ))}
-                </select>
-                <button
-                  type="button"
-                  onClick={() => {
-                    push({ role: "user", content: "Skip" });
-                    const nextStep = (workflowStep ?? 0) + 1;
-                    if (activeSteps && nextStep < activeSteps.length) {
-                      setWorkflowAnswers((a) => [...a, `${activeStep.question}\nSkip`]);
-                      setWorkflowStep(nextStep);
-                      push({ role: "assistant", content: activeSteps[nextStep].question });
-                    }
-                  }}
-                  className="mt-2 text-xs text-muted-foreground underline-offset-2 hover:underline"
-                >
-                  Skip
-                </button>
-              </div>
-            )}
-
-            {/* Choice picker */}
-            {activeStep?.kind === "choice" && activeStep.options && (
-              <div className="flex flex-wrap gap-2">
-                {activeStep.options.map((opt) => (
-                  <button
-                    key={opt}
-                    type="button"
-                    onClick={() => {
-                      setInput(opt);
-                    }}
-                    className="rounded-full border px-3 py-1 text-xs hover:bg-muted"
-                  >
-                    {opt}
-                  </button>
-                ))}
-              </div>
-            )}
-
             {/* Typing indicator */}
             {pending && (
-              <div className="mr-auto flex gap-1 rounded-2xl bg-muted/60 px-3.5 py-2.5">
-                {[0, 1, 2].map((i) => (
-                  <span
-                    key={i}
-                    className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground/60"
-                    style={{ animationDelay: `${i * 0.15}s` }}
-                  />
-                ))}
+              <div className="flex justify-start">
+                <div className="rounded-2xl border bg-background px-4 py-3 shadow-sm">
+                  <span className="flex items-center gap-1">
+                    {[0, 1, 2].map((item) => (
+                      <span
+                        key={item}
+                        className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary/70"
+                        style={{ animationDelay: `${item * 120}ms` }}
+                      />
+                    ))}
+                  </span>
+                </div>
               </div>
             )}
           </div>
 
           {/* Input area */}
-          <div className="border-t p-3">
-            <div className="flex items-end gap-2 rounded-xl border bg-muted/30 px-3 py-2">
+          <div className="sticky bottom-0 border-t bg-background px-4 py-3">
+            <div className="rounded-2xl border bg-background p-3 focus-within:border-primary/60 focus-within:ring-4 focus-within:ring-primary/15">
               <Textarea
                 value={input}
                 data-testid="ai-chat-input"
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
+                onChange={(event) => setInput(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && !event.shiftKey) {
+                    event.preventDefault();
                     handleSubmit();
                   }
                 }}
                 placeholder={
-                  activeStep?.placeholder ??
-                  (mode === "general"
-                    ? "Describe what you want to do…"
-                    : activeStep?.question ?? "Type your answer…")
+                  pendingField?.placeholder ??
+                  pendingField?.question ??
+                  MODE_PLACEHOLDERS[mode] ??
+                  (mode === "general" ? "Describe what you want to do…" : "Type your answer…")
                 }
-                rows={1}
-                className="min-h-0 flex-1 resize-none border-0 bg-transparent p-0 text-sm shadow-none focus-visible:ring-0"
+                rows={3}
+                className="min-h-[72px] resize-none border-0 p-0 text-sm shadow-none focus-visible:ring-0"
               />
-              <button
-                type="button"
-                onClick={handleSubmit}
-                disabled={!input.trim() || pending}
-                className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground disabled:opacity-40"
-                aria-label="Send"
-              >
-                <ArrowUp className="h-3.5 w-3.5" />
-              </button>
+              <div className="mt-3 flex items-center justify-between">
+                <span className="rounded-full border px-3 py-1 text-xs text-muted-foreground">
+                  {mode === "general" ? "Ask" : QUICK_ACTIONS.find((a) => a.mode === mode)?.title ?? "Ask"}
+                </span>
+                <Button
+                  type="button"
+                  size="icon"
+                  className="h-9 w-9 rounded-full"
+                  onClick={handleSubmit}
+                  disabled={pending || !input.trim()}
+                >
+                  <ArrowUp className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
-            <p className="mt-1.5 text-center text-[10px] text-muted-foreground/60">
-              Powered by Qwen · Stackivo AI
-            </p>
           </div>
         </div>
-      )}
+      ), panelSlot ?? document.body) : null}
     </>
   );
-
-  return createPortal(panel, document.body);
 }
