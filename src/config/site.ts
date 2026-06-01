@@ -1,7 +1,7 @@
 export const siteConfig = {
   name: "Stackivo",
   description:
-    "The operating system for modern independent professionals. Clients, invoices, contracts, projects, payments, time, and analytics — unified in one premium workspace with GST-ready billing for India.",
+    "Run your entire business from one workspace. Stackivo unifies clients, projects, tasks, documents, team collaboration, automations, and AI-powered workflows for freelancers, agencies, startups, and growing teams.",
   url: process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
   ogImage: "/og.png",
   links: {

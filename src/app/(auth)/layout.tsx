@@ -1,8 +1,8 @@
 import Link from "next/link";
 import {
   ArrowLeft,
-  Receipt,
-  TrendingUp,
+  Sparkles,
+  Workflow,
   Layers,
   Star,
 } from "lucide-react";
@@ -55,34 +55,33 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
               />
             ))}
             <span className="ml-2.5 text-xs font-medium text-white/50">
-              Loved by independent professionals
+              Trusted by modern teams
             </span>
           </div>
 
           <blockquote className="space-y-5">
             <p className="text-[19px] font-medium leading-[1.5] text-white/90 xl:text-xl xl:leading-relaxed">
-              &ldquo;I went from juggling three tools and a spreadsheet to
-              having everything in one place. Sending invoices actually feels
-              good now.&rdquo;
+              &ldquo;We replaced four tools with Stackivo. Clients, projects,
+              docs, and automations all live together — our team finally
+              works in one place.&rdquo;
             </p>
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary/40 to-indigo-500/40 text-sm font-semibold ring-1 ring-white/15">
-                AM
+                RK
               </div>
               <div>
-                <p className="text-sm font-medium text-white">Aanya Mehta</p>
+                <p className="text-sm font-medium text-white">Riya Kapoor</p>
                 <p className="text-[12px] text-white/40">
-                  Brand designer · Bengaluru
+                  Founder · Northwind Studio
                 </p>
               </div>
             </div>
           </blockquote>
 
-          {/* Value props */}
           <div className="space-y-2.5 pt-1">
-            <ValueProp icon={Receipt} label="Simple invoices or full GST — your call" />
-            <ValueProp icon={Layers} label="Clients, contracts, projects in one workspace" />
-            <ValueProp icon={TrendingUp} label="Pulse analytics: see your business clearly" />
+            <ValueProp icon={Layers} label="Clients, projects, and documents in one place" />
+            <ValueProp icon={Workflow} label="Automations that move work forward" />
+            <ValueProp icon={Sparkles} label="AI workflows grounded in your workspace" />
           </div>
         </div>
 
