@@ -58,16 +58,15 @@ function SectionIntro() {
     <div className="mx-auto flex max-w-3xl flex-col items-start lg:items-center lg:text-center">
       <span className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/60 px-3 py-1 text-[10.5px] font-semibold uppercase tracking-[0.22em] text-muted-foreground backdrop-blur">
         <span className="h-1 w-1 rounded-full bg-primary" />
-        The product
+        Everything you need
       </span>
-      <h2 className="mt-5 text-balance text-[34px] font-semibold leading-[1.02] tracking-[-0.03em] sm:text-[52px] lg:text-[68px]">
-        One workspace.{" "}
-        <span className="font-serif italic text-gradient">Seven disciplines.</span>
+      <h2 className="mt-5 text-balance text-[32px] font-semibold leading-[1.05] tracking-[-0.03em] sm:text-[44px] lg:text-[56px]">
+        One workspace. Seven core capabilities.
       </h2>
-      <p className="mt-6 max-w-2xl text-pretty text-[15.5px] leading-[1.75] text-muted-foreground sm:text-[17px]">
+      <p className="mt-5 max-w-2xl text-pretty text-[15.5px] leading-[1.65] text-muted-foreground sm:text-[17px]">
         Stop stitching together five tools that don&apos;t talk to each other.
-        Stackivo is one connected surface for everything modern teams do —
-        from the first hello to the final invoice.
+        Stackivo is one connected platform for everything your team does — from
+        the first client conversation to the final deliverable.
       </p>
     </div>
   );
