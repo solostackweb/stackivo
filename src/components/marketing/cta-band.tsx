@@ -21,24 +21,21 @@ export function CtaBand({ authState }: { authState: MarketingAuthState }) {
         className="pointer-events-none absolute inset-0 opacity-[0.10] [background-image:linear-gradient(to_right,rgba(255,255,255,0.6)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.6)_1px,transparent_1px)] [background-size:56px_56px] mask-radial-soft"
       />
 
-      <div className="relative mx-auto w-full max-w-[1480px] px-5 py-28 sm:px-8 sm:py-36 lg:px-12 lg:py-44 xl:px-16">
-        <div className="mx-auto flex max-w-4xl flex-col items-center text-center">
+      <div className="relative mx-auto w-full max-w-6xl px-5 py-20 sm:px-8 sm:py-24 lg:py-28">
+        <div className="mx-auto flex max-w-3xl flex-col items-center text-center">
           <span className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/[0.06] px-3 py-1 text-[10.5px] font-semibold uppercase tracking-[0.22em] text-white/70 backdrop-blur">
             <span className="h-1 w-1 rounded-full bg-white" />
-            The last tool you&apos;ll add
+            Get started in minutes
           </span>
 
           <motion.h2
             initial={{ y: 16 }}
             whileInView={{ y: 0 }}
             viewport={{ once: true }}
-            transition={{ duration: 0.8, ease: [0.2, 0.8, 0.2, 1] }}
-            className="mt-7 text-balance text-[44px] font-semibold leading-[1] tracking-[-0.035em] sm:text-[72px] lg:text-[104px]"
+            transition={{ duration: 0.7, ease: [0.2, 0.8, 0.2, 1] }}
+            className="mt-6 text-balance text-[36px] font-semibold leading-[1.05] tracking-[-0.035em] sm:text-[52px] lg:text-[64px]"
           >
-            {authed ? "Welcome back." : "Begin the"}{" "}
-            <span className="font-serif italic text-white/85">
-              {authed ? "Your workspace waits." : "quiet workspace."}
-            </span>
+            {authed ? "Welcome back to your workspace." : "Run your business from one place."}
           </motion.h2>
 
           <p className="mt-7 max-w-xl text-pretty text-[15px] leading-[1.75] text-white/60 sm:text-[17px]">
