@@ -42,8 +42,8 @@ export function PainSection() {
       </div>
 
       <motion.div
-        initial={{ opacity: 0, y: 24 }}
-        whileInView={{ opacity: 1, y: 0 }}
+        initial={{ y: 24 }}
+        whileInView={{ y: 0 }}
         viewport={{ once: true, margin: "-80px" }}
         transition={{ duration: 0.7, ease: [0.2, 0.8, 0.2, 1] }}
         className="relative mt-16 grid grid-cols-1 overflow-hidden rounded-3xl border border-border/70 bg-card/80 shadow-soft-lg md:grid-cols-2"
