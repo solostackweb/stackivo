@@ -42,7 +42,7 @@ export function HeroSection({ authState }: { authState: MarketingAuthState }) {
         </div>
 
         {/* Asymmetric grid */}
-        <div className="grid items-end gap-y-14 lg:grid-cols-12 lg:gap-x-10">
+        <div className="grid items-center gap-y-14 lg:grid-cols-12 lg:gap-x-10">
           {/* Headline */}
           <div className="lg:col-span-7">
             <h1 className="text-balance text-[40px] font-semibold leading-[1.02] tracking-[-0.035em] sm:text-[60px] lg:text-[84px] xl:text-[100px]">
