@@ -24,11 +24,11 @@ export function FeaturesSection() {
     <section id="features" className="relative isolate overflow-hidden border-b bg-background">
       <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[520px] bg-gradient-to-b from-primary/[0.06] via-transparent to-transparent" />
 
-      <div className="mx-auto w-full max-w-[1480px] px-5 py-24 sm:px-8 sm:py-28 lg:px-12 lg:py-36 xl:px-16">
+      <div className="mx-auto w-full max-w-6xl px-5 py-20 sm:px-8 sm:py-24 lg:py-28">
         <SectionIntro />
 
         {/* Bento grid */}
-        <div className="mt-20 grid grid-cols-1 gap-4 sm:grid-cols-6 sm:gap-5 lg:grid-cols-12">
+        <div className="mt-14 grid grid-cols-1 gap-4 sm:grid-cols-6 sm:gap-5 lg:grid-cols-12">
           <Tile className="sm:col-span-3 lg:col-span-5" tag="01 · Clients" title="Every client, one source of truth." body="Contacts, history, files, threads. Context that travels with the work.">
             <ClientsVisual />
           </Tile>
