@@ -1,125 +1,202 @@
+"use client";
+
 import Link from "next/link";
-import { ArrowRight, Sparkles, ShieldCheck, Zap } from "lucide-react";
+import { motion } from "framer-motion";
+import { ArrowUpRight, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DashboardMockup } from "./dashboard-mockup";
 import type { MarketingAuthState } from "@/features/marketing/types";
 
 /**
- * Hero — Stackivo positioning as the unified workspace for running an
- * entire business. Linear / Attio / Stripe tier composition.
+ * Editorial hero — magazine-grade composition. Asymmetric two-column grid
+ * with serif-display breakthrough word, rotating verb ticker, animated
+ * orb mesh, dotted grid, and a logo marquee underneath. The mockup is
+ * tilted in 3D for product immediacy.
  */
-export function HeroSection({
-  authState,
-}: {
-  authState: MarketingAuthState;
-}) {
+
+const ROTATING_NOUNS = ["business.", "agency.", "studio.", "team.", "practice."];
+
+export function HeroSection({ authState }: { authState: MarketingAuthState }) {
   return (
     <section className="relative isolate overflow-hidden border-b bg-background">
-      <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 hidden overflow-hidden sm:block">
-        <div className="absolute -left-[10%] -top-[18%] h-[60%] w-[60%] rounded-full bg-gradient-to-br from-indigo-600/[0.18] via-violet-500/[0.10] to-transparent blur-3xl" />
-        <div className="absolute right-[-12%] top-[-6%] h-[55%] w-[55%] rounded-full bg-gradient-to-bl from-violet-600/[0.14] via-fuchsia-500/[0.06] to-transparent blur-3xl" />
-        <div className="absolute bottom-[-22%] left-[24%] h-[45%] w-[45%] rounded-full bg-gradient-to-t from-indigo-500/[0.09] to-transparent blur-3xl" />
+      {/* Animated mesh orbs */}
+      <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
+        <div className="absolute -left-[10%] -top-[20%] h-[55vw] w-[55vw] rounded-full bg-[radial-gradient(circle_at_center,hsl(243_75%_55%/0.22),transparent_60%)] blur-3xl animate-floaty" />
+        <div className="absolute -right-[8%] top-[10%] h-[42vw] w-[42vw] rounded-full bg-[radial-gradient(circle_at_center,hsl(280_70%_60%/0.18),transparent_60%)] blur-3xl animate-floaty [animation-delay:-4s]" />
+        <div className="absolute bottom-[-25%] left-[30%] h-[40vw] w-[40vw] rounded-full bg-[radial-gradient(circle_at_center,hsl(262_83%_64%/0.14),transparent_60%)] blur-3xl animate-floaty [animation-delay:-8s]" />
       </div>
 
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 -z-10 hidden sm:block opacity-[0.22] [background-image:radial-gradient(hsl(var(--primary)/0.55)_1px,transparent_1px)] [background-size:32px_32px] [mask-image:radial-gradient(ellipse_75%_60%_at_55%_28%,#000,transparent_85%)]"
-      />
+      {/* Editorial dotted grid + noise */}
+      <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 bg-editorial-dots opacity-50 mask-radial-soft" />
+      <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 bg-noise opacity-[0.035]" />
 
-      <div className="relative mx-auto w-full max-w-[1500px] px-5 pb-20 pt-16 sm:px-8 sm:pb-24 sm:pt-20 lg:px-10 lg:pb-28 lg:pt-24 xl:px-14 2xl:px-20">
-        <div className="grid items-center gap-12 lg:grid-cols-[0.95fr_1.05fr] lg:gap-14 xl:gap-20">
-          <div className="max-w-xl text-left">
-            <span className="inline-flex items-center gap-2 rounded-full border border-primary/25 bg-gradient-to-r from-primary/8 to-violet-500/6 px-4 py-1.5 text-xs font-semibold text-primary shadow-sm shadow-primary/10 backdrop-blur-sm">
-              <span className="relative flex h-2 w-2" aria-hidden>
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-50" />
-                <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
-              </span>
-              The workspace for modern teams
+      <div className="relative mx-auto w-full max-w-[1480px] px-5 pb-16 pt-14 sm:px-8 sm:pb-24 sm:pt-20 lg:px-12 lg:pb-32 lg:pt-28 xl:px-16">
+        {/* Eyebrow row — top meta */}
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+          className="mb-10 flex items-center justify-between text-[11px] font-medium uppercase tracking-[0.22em] text-muted-foreground/80 sm:mb-14"
+        >
+          <span className="hidden sm:inline">Vol. 01 · The Workspace Issue</span>
+          <span className="inline-flex items-center gap-2">
+            <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500">
+              <span className="absolute inset-0 animate-ping rounded-full bg-emerald-500/60" />
             </span>
+            Now in private beta · MMXXVI
+          </span>
+          <span className="hidden sm:inline">Made for teams 1–500</span>
+        </motion.div>
 
-            <h1 className="mt-6 text-balance text-[40px] font-bold leading-[1.04] tracking-tight sm:text-[54px] lg:text-[62px] xl:text-[72px]">
-              Run your entire business{" "}
-              <span className="text-gradient">from one workspace.</span>
-            </h1>
+        {/* Asymmetric grid */}
+        <div className="grid items-end gap-y-14 lg:grid-cols-12 lg:gap-x-10">
+          {/* Headline — left, takes 7 cols */}
+          <div className="lg:col-span-7">
+            <motion.h1
+              initial={{ opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.75, ease: [0.2, 0.8, 0.2, 1] }}
+              className="text-balance text-[44px] font-semibold leading-[0.98] tracking-[-0.035em] sm:text-[64px] lg:text-[88px] xl:text-[104px]"
+            >
+              Run your entire{" "}
+              <span className="relative inline-block align-bottom">
+                <span className="inline-flex h-[1em] w-[5.3ch] overflow-hidden align-bottom sm:w-[5.5ch]">
+                  <span className="flex flex-col animate-ticker-y font-serif italic text-gradient">
+                    {[...ROTATING_NOUNS, ROTATING_NOUNS[0]].map((w, i) => (
+                      <span key={i} className="h-[1em] leading-[0.98]">{w}</span>
+                    ))}
+                  </span>
+                </span>
+              </span>
+              <br />
+              From one quiet, <span className="font-serif italic text-foreground/85">unhurried</span> workspace.
+            </motion.h1>
 
-            <p className="mt-6 max-w-[40rem] text-pretty text-base leading-[1.75] text-muted-foreground sm:text-[17px]">
-              Stackivo brings clients, projects, tasks, documents, team
-              collaboration, automations and AI-powered workflows into one
-              unified platform — built for freelancers, agencies, startups,
-              and growing businesses.
-            </p>
+            <motion.p
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.7, delay: 0.15 }}
+              className="mt-8 max-w-[34rem] text-pretty text-[15.5px] leading-[1.75] text-muted-foreground sm:text-[17px]"
+            >
+              Stackivo is the operating layer for modern teams — clients,
+              projects, tasks, documents, collaboration, automations, and
+              AI workflows in one connected surface. Not another tool.
+              <span className="text-foreground/80"> The last one you&apos;ll add.</span>
+            </motion.p>
 
             <HeroCtas authState={authState} />
-
-            <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-2.5 text-sm font-medium text-muted-foreground">
-              <span className="inline-flex items-center gap-1.5">
-                <ShieldCheck className="h-3.5 w-3.5 text-primary/70" />
-                SOC-grade security
-              </span>
-              <span className="inline-flex items-center gap-1.5">
-                <Zap className="h-3.5 w-3.5 text-primary/70" />
-                Set up in under 2 minutes
-              </span>
-              <span className="inline-flex items-center gap-1.5">
-                <Sparkles className="h-3.5 w-3.5 text-primary/70" />
-                AI workflows included
-              </span>
-            </div>
           </div>
 
-          <div className="relative mx-auto w-full max-w-[940px] overflow-hidden px-2 pb-6 pt-2 lg:max-w-none xl:overflow-visible xl:px-0 xl:pb-0 xl:pt-0">
+          {/* Mockup — right, takes 5 cols, tilted */}
+          <motion.div
+            initial={{ opacity: 0, y: 30, rotateX: 8 }}
+            animate={{ opacity: 1, y: 0, rotateX: 0 }}
+            transition={{ duration: 1, ease: [0.2, 0.8, 0.2, 1], delay: 0.2 }}
+            className="relative lg:col-span-5"
+            style={{ perspective: "1800px" }}
+          >
             <div
-              aria-hidden
-              className="pointer-events-none absolute -inset-x-10 -top-14 -z-10 hidden h-[130%] rounded-[3rem] bg-gradient-to-b from-indigo-600/[0.16] via-violet-500/[0.07] to-transparent blur-3xl sm:block"
-            />
-            <DashboardMockup />
-          </div>
+              className="relative origin-bottom-right transition-transform duration-700 ease-out hover:rotate-0 hover:scale-[1.02] lg:rotate-[-1.5deg]"
+              style={{ transformStyle: "preserve-3d" }}
+            >
+              {/* Glow halo behind mockup */}
+              <div
+                aria-hidden
+                className="pointer-events-none absolute -inset-8 -z-10 rounded-[3rem] bg-gradient-to-br from-primary/25 via-violet-500/15 to-fuchsia-500/10 blur-3xl"
+              />
+              {/* Frame */}
+              <div className="overflow-hidden rounded-[1.6rem] border border-border/70 bg-card/95 shadow-editorial ring-1 ring-foreground/[0.03] backdrop-blur-sm">
+                <DashboardMockup />
+              </div>
+
+              {/* Floating chip — top */}
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.9, duration: 0.5 }}
+                className="absolute -top-5 left-6 hidden items-center gap-2 rounded-full border border-border/80 bg-background/95 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-foreground/80 shadow-soft-lg backdrop-blur lg:flex"
+              >
+                <Sparkles className="h-3 w-3 text-primary" />
+                Live workspace
+              </motion.div>
+
+              {/* Floating chip — bottom */}
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 1.1, duration: 0.5 }}
+                className="absolute -bottom-4 -left-4 hidden flex-col rounded-2xl border border-border/80 bg-background/95 p-3 shadow-soft-lg backdrop-blur lg:flex"
+              >
+                <span className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground">Active today</span>
+                <span className="text-xl font-semibold tabular-nums">2,418</span>
+              </motion.div>
+            </div>
+          </motion.div>
         </div>
       </div>
 
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-background to-transparent" />
+      {/* Trusted-by marquee — full bleed */}
+      <div className="relative border-t border-border/60 bg-background/60 py-7 sm:py-9">
+        <div className="mb-3 text-center text-[10.5px] font-semibold uppercase tracking-[0.28em] text-muted-foreground/70">
+          The operating layer for modern teams worldwide
+        </div>
+        <div className="mask-fade-r relative overflow-hidden">
+          <div className="flex w-max animate-marquee items-center gap-14 whitespace-nowrap pl-14 text-[22px] font-serif italic text-muted-foreground/55 sm:gap-20 sm:text-[26px]">
+            {[...LOGOS, ...LOGOS].map((name, i) => (
+              <span key={i} className="inline-flex items-center gap-3">
+                <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40" />
+                {name}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
     </section>
   );
 }
 
+const LOGOS = [
+  "Northwind Studio",
+  "Atlas Collective",
+  "Mercer & Bell",
+  "Field Notes Co.",
+  "Praxis Labs",
+  "Holloway",
+  "Sundial",
+  "Cobalt Type",
+  "Ferment Studio",
+  "Loomwright",
+];
+
 function HeroCtas({ authState }: { authState: MarketingAuthState }) {
-  if (authState.isAuthenticated) {
-    return (
-      <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-        <Button
-          asChild
-          size="lg"
-          className="btn-gradient h-12 min-w-[200px] rounded-full border-0 text-base"
-        >
+  const authed = authState.isAuthenticated;
+  return (
+    <div className="mt-10 flex flex-col gap-4 sm:flex-row sm:items-center">
+      {authed ? (
+        <Button asChild size="lg" className="btn-gradient h-12 min-w-[210px] rounded-full border-0 text-[15px] font-semibold">
           <Link href="/dashboard" data-cta="hero_dashboard">
-            Open workspace <ArrowRight className="ml-1.5 h-4 w-4" />
+            Open workspace <ArrowUpRight className="ml-1.5 h-4 w-4" />
           </Link>
         </Button>
-      </div>
-    );
-  }
-
-  return (
-    <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
-      <Button
-        asChild
-        size="lg"
-        className="btn-gradient h-12 min-w-[190px] rounded-full border-0 text-base"
-      >
-        <Link href="/signup" data-cta="hero_primary">
-          Create workspace <ArrowRight className="ml-1.5 h-4 w-4" />
-        </Link>
-      </Button>
-      <Button
-        asChild
-        variant="outline"
-        size="lg"
-        className="h-12 min-w-[150px] rounded-full border-primary/25 text-base hover:border-primary/50 hover:bg-primary/5"
-      >
-        <Link href="/demo" data-cta="hero_demo">Book a demo</Link>
-      </Button>
-      <p className="text-xs font-medium text-muted-foreground sm:ml-2">
-        Free to start · No credit card
+      ) : (
+        <>
+          <Button asChild size="lg" className="btn-gradient h-12 min-w-[210px] rounded-full border-0 text-[15px] font-semibold">
+            <Link href="/signup" data-cta="hero_primary">
+              Create your workspace <ArrowUpRight className="ml-1.5 h-4 w-4" />
+            </Link>
+          </Button>
+          <Button asChild variant="ghost" size="lg" className="group h-12 min-w-[150px] rounded-full text-[15px] font-medium hover:bg-foreground/5">
+            <Link href="/demo" data-cta="hero_demo">
+              Watch the 90s tour{" "}
+              <span className="ml-2 inline-flex h-6 w-6 items-center justify-center rounded-full border border-border bg-background transition-transform group-hover:translate-x-0.5">
+                <ArrowUpRight className="h-3 w-3" />
+              </span>
+            </Link>
+          </Button>
+        </>
+      )}
+      <p className="mt-1 text-[12.5px] font-medium text-muted-foreground sm:ml-3 sm:mt-0">
+        Free for 5 seats · No credit card · 2-minute setup
       </p>
     </div>
   );
