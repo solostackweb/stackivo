@@ -29,8 +29,8 @@ export function CtaBand({ authState }: { authState: MarketingAuthState }) {
           </span>
 
           <motion.h2
-            initial={{ opacity: 0, y: 16 }}
-            whileInView={{ opacity: 1, y: 0 }}
+            initial={{ y: 16 }}
+            whileInView={{ y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.8, ease: [0.2, 0.8, 0.2, 1] }}
             className="mt-7 text-balance text-[44px] font-semibold leading-[1] tracking-[-0.035em] sm:text-[72px] lg:text-[104px]"

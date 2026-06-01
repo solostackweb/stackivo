@@ -69,8 +69,8 @@ export function WorkflowSection() {
             {STEPS.map((s, i) => (
               <motion.li
                 key={s.title}
-                initial={{ opacity: 0, x: 16 }}
-                whileInView={{ opacity: 1, x: 0 }}
+                initial={{ x: 16 }}
+                whileInView={{ x: 0 }}
                 viewport={{ once: true, margin: "-60px" }}
                 transition={{ duration: 0.6, delay: i * 0.08, ease: [0.2, 0.8, 0.2, 1] }}
                 className="group relative flex gap-6 pb-12 last:pb-0"

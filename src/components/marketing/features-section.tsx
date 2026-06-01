@@ -85,8 +85,8 @@ interface TileProps {
 function Tile({ className, tag, title, body, big, children }: TileProps) {
   return (
     <motion.article
-      initial={{ opacity: 0, y: 24 }}
-      whileInView={{ opacity: 1, y: 0 }}
+      initial={{ y: 24 }}
+      whileInView={{ y: 0 }}
       viewport={{ once: true, margin: "-80px" }}
       transition={{ duration: 0.6, ease: [0.2, 0.8, 0.2, 1] }}
       className={`group relative isolate flex flex-col overflow-hidden rounded-3xl border border-border/70 bg-card/80 p-7 backdrop-blur transition-all duration-500 hover:-translate-y-1 hover:border-foreground/15 hover:shadow-soft-lg sm:p-8 ${big ? "lg:p-12" : ""} ${className ?? ""}`}
