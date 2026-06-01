@@ -115,7 +115,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${fontSans.variable} ${fontMono.variable}`}
+      className={`${fontSans.variable} ${fontSerif.variable} ${fontMono.variable}`}
     >
       <body className="font-sans antialiased">
         {/*
