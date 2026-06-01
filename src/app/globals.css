@@ -190,6 +190,34 @@
   }
 }
 
+/* Mobile / PWA: the rail is hidden below md, so render the panel as a
+   full-screen overlay that slides in from the right. */
+@media (max-width: 767px) {
+  .stackivo-ai-panel {
+    position: fixed;
+    inset: 0;
+    z-index: 70;
+    height: 100dvh;
+    width: 100vw;
+    transform: translateX(100%);
+    opacity: 0;
+    transition: transform 220ms ease-out, opacity 220ms ease-out;
+    /* Respect the device notch / status bar in standalone PWA mode. */
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .stackivo-ai-panel[data-open="true"] {
+    transform: translateX(0);
+    opacity: 1;
+  }
+
+  /* The desktop drag-to-resize handle has no place on touch screens. */
+  .stackivo-ai-panel .stackivo-ai-resizer {
+    display: none;
+  }
+}
+
 @layer base {
   * {
     @apply border-border;

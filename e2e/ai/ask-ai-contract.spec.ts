@@ -29,7 +29,7 @@ async function draftContract(page: Page, prompt: string): Promise<void> {
   await input.press("Enter");
 
   // A missing client surfaces the explicit picker — resolve it if shown.
-  const clientPickerTitle = page.getByText("Which client is this invoice for?");
+  const clientPickerTitle = page.getByText("Which client is this contract for?");
   const ready = page.getByText(/Contract ready|Proposal ready/i);
   await Promise.race([
     ready.waitFor({ state: "visible", timeout: 90_000 }),
@@ -91,5 +91,38 @@ test.describe("Ask AI contract flow", () => {
       page.getByRole("button", { name: /WhatsApp/i }).click(),
     ]);
     expect(newPage.url()).toMatch(/whatsapp\.com|wa\.me/);
+  });
+
+  test("refines an existing contract draft from a follow-up instruction", async ({ page }) => {
+    test.setTimeout(150_000);
+
+    await loginUser(page, USER_EMAIL!, USER_PASSWORD!);
+    await openAiPanel(page);
+
+    await draftContract(
+      page,
+      "Service agreement for a marketing website build, 4-week timeline. INR 70000 total, 50% upfront.",
+    );
+
+    await expect(page.getByText(/Contract ready|Proposal ready/i)).toBeVisible({ timeout: 90_000 });
+    // The preview should invite in-panel edits.
+    await expect(page.getByText(/Want changes\?/i)).toBeVisible();
+
+    // A follow-up instruction must revise the SAME draft, not start a new one.
+    const input = aiInput(page);
+    await input.fill("Add a confidentiality clause and change the fee to 90000");
+    await input.press("Enter");
+
+    const result = await raceVisible(
+      page,
+      ["Contract ready", "Proposal ready", "Could not", "not found"],
+      90_000,
+    );
+    if (result.includes("Could not") || result.includes("not found")) {
+      throw new Error(`Contract refinement failed: "${result}"`);
+    }
+    // Still a single live draft preview after the revision.
+    await expect(page.getByText(/Contract ready|Proposal ready/i).last()).toBeVisible();
+    await expect(page.getByRole("button", { name: /Approve.*Email/i }).last()).toBeVisible();
   });
 });

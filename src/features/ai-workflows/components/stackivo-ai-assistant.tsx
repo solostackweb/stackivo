@@ -41,10 +41,12 @@ import {
   emailInvoiceFromAiAction,
   interpretAiMessageAction,
   invoiceWhatsappFromAiAction,
+  refineContractFromAiAction,
   sendContractFromAiAction,
   sendWelcomeDocFromAiAction,
   welcomeDocWhatsappFromAiAction,
   answerFromDocsAction,
+  NO_CLIENT_SENTINEL,
 } from "@/features/ai-workflows/global-actions";
 import { submitBugReportAction } from "@/features/support/actions";
 import type {
@@ -237,6 +239,29 @@ function modeIntro(mode: AiMode): string {
     default:
       return "What would you like to do?";
   }
+}
+
+/**
+ * Quick conversational replies for greetings and meta questions ("hi",
+ * "can I ask you a question", "what can you do") so the assistant answers
+ * naturally instead of running a docs lookup that finds nothing.
+ * Returns null for substantive questions, which fall through to the docs flow.
+ */
+function conversationalReply(text: string): string | null {
+  const t = text.trim().toLowerCase().replace(/[!.?,]+$/g, "");
+  if (/^(hi+|hey+|hello+|yo|hiya|namaste|good (morning|afternoon|evening))\b/.test(t)) {
+    return "Hey! I can create invoices, contracts, and welcome docs, add clients and projects, log time, or answer questions about Stackivo. What would you like to do?";
+  }
+  if (/^(thanks|thank you|thx|ty|great|perfect|awesome|cool|nice|ok|okay|got it)\b/.test(t)) {
+    return "Anytime! Tell me the next thing you'd like to do.";
+  }
+  if (/\b(can|could|may) i ask( you)?( a| you a)? ?(question|something|doubt)?\b|^ask you|are you (there|online|here)|you there/.test(t)) {
+    return "Of course — go ahead and ask. I can help with invoices, contracts, welcome docs, clients, projects, time logs, or how Stackivo works.";
+  }
+  if (/what can you do|who are you|what are you|how can you help|what do you do|how do you work/.test(t)) {
+    return "I'm your Stackivo workflow assistant. I can draft and send invoices & contracts, prepare welcome documents, add clients and projects, log billable time, and answer questions about how Stackivo works. Just describe what you need — for example, “Invoice Acme 50000 for a landing page.”";
+  }
+  return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -436,17 +461,23 @@ function InvoiceDeliveryActions({
   );
 }
 
-function InvoiceClientPicker({
+function ClientPicker({
   clients,
+  label,
+  allowSkip = false,
   onSelect,
+  onSkip,
 }: {
   clients: AiEntityOption[];
+  label: string;
+  allowSkip?: boolean;
   onSelect: (clientId: string) => void;
+  onSkip?: () => void;
 }) {
   const [selected, setSelected] = React.useState("");
   return (
     <div className="space-y-3">
-      <p className="text-sm">Which client is this invoice for?</p>
+      <p className="text-sm">{label}</p>
       <select
         className="w-full rounded-md border bg-background px-3 py-2 text-sm"
         value={selected}
@@ -459,14 +490,21 @@ function InvoiceClientPicker({
           </option>
         ))}
       </select>
-      <Button
-        type="button"
-        size="sm"
-        disabled={!selected}
-        onClick={() => selected && onSelect(selected)}
-      >
-        Use selected client
-      </Button>
+      <div className="flex flex-wrap gap-2">
+        <Button
+          type="button"
+          size="sm"
+          disabled={!selected}
+          onClick={() => selected && onSelect(selected)}
+        >
+          Use selected client
+        </Button>
+        {allowSkip && onSkip && (
+          <Button type="button" size="sm" variant="ghost" onClick={onSkip}>
+            No client (internal)
+          </Button>
+        )}
+      </div>
     </div>
   );
 }
@@ -500,6 +538,10 @@ function ContractDraftPreview({
         )}
       </div>
       <SectionList sections={preview.sections} limit={4} />
+      <p className="rounded-lg border border-dashed bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+        Want changes? Just tell me what to adjust — e.g. “change the fee to 90000”
+        or “add a confidentiality clause” — and I’ll revise this draft.
+      </p>
       <div className="flex flex-wrap gap-2">
         <Button
           type="button"
@@ -640,6 +682,13 @@ export function StackivoAiAssistant({ clients, projects }: StackivoAiAssistantPr
   const [projectId, setProjectId] = React.useState("");
   const [lastInvoicePreview, setLastInvoicePreview] =
     React.useState<AiInvoicePreview | null>(null);
+  // A contract draft that is open for in-panel refinement (follow-up messages
+  // revise it instead of starting a new workflow).
+  const [activeContract, setActiveContract] =
+    React.useState<AiContractPreview | null>(null);
+  // Mobile/PWA: the desktop panel lives in a hidden md-only rail, so on small
+  // screens we portal the panel to document.body and render it full-screen.
+  const [isMobile, setIsMobile] = React.useState(false);
   const [pending, startTransition] = React.useTransition();
   const [messages, setMessages] = React.useState<Message[]>(() => [
     {
@@ -680,6 +729,7 @@ export function StackivoAiAssistant({ clients, projects }: StackivoAiAssistantPr
     setClientId("");
     setProjectId("");
     setLastInvoicePreview(null);
+    setActiveContract(null);
     setMessages((prev) => prev.slice(0, 1));
   }, []);
 
@@ -688,6 +738,16 @@ export function StackivoAiAssistant({ clients, projects }: StackivoAiAssistantPr
   React.useEffect(() => {
     if (!mounted) return;
     setPanelSlot(document.getElementById("stackivo-ai-panel-slot"));
+  }, [mounted]);
+
+  // Track the mobile breakpoint so we can portal + style the panel full-screen.
+  React.useEffect(() => {
+    if (!mounted) return;
+    const mq = window.matchMedia("(max-width: 767px)");
+    const update = () => setIsMobile(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
   }, [mounted]);
 
   React.useEffect(() => {
@@ -872,6 +932,7 @@ export function StackivoAiAssistant({ clients, projects }: StackivoAiAssistantPr
       startTransition(async () => {
         const res = await sendContractFromAiAction({ contractId: preview.id });
         if (!res.ok) { push({ role: "assistant", content: res.error }); return; }
+        setActiveContract(null);
         push({
           role: "assistant",
           content: `${preview.kind === "proposal" ? "Proposal" : "Contract"} sent to ${preview.clientEmail ?? "the selected client"}.`,
@@ -888,6 +949,7 @@ export function StackivoAiAssistant({ clients, projects }: StackivoAiAssistantPr
       startTransition(async () => {
         const res = await contractWhatsappFromAiAction({ contractId: preview.id });
         if (!res.ok) { push({ role: "assistant", content: res.error }); return; }
+        setActiveContract(null);
         window.open(res.data.url, "_blank", "noopener,noreferrer");
         push({ role: "assistant", content: `WhatsApp is open with the ${preview.kind === "proposal" ? "proposal" : "contract"} link ready to send.` });
         router.refresh();
@@ -900,6 +962,13 @@ export function StackivoAiAssistant({ clients, projects }: StackivoAiAssistantPr
 
   const runSupport = React.useCallback(
     async (text: string, fileTicket: boolean) => {
+      // Greetings and meta questions ("hi", "can I ask you a question") get a
+      // natural reply instead of an empty docs lookup.
+      const chat = conversationalReply(text);
+      if (chat) {
+        push({ role: "assistant", content: chat });
+        return;
+      }
       if (text.trim().length < 4) {
         push({ role: "assistant", content: "Tell me a little more about what you need." });
         return;
@@ -907,7 +976,7 @@ export function StackivoAiAssistant({ clients, projects }: StackivoAiAssistantPr
       const docs = await answerFromDocsAction({ question: text });
       const answer = docs.ok
         ? docs.data.answer
-        : "I could not read a precise answer from the docs.";
+        : "I'm not sure from the docs — could you rephrase, or tell me what you're trying to do? I can help with invoices, contracts, welcome docs, clients, projects, and time logs.";
       const usedDocs = docs.ok && docs.data.usedDocs;
 
       if (fileTicket && !usedDocs) {
@@ -944,20 +1013,37 @@ export function StackivoAiAssistant({ clients, projects }: StackivoAiAssistantPr
       const askMissing = (missing: AiMissingField) => {
         setPendingField(missing);
         if (missing.field === "clientId") {
+          const subject =
+            workflow === "invoice"
+              ? "invoice"
+              : workflow === "contract"
+                ? "contract"
+                : workflow === "project"
+                  ? "project"
+                  : workflow === "welcome_document"
+                    ? "welcome document"
+                    : "";
+          const label = subject ? `Which client is this ${subject} for?` : "Which client is this for?";
+          const allowSkip = workflow === "project";
+          const proceed = (id: string, display: string) => {
+            if (id !== NO_CLIENT_SENTINEL) setClientId(id);
+            setPendingField(null);
+            push({ role: "user", content: display });
+            startTransition(async () => {
+              await runWorkflowRef.current(workflow, fields, id, pId, "");
+            });
+          };
           push({
             role: "assistant",
             content: (
-              <InvoiceClientPicker
+              <ClientPicker
                 clients={clients}
-                onSelect={(id) => {
-                  const name = clients.find((c) => c.id === id)?.name ?? "Selected client";
-                  setClientId(id);
-                  setPendingField(null);
-                  push({ role: "user", content: name });
-                  startTransition(async () => {
-                    await runWorkflowRef.current(workflow, fields, id, pId, "");
-                  });
-                }}
+                label={label}
+                allowSkip={allowSkip}
+                onSelect={(id) =>
+                  proceed(id, clients.find((c) => c.id === id)?.name ?? "Selected client")
+                }
+                onSkip={() => proceed(NO_CLIENT_SENTINEL, "No client (internal)")}
               />
             ),
           });
@@ -982,6 +1068,11 @@ export function StackivoAiAssistant({ clients, projects }: StackivoAiAssistantPr
         setMode("general");
         setCollected({});
         setPendingField(null);
+        // Clear workspace context so the next workflow never inherits a stale
+        // client/project (e.g. a project silently reusing the invoice's client).
+        setClientId("");
+        setProjectId("");
+        setActiveContract(null);
       };
 
       switch (workflow) {
@@ -1063,6 +1154,9 @@ export function StackivoAiAssistant({ clients, projects }: StackivoAiAssistantPr
             return;
           }
           finish();
+          // Keep the draft open for in-panel refinement: follow-up messages
+          // revise this contract instead of starting a new workflow.
+          setActiveContract(res.data);
           push({
             role: "assistant",
             content: (
@@ -1161,6 +1255,9 @@ export function StackivoAiAssistant({ clients, projects }: StackivoAiAssistantPr
       setInput("");
       setCollected({});
       setPendingField(null);
+      setClientId("");
+      setProjectId("");
+      setActiveContract(null);
       push({ role: "assistant", content: <span className="block">{modeIntro(nextMode)}</span> });
     },
     [push],
@@ -1199,6 +1296,49 @@ export function StackivoAiAssistant({ clients, projects }: StackivoAiAssistantPr
       });
       const nlu: AiInterpretation | null = interpreted.ok ? interpreted.data : null;
 
+      // 1b. If a contract draft is open, revise it in place — unless the user
+      // is starting a brand-new document or confidently switching workflow.
+      if (activeContract) {
+        const chat = conversationalReply(text);
+        if (chat) {
+          push({ role: "assistant", content: chat });
+          return;
+        }
+        const switchingAway =
+          !!nlu?.confident && nlu.intent !== "general" && nlu.intent !== "contract";
+        const startsNewContract =
+          /\b(create|draft|start|generate|prepare|make)\s+(a\s+|an\s+|another\s+|new\s+)?(new\s+)?(contract|proposal|agreement)\b/i.test(
+            text,
+          ) ||
+          /\b(new|another|second|separate|different)\s+(contract|proposal|agreement)\b/i.test(text);
+        if (!switchingAway && !startsNewContract) {
+          const res = await refineContractFromAiAction({
+            contractId: activeContract.id,
+            instruction: text,
+          });
+          if (!res.ok) {
+            push({ role: "assistant", content: res.error });
+            return;
+          }
+          setActiveContract(res.data);
+          push({
+            role: "assistant",
+            content: (
+              <ContractDraftPreview
+                preview={res.data}
+                onApproveAndSend={handleContractApproveAndSend}
+                onWhatsApp={handleContractWhatsApp}
+                onOpen={() => router.push(`/dashboard/contracts/${res.data.id}`)}
+              />
+            ),
+          });
+          router.refresh();
+          return;
+        }
+        // Starting fresh / switching: drop the refinement context and continue.
+        setActiveContract(null);
+      }
+
       // 2. Decide the target workflow, honouring confident context switches.
       let targetMode: AiMode = mode;
       if (nlu) {
@@ -1232,17 +1372,23 @@ export function StackivoAiAssistant({ clients, projects }: StackivoAiAssistantPr
       setCollected(merged);
       setPendingField(null);
 
-      // 4. Resolve client/project — prefer the NLU match, else the dropdown.
-      const cId = nlu?.clientId || clientId;
-      const pId = nlu?.projectId || projectId;
-      if (nlu?.clientId && nlu.clientId !== clientId) setClientId(nlu.clientId);
-      if (nlu?.projectId && nlu.projectId !== projectId) setProjectId(nlu.projectId);
+      // 4. Resolve client/project — prefer the NLU match. When switching
+      // workflows, never inherit the previous one's client/project; only a
+      // client/project named in this very message carries over.
+      const cId = nlu?.clientId || (switching ? "" : clientId);
+      const pId = nlu?.projectId || (switching ? "" : projectId);
+      if (cId !== clientId) setClientId(cId);
+      if (pId !== projectId) setProjectId(pId);
 
       await runWorkflow(targetMode, merged, cId, pId, text);
     });
   }, [
     input,
     pending,
+    activeContract,
+    handleContractApproveAndSend,
+    handleContractWhatsApp,
+    router,
     mode,
     collected,
     pendingField,
@@ -1290,8 +1436,10 @@ export function StackivoAiAssistant({ clients, projects }: StackivoAiAssistantPr
         </div>
       )}
 
-      {/* Full-height right-side panel */}
-      {mounted ? createPortal((
+      {/* Full-height right-side panel (desktop: docked rail; mobile/PWA:
+          full-screen overlay portaled to the body so it isn't trapped inside
+          the hidden md-only rail). */}
+      {mounted && (isMobile || panelSlot) ? createPortal((
         <div
           data-open={open ? "true" : "false"}
           className={cn(
@@ -1529,7 +1677,7 @@ export function StackivoAiAssistant({ clients, projects }: StackivoAiAssistantPr
             </div>
           </div>
         </div>
-      ), panelSlot ?? document.body) : null}
+      ), isMobile ? document.body : (panelSlot ?? document.body)) : null}
     </>
   );
 }

@@ -13,7 +13,7 @@ import { getProfile } from "@/features/profile/server";
 import { nextInvoiceNumber } from "@/features/invoices/server";
 import { createInvoiceAction, setInvoiceStatusAction } from "@/features/invoices/actions";
 import { sendInvoiceAction } from "@/features/invoices/delivery";
-import { createContractAction } from "@/features/contracts/actions";
+import { createContractAction, updateContractAction } from "@/features/contracts/actions";
 import { sendContractAction } from "@/features/contracts/delivery";
 import { getContractShareUrl } from "@/features/documents/urls";
 import { createClientAction } from "@/features/clients/actions";
@@ -81,6 +81,14 @@ const aiCreateSchema = z.object({
 });
 
 type AiCreateInput = z.infer<typeof aiCreateSchema>;
+
+/**
+ * Explicit "no client / internal" marker. The client picker sends this when the
+ * user deliberately skips choosing a client (only offered where a client is
+ * optional, e.g. projects), so the missing-field loop treats the choice as
+ * answered instead of asking again.
+ */
+export const NO_CLIENT_SENTINEL = "__none__";
 
 /** Read a canonical field, trimmed; treats "skip"/"none" as empty. */
 function field(fields: AiFields | undefined, key: string): string {
@@ -164,17 +172,17 @@ export async function interpretAiMessageAction(input: z.infer<typeof aiInterpret
   return { ok: true as const, data: result };
 }
 
+// Currency tokens we recognise before/after an amount. `rup\w*` catches
+// "rupee", "rupees", and common misspellings like "ruppess"/"rupaye".
+const CURRENCY_TOKEN = String.raw`(?:₹|rs\.?|inr|rupees?|rup\w*|\/-)`;
+
 function amountFromPrompt(prompt: string) {
   const normalized = prompt.replace(/,/g, "");
   const match =
-    normalized.match(/(?:₹|rs\.?|inr)\s*(\d+(?:\.\d+)?)/i) ??
-    normalized.match(/(\d+(?:\.\d+)?)\s*(?:₹|rs\.?|inr)/i) ??
+    normalized.match(new RegExp(`${CURRENCY_TOKEN}\\s*(\\d+(?:\\.\\d+)?)`, "i")) ??
+    normalized.match(new RegExp(`(\\d+(?:\\.\\d+)?)\\s*${CURRENCY_TOKEN}`, "i")) ??
     normalized.match(/\b(\d{4,}(?:\.\d+)?)\b/);
-  if (match) return Number(match[1]);
-  const rupeeMatch =
-    normalized.match(/₹\s*(\d+(?:\.\d+)?)/i) ??
-    normalized.match(/(\d+(?:\.\d+)?)\s*₹/i);
-  return rupeeMatch ? Number(rupeeMatch[1]) : 0;
+  return match ? Number(match[1]) : 0;
 }
 
 function quantityFromPrompt(prompt: string) {
@@ -206,13 +214,13 @@ function discountFromPrompt(prompt: string, subtotal: number) {
   }
 
   const flatMatch =
-    normalized.match(/(?:discount|off)\s*(?:of\s*)?(?:â‚¹|rs\.?|inr)?\s*(\d+(?:\.\d+)?)/) ??
-    normalized.match(/(?:â‚¹|rs\.?|inr)\s*(\d+(?:\.\d+)?)\s*(?:discount|off)/);
-  if (flatMatch) return Math.min(subtotal, Math.max(0, Number(flatMatch[1])));
-  const rupeeMatch =
-    normalized.match(/(?:discount|off)\s*(?:of\s*)?₹\s*(\d+(?:\.\d+)?)/) ??
-    normalized.match(/₹\s*(\d+(?:\.\d+)?)\s*(?:discount|off)/);
-  return rupeeMatch ? Math.min(subtotal, Math.max(0, Number(rupeeMatch[1]))) : 0;
+    normalized.match(
+      new RegExp(`(?:discount|off)\\s*(?:of\\s*)?${CURRENCY_TOKEN}?\\s*(\\d+(?:\\.\\d+)?)`, "i"),
+    ) ??
+    normalized.match(
+      new RegExp(`${CURRENCY_TOKEN}?\\s*(\\d+(?:\\.\\d+)?)\\s*(?:discount|off)`, "i"),
+    );
+  return flatMatch ? Math.min(subtotal, Math.max(0, Number(flatMatch[1]))) : 0;
 }
 
 function discountFromAnswer(value: string, subtotal: number) {
@@ -495,14 +503,17 @@ export async function createProjectFromAiAction(input: AiCreateInput) {
   if (!parsed.success) return { ok: false as const, error: "Tell me about the project first." };
   const fields = parsed.data.fields ?? {};
 
+  // "__none__" is the explicit "internal project, no client" choice from the picker.
+  const rawClientId = parsed.data.clientId || "";
+  const clientSkipped = rawClientId === NO_CLIENT_SENTINEL;
+  const clientId = clientSkipped ? "" : rawClientId;
+
   const name = field(fields, "name");
-  const missing = firstMissingField("project", fields, {});
-  if (!name || missing) {
-    return {
-      ok: false as const,
-      error: (missing ?? MISSING_FIELD_QUESTIONS.name).question,
-      missing: missing ?? MISSING_FIELD_QUESTIONS.name,
-    };
+  const missing = firstMissingField("project", fields, {
+    clientId: clientSkipped ? NO_CLIENT_SENTINEL : clientId,
+  });
+  if (missing) {
+    return { ok: false as const, error: missing.question, missing };
   }
 
   const scope = field(fields, "scope");
@@ -512,7 +523,7 @@ export async function createProjectFromAiAction(input: AiCreateInput) {
   const fd = new FormData();
   fd.set("name", name);
   fd.set("description", scope);
-  fd.set("clientId", parsed.data.clientId || "");
+  fd.set("clientId", clientId);
   fd.set("status", status);
   fd.set("startDate", startDate);
   fd.set("dueDate", dueDate);
@@ -955,6 +966,150 @@ export async function sendContractFromAiAction(input: z.infer<typeof aiContractI
   const parsed = aiContractIdSchema.safeParse(input);
   if (!parsed.success) return { ok: false as const, error: "Invalid contract." };
   return sendContractAction({ contractId: parsed.data.contractId });
+}
+
+const aiContractRefineSchema = z.object({
+  contractId: z.string().uuid("Invalid contract id"),
+  instruction: z.string().trim().min(2).max(2000),
+});
+
+/**
+ * Revise an existing AI-drafted contract in place from a natural-language
+ * instruction (e.g. "change the fee to 90000", "add a confidentiality clause").
+ * Keeps the same client/project/value and re-renders the full preview so the
+ * user can keep refining before they approve & send.
+ */
+export async function refineContractFromAiAction(
+  input: z.infer<typeof aiContractRefineSchema>,
+) {
+  const parsed = aiContractRefineSchema.safeParse(input);
+  if (!parsed.success) return { ok: false as const, error: "Tell me what to change in the contract." };
+
+  const userId = await requireUserId();
+  const supabase = await getServerSupabase();
+
+  const { data: contractRow } = await supabase
+    .from("contracts")
+    .select("id, kind, title, content, client_id, project_id, value_amount, currency")
+    .eq("id", parsed.data.contractId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  const contract = contractRow as
+    | {
+        id: string;
+        kind: string;
+        title: string;
+        content: string | null;
+        client_id?: string | null;
+        project_id?: string | null;
+        value_amount?: number | null;
+        currency?: string | null;
+      }
+    | null;
+  if (!contract) return { ok: false as const, error: "Contract not found." };
+
+  let existingSections: Array<{ heading: string; body: string }> = [];
+  try {
+    const parsedContent = contract.content ? JSON.parse(contract.content) : [];
+    if (Array.isArray(parsedContent)) {
+      existingSections = parsedContent.filter(
+        (s): s is { heading: string; body: string } =>
+          s && typeof s.heading === "string" && typeof s.body === "string",
+      );
+    }
+  } catch {
+    /* ignore malformed content */
+  }
+
+  const currentText = existingSections.map((s) => `## ${s.heading}\n${s.body}`).join("\n\n");
+  const brief = [
+    "Revise the EXISTING agreement below by applying the requested change.",
+    "Keep every unchanged section intact; only modify what the change requires.",
+    "",
+    "CURRENT DRAFT:",
+    currentText || "(empty draft)",
+    "",
+    `REQUESTED CHANGE: ${parsed.data.instruction}`,
+  ].join("\n");
+
+  const fdDraft = new FormData();
+  fdDraft.set(
+    "payload",
+    JSON.stringify({
+      workflow: "contract",
+      prompt: brief,
+      clientId: contract.client_id ?? "",
+      projectId: contract.project_id ?? "",
+    }),
+  );
+  const draftResult = await generateOperationalDraftAction(fdDraft);
+  if (!draftResult.ok || !("sections" in draftResult.data)) {
+    return {
+      ok: false as const,
+      error: draftResult.ok ? "Could not revise the contract." : draftResult.error,
+    };
+  }
+
+  const draft = draftResult.data as AiContractDraft;
+  const sections = draft.sections.length > 0 ? draft.sections : existingSections;
+  const kind = contract.kind === "proposal" ? ("proposal" as const) : ("contract" as const);
+  const title = cleanAiAnswer(draft.title) || contract.title;
+  const amount =
+    draft.valueAmount ?? (contract.value_amount ? Number(contract.value_amount) : null);
+  const currency = contract.currency || "INR";
+
+  const fd = new FormData();
+  fd.set("id", contract.id);
+  fd.set("kind", kind);
+  fd.set("title", title);
+  fd.set("content", JSON.stringify(sections));
+  if (contract.client_id) fd.set("clientId", contract.client_id);
+  if (contract.project_id) fd.set("projectId", contract.project_id);
+  fd.set("status", "draft");
+  fd.set("currency", currency);
+  if (amount && amount > 0) fd.set("valueAmount", String(amount));
+
+  const res = await updateContractAction(undefined, fd);
+  if (!res.ok) return { ok: false as const, error: res.error };
+
+  const { data: clientRow } = contract.client_id
+    ? await supabase
+        .from("clients")
+        .select("full_name, business_name, email")
+        .eq("id", contract.client_id)
+        .eq("user_id", userId)
+        .maybeSingle()
+    : { data: null };
+  const client = clientRow as
+    | { full_name?: string | null; business_name?: string | null; email?: string | null }
+    | null;
+
+  let projectName: string | null = null;
+  if (contract.project_id) {
+    const { data: projectRow } = await supabase
+      .from("projects")
+      .select("name")
+      .eq("id", contract.project_id)
+      .eq("user_id", userId)
+      .maybeSingle();
+    projectName = (projectRow as { name?: string | null } | null)?.name ?? null;
+  }
+
+  return {
+    ok: true as const,
+    data: {
+      id: contract.id,
+      title,
+      kind,
+      clientName: client?.business_name || client?.full_name || "Selected client",
+      clientEmail: client?.email ?? null,
+      projectName,
+      valueAmount: amount && amount > 0 ? amount : null,
+      currency,
+      sections,
+    },
+    message: "Contract updated.",
+  };
 }
 
 export async function answerFromDocsAction(input: z.infer<typeof aiDocsQuestionSchema>) {

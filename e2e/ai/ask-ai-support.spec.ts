@@ -89,4 +89,27 @@ test.describe("Ask AI support flow", () => {
     await raceVisible(page, ["GST", "gst", "tax", "sent to Stackivo", "I could not"], 60_000);
     expect(await assistantMessages(page).count()).toBeGreaterThan(1);
   });
+
+  test("answers a meta question conversationally instead of a docs miss", async ({ page }) => {
+    test.setTimeout(60_000);
+
+    await loginUser(page, USER_EMAIL!, USER_PASSWORD!);
+    await openAiPanel(page);
+
+    // A meta/greeting message must NOT trigger a "couldn't find it in docs" miss.
+    await aiSubmit(page, "Can I ask you a question?");
+
+    await expect(page.getByText(/go ahead and ask/i)).toBeVisible({ timeout: 15_000 });
+  });
+
+  test("greets the user conversationally in general mode", async ({ page }) => {
+    test.setTimeout(60_000);
+
+    await loginUser(page, USER_EMAIL!, USER_PASSWORD!);
+    await openAiPanel(page);
+
+    await aiSubmit(page, "hi");
+
+    await expect(page.getByText(/What would you like to do/i)).toBeVisible({ timeout: 15_000 });
+  });
 });

@@ -180,7 +180,7 @@ export const AI_REQUIRED_FIELDS: Record<AiWorkflow, string[]> = {
   contract: ["clientId", "scope"],
   welcome_document: ["process"],
   client: ["fullName"],
-  project: ["name"],
+  project: ["name", "clientId"],
   time_entry: ["description", "duration"],
   support: ["question"],
 };
