@@ -1,165 +1,108 @@
-"use client";
-
-import type { LucideIcon } from "lucide-react";
 import {
-  BarChart3,
-  Briefcase,
-  Clock,
-  FileText,
-  Receipt,
-  ShieldCheck,
   Users,
-  Wallet,
+  FolderKanban,
+  CheckSquare,
+  FileText,
+  MessagesSquare,
+  Workflow,
+  Sparkles,
 } from "lucide-react";
-import { Section, SectionHeading } from "./section";
-import { Reveal, StaggerReveal, StaggerItem } from "./motion";
-import { cn } from "@/lib/utils";
+import type { LucideIcon } from "lucide-react";
 
-interface Feature {
+interface Pillar {
   icon: LucideIcon;
   title: string;
-  description: string;
-  /** Column span on desktop: 1-3 out of 6. */
-  span?: 2 | 3;
-  /** Row span on desktop — used for the tall featured tiles. */
-  rowSpan?: 1 | 2;
-  /** Optional visual accent for the hero tile. */
-  accent?: boolean;
+  body: string;
 }
 
-/**
- * Bento-style asymmetric grid. Two featured tiles span wider, the rest
- * fill the negative space. Feels closer to Linear / Notion than a flat
- * uniform 4×2 grid.
- */
-const FEATURES: Feature[] = [
-  {
-    icon: Receipt,
-    title: "Invoicing that just works",
-    description:
-      "Send polished invoices in seconds. Simple invoices for non-registered freelancers; full CGST/SGST/IGST split when you need GST — Stackivo handles the difference for you.",
-    span: 3,
-    accent: true,
-  },
-  {
-    icon: BarChart3,
-    title: "Pulse analytics",
-    description:
-      "Revenue trends, top clients, time analytics, and contract-backed income. Your business, clearly.",
-    span: 3,
-  },
+const PILLARS: Pillar[] = [
   {
     icon: Users,
-    title: "Client management",
-    description:
-      "Clean records with billing addresses and contact history. Works for B2C, B2B, and everything in between.",
-    span: 2,
+    title: "Clients",
+    body: "A single, searchable source of truth for every client — contacts, history, files, and context that travels with you across every project.",
+  },
+  {
+    icon: FolderKanban,
+    title: "Projects",
+    body: "Plan, scope, and ship work with structured projects that connect briefs, tasks, documents, and deliverables in one timeline.",
+  },
+  {
+    icon: CheckSquare,
+    title: "Tasks",
+    body: "Lightweight tasks and rich workflows in the same surface. Assign, prioritise, and never lose the thread between client and delivery.",
   },
   {
     icon: FileText,
-    title: "Contracts & proposals",
-    description:
-      "Draft, send and track with public signing links and a full status timeline.",
-    span: 2,
+    title: "Documents",
+    body: "Briefs, proposals, contracts, SOPs. Edit collaboratively, send for signature, and keep every version tied to the right client.",
   },
   {
-    icon: Briefcase,
-    title: "Project workspaces",
-    description:
-      "Tie invoices, contracts, time and files to a project. See where every engagement stands.",
-    span: 2,
+    icon: MessagesSquare,
+    title: "Team collaboration",
+    body: "Threads, mentions, and shared context inline with the work — so decisions stay close to the project, not buried in another app.",
   },
   {
-    icon: Clock,
-    title: "Time tracking",
-    description:
-      "One-tap timer or manual entries. Billable rates flow directly into invoices.",
-    span: 2,
+    icon: Workflow,
+    title: "Automations",
+    body: "Trigger handoffs, reminders, status updates, and external actions when work moves forward. Zero glue code required.",
   },
   {
-    icon: Wallet,
-    title: "Payments",
-    description:
-      "Sent · viewed · paid · overdue. Cash flow at a glance, never lose a payment.",
-    span: 2,
-  },
-  {
-    icon: ShieldCheck,
-    title: "Compliance when you need it",
-    description:
-      "GSTIN validation, place-of-supply rules, immutable history — only switched on when you turn GST on. Audit-ready from day one.",
-    span: 2,
+    icon: Sparkles,
+    title: "AI-powered workflows",
+    body: "AI that operates on your actual workspace — drafts, summaries, recaps, and next-step suggestions grounded in your clients and projects.",
   },
 ];
 
 export function FeaturesSection() {
   return (
-    <Section id="features" size="wide" className="relative">
-      <Reveal>
-        <SectionHeading
-          eyebrow="Everything in one place"
-          title="One workspace. Every part of your freelance business."
-          subtitle="Stop stitching together five tools. Stackivo handles every operational workflow — from client onboarding to revenue analytics."
-        />
-      </Reveal>
+    <section
+      id="features"
+      className="relative isolate overflow-hidden border-b bg-background"
+    >
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[420px] bg-gradient-to-b from-primary/[0.04] to-transparent"
+      />
 
-      <StaggerReveal
-        className="mt-10 grid grid-cols-1 gap-3 sm:mt-12 sm:grid-cols-2 sm:gap-4 lg:mt-14 lg:grid-cols-6"
-        amount={0.1}
-      >
-        {FEATURES.map((f) => (
-          <StaggerItem
-            key={f.title}
-            className={cn(
-              f.span === 3 && "lg:col-span-3",
-              f.span === 2 && "lg:col-span-2",
-            )}
-          >
-            <FeatureTile feature={f} />
-          </StaggerItem>
-        ))}
-      </StaggerReveal>
-    </Section>
+      <div className="mx-auto w-full max-w-[1400px] px-5 py-20 sm:px-8 sm:py-24 lg:px-10 lg:py-28 xl:px-14 2xl:px-20">
+        <div className="mx-auto max-w-2xl text-center">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary/80">
+            One workspace · seven pillars
+          </p>
+          <h2 className="mt-4 text-balance text-3xl font-bold tracking-tight sm:text-[40px] lg:text-[52px] lg:leading-[1.05] lg:tracking-[-0.025em]">
+            Everything you need to run the work,{" "}
+            <span className="text-gradient">together at last.</span>
+          </h2>
+          <p className="mt-5 text-pretty text-base leading-[1.8] text-muted-foreground sm:text-[17px]">
+            Stop stitching together five tools that don&apos;t talk to each
+            other. Stackivo is one connected surface for clients, projects,
+            documents, collaboration, and automation.
+          </p>
+        </div>
+
+        <div className="mt-16 grid gap-px overflow-hidden rounded-2xl border border-border/70 bg-border/60 shadow-sm sm:grid-cols-2 lg:grid-cols-3">
+          {PILLARS.map((p) => (
+            <FeatureCard key={p.title} {...p} />
+          ))}
+          <div className="hidden bg-background/60 lg:block" />
+        </div>
+      </div>
+    </section>
   );
 }
 
-function FeatureTile({ feature }: { feature: Feature }) {
-  const { icon: Icon, title, description, accent } = feature;
+function FeatureCard({ icon: Icon, title, body }: Pillar) {
   return (
-    <div
-      className={cn(
-        "group relative flex h-full flex-col gap-4 overflow-hidden rounded-2xl border bg-card p-5 sm:p-6",
-        "transition-all duration-250 ease-out",
-        "hover:-translate-y-1 hover:border-primary/30 hover:shadow-xl hover:shadow-primary/[0.07]",
-        accent
-          ? "border-primary/20 bg-gradient-to-br from-primary/[0.06] via-card to-card glow-ring"
-          : "hover:bg-gradient-to-br hover:from-primary/[0.02] hover:to-transparent",
-      )}
-    >
-      {accent ? (
-        <>
-          <div aria-hidden className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-indigo-500/[0.14] blur-3xl" />
-          <div aria-hidden className="pointer-events-none absolute -bottom-10 -left-10 h-40 w-40 rounded-full bg-violet-500/[0.10] blur-2xl" />
-        </>
-      ) : null}
-      <span
-        className={cn(
-          "inline-flex h-10 w-10 items-center justify-center rounded-xl ring-1 transition-all duration-250 group-hover:scale-105",
-          accent
-            ? "btn-gradient border-0 text-white shadow-lg shadow-primary/25 ring-0"
-            : "border-0 bg-gradient-to-br from-primary/12 to-violet-500/8 text-primary ring-primary/15 group-hover:from-primary/18 group-hover:shadow-md group-hover:shadow-primary/10",
-        )}
-      >
-        <Icon className="h-[18px] w-[18px]" strokeWidth={2} />
+    <div className="group relative isolate flex flex-col gap-3 bg-background p-7 transition-colors duration-200 hover:bg-card sm:p-8">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/30 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+      />
+      <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary/15 to-violet-500/10 text-primary ring-1 ring-primary/15">
+        <Icon className="h-5 w-5" />
       </span>
-      <div className="space-y-1.5">
-        <h3 className="text-base font-semibold tracking-tight lg:text-[17px]">
-          {title}
-        </h3>
-        <p className="text-sm leading-relaxed text-muted-foreground lg:text-[14.5px]">
-          {description}
-        </p>
-      </div>
+      <h3 className="mt-1 text-[17px] font-semibold tracking-tight">{title}</h3>
+      <p className="text-[14.5px] leading-[1.7] text-muted-foreground">{body}</p>
     </div>
   );
 }

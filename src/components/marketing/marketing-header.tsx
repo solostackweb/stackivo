@@ -119,46 +119,45 @@ export function MarketingHeader({
 }
 
 const NAV_LINKS = [
-  { href: "/#features", label: "Features" },
+  { href: "/#features", label: "Product" },
   { href: "/pricing", label: "Pricing" },
-  { href: "/blog", label: "Blog" },
-  { href: "/tools", label: "Free tools" },
+  { href: "/#workflow", label: "Workflows" },
+  { href: "/about", label: "Company" },
 ];
 
 function HeaderCtas({ authState }: { authState: MarketingAuthState }) {
   if (authState.isAuthenticated) {
     return (
       <div className="hidden items-center gap-3 md:flex">
-        {authState.showUpgradeNudge ? (
-          <Link
-            href="/dashboard/settings/billing?upgrade=clients"
-            className="text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
-          >
-            Upgrade to Pro
-          </Link>
-        ) : null}
         <Button asChild size="sm">
-          <Link href="/dashboard" data-cta="header_dashboard">Dashboard</Link>
+          <Link href="/dashboard" data-cta="header_dashboard">Open workspace</Link>
         </Button>
       </div>
     );
   }
 
   return (
-    <div className="hidden items-center gap-3 md:flex">
+    <div className="hidden items-center gap-2 md:flex">
       <Link
         href="/login"
         data-cta="header_login"
-        className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+        className="rounded-md px-3 py-1.5 text-[13.5px] font-medium text-muted-foreground transition-colors hover:text-foreground"
       >
         Log in
+      </Link>
+      <Link
+        href="/demo"
+        data-cta="header_demo"
+        className="hidden rounded-md px-3 py-1.5 text-[13.5px] font-medium text-muted-foreground transition-colors hover:text-foreground lg:inline-flex"
+      >
+        Book demo
       </Link>
       <Button
         asChild
         size="sm"
-        className="btn-gradient h-8 rounded-full border-0 px-4 text-xs font-semibold"
+        className="btn-gradient h-9 rounded-full border-0 px-4 text-[13px] font-semibold"
       >
-        <Link href="/signup" data-cta="header_primary">Start free →</Link>
+        <Link href="/signup" data-cta="header_primary">Create workspace →</Link>
       </Button>
     </div>
   );
