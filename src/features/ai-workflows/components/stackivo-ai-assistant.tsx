@@ -46,13 +46,13 @@ import {
   sendWelcomeDocFromAiAction,
   welcomeDocWhatsappFromAiAction,
   answerFromDocsAction,
-  NO_CLIENT_SENTINEL,
 } from "@/features/ai-workflows/global-actions";
 import { submitBugReportAction } from "@/features/support/actions";
-import type {
-  AiFields,
-  AiInterpretation,
-  AiMissingField,
+import {
+  NO_CLIENT_SENTINEL,
+  type AiFields,
+  type AiInterpretation,
+  type AiMissingField,
 } from "@/features/ai-workflows/types";
 
 // ---------------------------------------------------------------------------

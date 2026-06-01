@@ -184,3 +184,12 @@ export const AI_REQUIRED_FIELDS: Record<AiWorkflow, string[]> = {
   time_entry: ["description", "duration"],
   support: ["question"],
 };
+
+/**
+ * Explicit "no client / internal" marker. The client picker sends this when the
+ * user deliberately skips choosing a client (only offered where a client is
+ * optional, e.g. projects), so the missing-field loop treats the choice as
+ * answered instead of asking again. Defined here (a plain module) rather than
+ * in the "use server" actions file, which may only export async functions.
+ */
+export const NO_CLIENT_SENTINEL = "__none__";

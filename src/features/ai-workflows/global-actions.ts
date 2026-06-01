@@ -38,6 +38,7 @@ import { generateStructuredJson } from "./groq";
 import { interpretMessage } from "./nlu";
 import {
   AI_REQUIRED_FIELDS,
+  NO_CLIENT_SENTINEL,
   aiInterpretRequestSchema,
   type AiContractDraft,
   type AiFields,
@@ -81,14 +82,6 @@ const aiCreateSchema = z.object({
 });
 
 type AiCreateInput = z.infer<typeof aiCreateSchema>;
-
-/**
- * Explicit "no client / internal" marker. The client picker sends this when the
- * user deliberately skips choosing a client (only offered where a client is
- * optional, e.g. projects), so the missing-field loop treats the choice as
- * answered instead of asking again.
- */
-export const NO_CLIENT_SENTINEL = "__none__";
 
 /** Read a canonical field, trimmed; treats "skip"/"none" as empty. */
 function field(fields: AiFields | undefined, key: string): string {
