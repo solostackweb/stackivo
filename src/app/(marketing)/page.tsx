@@ -1,25 +1,21 @@
 import type { Metadata } from "next";
 import { HeroSection } from "@/components/marketing/hero-section";
 import { FeaturesSection } from "@/components/marketing/features-section";
-import { WorkflowSection } from "@/components/marketing/workflow-section";
-import { GstSection } from "@/components/marketing/gst-section";
 import { PainSection } from "@/components/marketing/pain-section";
-import { PulseSection } from "@/components/marketing/pulse-section";
 import { FaqSection } from "@/components/marketing/faq-section";
 import { CtaBand } from "@/components/marketing/cta-band";
-import { FounderNote } from "@/components/marketing/founder-note";
 import { getMarketingAuthState } from "@/features/marketing/auth-state";
 import { siteConfig } from "@/config/site";
 
 export const metadata: Metadata = {
-  title: "Stackivo — Your freelance workflow, all in one place",
+  title: "Stackivo — One workspace to run your entire business",
   description:
-    "Stackivo brings clients, invoices, contracts, projects, time tracking, and payments into one clean workspace for freelancers, consultants, and small studios. Simple invoices or full GST — you decide.",
+    "Stackivo brings clients, projects, tasks, documents, team collaboration, and AI workflows together — so modern teams ship faster without juggling six tools.",
   alternates: { canonical: "/" },
   openGraph: {
-    title: "Stackivo — Your freelance workflow, all in one place",
+    title: "Stackivo — One workspace to run your entire business",
     description:
-      "Clients, projects, GST-ready invoices, contracts, time tracking, and payments in one workspace. Free forever for your first 5 clients.",
+      "Clients, projects, tasks, documents, collaboration, and AI workflows in one connected workspace.",
     url: siteConfig.url,
   },
 };
@@ -38,28 +34,16 @@ export default async function LandingPage() {
             "@type": "SoftwareApplication",
             name: "Stackivo",
             applicationCategory: "BusinessApplication",
-            applicationSubCategory: "FreelanceManagement",
             operatingSystem: "Web",
             description: siteConfig.description,
             url: siteConfig.url,
-            offers: {
-              "@type": "Offer",
-              price: "0",
-              priceCurrency: "INR",
-            },
+            offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
           }),
         }}
       />
       <HeroSection authState={authState} />
-      {/* Pain-first: lead with the problem the visitor recognises before
-          parading the tooling. Features-first ordering reads as "we are a
-          feature list"; pain-first creates relevance + emotional hook. */}
-      <PainSection />
       <FeaturesSection />
-      <WorkflowSection />
-      <GstSection />
-      <PulseSection />
-      <FounderNote />
+      <PainSection />
       <FaqSection />
       <CtaBand authState={authState} />
     </>

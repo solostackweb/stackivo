@@ -24,11 +24,11 @@ export function FeaturesSection() {
     <section id="features" className="relative isolate overflow-hidden border-b bg-background">
       <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[520px] bg-gradient-to-b from-primary/[0.06] via-transparent to-transparent" />
 
-      <div className="mx-auto w-full max-w-[1480px] px-5 py-24 sm:px-8 sm:py-28 lg:px-12 lg:py-36 xl:px-16">
+      <div className="mx-auto w-full max-w-6xl px-5 py-20 sm:px-8 sm:py-24 lg:py-28">
         <SectionIntro />
 
         {/* Bento grid */}
-        <div className="mt-20 grid grid-cols-1 gap-4 sm:grid-cols-6 sm:gap-5 lg:grid-cols-12">
+        <div className="mt-14 grid grid-cols-1 gap-4 sm:grid-cols-6 sm:gap-5 lg:grid-cols-12">
           <Tile className="sm:col-span-3 lg:col-span-5" tag="01 · Clients" title="Every client, one source of truth." body="Contacts, history, files, threads. Context that travels with the work.">
             <ClientsVisual />
           </Tile>
@@ -58,16 +58,15 @@ function SectionIntro() {
     <div className="mx-auto flex max-w-3xl flex-col items-start lg:items-center lg:text-center">
       <span className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/60 px-3 py-1 text-[10.5px] font-semibold uppercase tracking-[0.22em] text-muted-foreground backdrop-blur">
         <span className="h-1 w-1 rounded-full bg-primary" />
-        The product
+        Everything you need
       </span>
-      <h2 className="mt-5 text-balance text-[34px] font-semibold leading-[1.02] tracking-[-0.03em] sm:text-[52px] lg:text-[68px]">
-        One workspace.{" "}
-        <span className="font-serif italic text-gradient">Seven disciplines.</span>
+      <h2 className="mt-5 text-balance text-[32px] font-semibold leading-[1.05] tracking-[-0.03em] sm:text-[44px] lg:text-[56px]">
+        One workspace. Seven core capabilities.
       </h2>
-      <p className="mt-6 max-w-2xl text-pretty text-[15.5px] leading-[1.75] text-muted-foreground sm:text-[17px]">
+      <p className="mt-5 max-w-2xl text-pretty text-[15.5px] leading-[1.65] text-muted-foreground sm:text-[17px]">
         Stop stitching together five tools that don&apos;t talk to each other.
-        Stackivo is one connected surface for everything modern teams do —
-        from the first hello to the final invoice.
+        Stackivo is one connected platform for everything your team does — from
+        the first client conversation to the final deliverable.
       </p>
     </div>
   );
