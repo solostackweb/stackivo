@@ -1,95 +1,99 @@
 "use client";
 
+import { motion } from "framer-motion";
 import {
-  CheckCircle2,
-  CircleDollarSign,
-  FileSignature,
-  Send,
   Users,
+  FolderKanban,
+  CheckSquare,
+  Workflow,
+  Sparkles,
 } from "lucide-react";
-import { Section, SectionHeading } from "./section";
-import { Reveal, StaggerReveal, StaggerItem } from "./motion";
 
 const STEPS = [
   {
     icon: Users,
-    title: "Add a client",
+    title: "Bring in the client.",
     description:
-      "Capture GSTIN, billing state, place of supply. We figure out CGST vs IGST so you don't have to.",
+      "Capture context once. Stackivo carries it across every project, document, and thread — so nobody re-explains the brief.",
   },
   {
-    icon: FileSignature,
-    title: "Send the proposal",
+    icon: FolderKanban,
+    title: "Scope the work.",
     description:
-      "Draft a contract, share a public signing link, watch the status update in real time.",
+      "Spin up a project, draft the brief, attach the contract. The whole engagement gets a single, searchable home.",
   },
   {
-    icon: Send,
-    title: "Invoice the engagement",
+    icon: CheckSquare,
+    title: "Ship the work.",
     description:
-      "Pull line items from tracked time, apply the right tax mode, send a payment-ready invoice.",
+      "Tasks, files, decisions, presence — all on one surface. The team stays in flow; the client stays in the loop.",
   },
   {
-    icon: CircleDollarSign,
-    title: "Track the payment",
+    icon: Workflow,
+    title: "Let automation handle the seams.",
     description:
-      "Mark sent · viewed · paid. Pulse aggregates your cash flow automatically.",
+      "Handoffs, reminders, status updates, external pings — Stackivo moves the work between humans without glue code.",
   },
   {
-    icon: CheckCircle2,
-    title: "Close the loop",
+    icon: Sparkles,
+    title: "Close with AI on your side.",
     description:
-      "Project marked complete, revenue logged, client primed for the next engagement.",
+      "Recaps, summaries, next-step drafts — grounded in the actual workspace, ready to send the moment work wraps.",
   },
 ];
 
 export function WorkflowSection() {
   return (
-    <Section id="workflow" size="wide" className="relative border-y bg-muted/30">
-      <Reveal>
-        <SectionHeading
-          eyebrow="The freelancer workflow"
-          title="From first hello to final payment — without switching tabs."
-          subtitle="Every freelance engagement follows the same arc. Stackivo is the rails underneath."
-        />
-      </Reveal>
+    <section id="workflow" className="relative isolate overflow-hidden border-y bg-background">
+      <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 bg-editorial-dots opacity-30 mask-radial-soft" />
+      <div className="mx-auto w-full max-w-[1480px] px-5 py-24 sm:px-8 sm:py-32 lg:px-12 lg:py-40 xl:px-16">
+        {/* Two-column intro */}
+        <div className="grid gap-12 lg:grid-cols-12 lg:gap-16">
+          <div className="lg:col-span-5 lg:sticky lg:top-28 lg:self-start">
+            <span className="font-mono text-[10.5px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+              The arc · Five movements
+            </span>
+            <h2 className="mt-4 text-balance text-[34px] font-semibold leading-[1.02] tracking-[-0.03em] sm:text-[44px] lg:text-[56px]">
+              From first hello to{" "}
+              <span className="font-serif italic text-gradient">final invoice.</span>
+            </h2>
+            <p className="mt-6 max-w-md text-pretty text-[15.5px] leading-[1.75] text-muted-foreground">
+              Every engagement follows the same arc. Stackivo is the
+              rails underneath — quietly composing the work as your team
+              moves through it.
+            </p>
+          </div>
 
-      <div className="relative mt-16 sm:mt-20">
-        {/* Static connecting line on lg+ — the entrance animation removed; the
-           parent StaggerReveal already supplies the cinematic feel as each
-           card fades in beneath the line. */}
-        <div
-          aria-hidden
-          className="pointer-events-none absolute left-[10%] right-[10%] top-9 hidden h-px bg-gradient-to-r from-transparent via-primary/40 to-transparent lg:block"
-        />
-        <StaggerReveal
-          className="relative grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-5 lg:gap-4"
-          amount={0.15}
-        >
-          {STEPS.map((s, i) => (
-            <StaggerItem key={s.title}>
-              <div className="group relative flex h-full flex-col gap-4 rounded-2xl border bg-card p-6 transition-all duration-300 ease-out hover:-translate-y-1.5 hover:border-primary/30 hover:shadow-xl hover:shadow-primary/[0.04] lg:p-7">
-                <div className="flex items-center justify-between">
-                  <span className="flex h-10 w-10 items-center justify-center rounded-xl border bg-background text-primary shadow-sm transition-all duration-300 group-hover:scale-110 group-hover:border-primary/40 group-hover:shadow-md">
-                    <s.icon className="h-[18px] w-[18px]" />
-                  </span>
-                  <span className="font-mono text-[11px] font-semibold tracking-wider text-muted-foreground">
-                    {String(i + 1).padStart(2, "0")}
+          <ol className="relative lg:col-span-7">
+            <div aria-hidden className="absolute left-[27px] top-2 bottom-2 w-px bg-gradient-to-b from-transparent via-border to-transparent" />
+            {STEPS.map((s, i) => (
+              <motion.li
+                key={s.title}
+                initial={{ opacity: 0, x: 16 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                viewport={{ once: true, margin: "-60px" }}
+                transition={{ duration: 0.6, delay: i * 0.08, ease: [0.2, 0.8, 0.2, 1] }}
+                className="group relative flex gap-6 pb-12 last:pb-0"
+              >
+                <div className="relative z-10 grid h-[56px] w-[56px] shrink-0 place-items-center rounded-2xl border border-border/70 bg-background shadow-soft-lg transition-all duration-500 group-hover:border-primary/40 group-hover:scale-105">
+                  <s.icon className="h-5 w-5 text-foreground/80 transition-colors group-hover:text-primary" />
+                  <span className="absolute -right-1 -top-1 grid h-[18px] w-[18px] place-items-center rounded-full bg-foreground text-[9px] font-bold text-background">
+                    {i + 1}
                   </span>
                 </div>
-                <div className="space-y-1.5">
-                  <h3 className="text-base font-semibold tracking-tight lg:text-lg">
+                <div className="flex-1 pt-1.5">
+                  <h3 className="text-balance text-[22px] font-semibold tracking-[-0.02em] sm:text-[26px]">
                     {s.title}
                   </h3>
-                  <p className="text-sm leading-relaxed text-muted-foreground">
+                  <p className="mt-2 max-w-lg text-[14.5px] leading-[1.7] text-muted-foreground sm:text-[15.5px]">
                     {s.description}
                   </p>
                 </div>
-              </div>
-            </StaggerItem>
-          ))}
-        </StaggerReveal>
+              </motion.li>
+            ))}
+          </ol>
+        </div>
       </div>
-    </Section>
+    </section>
   );
 }
