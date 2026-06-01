@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, JetBrains_Mono } from "next/font/google";
+import { Inter, JetBrains_Mono, Instrument_Serif } from "next/font/google";
 import Script from "next/script";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
@@ -7,17 +7,18 @@ import { AppProviders } from "@/components/providers/app-providers";
 import { siteConfig } from "@/config/site";
 import "./globals.css";
 
-/**
- * Self-hosted, preloaded, swap-display fonts.
- *
- * Binding to the CSS variables already consumed by `tailwind.config.ts`
- * (`--font-sans`, `--font-mono`) means every existing `font-sans` /
- * `font-mono` class in the codebase now hits real Inter / JetBrains Mono
- * — no FOUT swap, no post-load `text-balance` reflow, stable hero metrics.
- */
 const fontSans = Inter({
   subsets: ["latin"],
   variable: "--font-sans",
+  display: "swap",
+  preload: true,
+});
+
+const fontSerif = Instrument_Serif({
+  subsets: ["latin"],
+  weight: "400",
+  style: ["normal", "italic"],
+  variable: "--font-serif",
   display: "swap",
   preload: true,
 });
