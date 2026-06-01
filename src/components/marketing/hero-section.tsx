@@ -71,9 +71,9 @@ export function HeroSection({ authState }: { authState: MarketingAuthState }) {
           </div>
 
           {/* Mockup */}
-          <div className="relative lg:col-span-5" style={{ perspective: "1800px" }}>
+          <div className="relative lg:col-span-5 lg:overflow-hidden lg:py-6" style={{ perspective: "1800px" }}>
             <div
-              className="relative origin-bottom-right transition-transform duration-700 ease-out hover:rotate-0 hover:scale-[1.02] lg:rotate-[-1.5deg]"
+              className="relative origin-bottom-right transition-transform duration-700 ease-out hover:rotate-0 lg:rotate-[-1.5deg] lg:scale-[0.96]"
               style={{ transformStyle: "preserve-3d" }}
             >
               <div aria-hidden className="pointer-events-none absolute -inset-8 -z-10 rounded-[3rem] bg-gradient-to-br from-primary/25 via-violet-500/15 to-fuchsia-500/10 blur-3xl" />
