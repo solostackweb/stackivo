@@ -49,7 +49,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         {/* Middle: Editorial quote + value props */}
         <motion.div
           initial={{ y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
+          animate={{ y: 0 }}
           transition={{ duration: 0.7, ease: [0.2, 0.8, 0.2, 1] }}
           className="relative z-10 space-y-10"
         >
@@ -120,7 +120,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         </div>
         <motion.div
           initial={{ y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
+          animate={{ y: 0 }}
           transition={{ duration: 0.6, ease: [0.2, 0.8, 0.2, 1] }}
           className="w-full max-w-[380px]"
         >
