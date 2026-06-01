@@ -44,8 +44,8 @@ export function PainSection() {
         initial={{ y: 24 }}
         whileInView={{ y: 0 }}
         viewport={{ once: true, margin: "-80px" }}
-        transition={{ duration: 0.7, ease: [0.2, 0.8, 0.2, 1] }}
-        className="relative mt-16 grid grid-cols-1 overflow-hidden rounded-3xl border border-border/70 bg-card/80 shadow-soft-lg md:grid-cols-2"
+        transition={{ duration: 0.6, ease: [0.2, 0.8, 0.2, 1] }}
+        className="relative mt-12 grid grid-cols-1 overflow-hidden rounded-3xl border border-border/70 bg-card/80 shadow-soft-lg md:grid-cols-2"
       >
         {/* Divider */}
         <div aria-hidden className="absolute inset-y-8 left-1/2 hidden w-px bg-gradient-to-b from-transparent via-border to-transparent md:block" />
