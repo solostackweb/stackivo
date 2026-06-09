@@ -4,275 +4,161 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import {
   ArrowRight,
-  Play,
-  Users,
-  FolderKanban,
   FileText,
-  Sparkles,
-  CheckCircle2,
+  FileSignature,
   Clock,
+  BellRing,
   CircleDollarSign,
+  CheckCircle2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { MarketingAuthState } from "@/features/marketing/types";
 
 /**
- * Keka-inspired hero. Asymmetric split — left: tight headline, supporting
- * subhead, two CTAs, trust microcopy. Right: a constellation of floating
- * product UI cards (clients, kanban, AI, invoice, time tracker) on a clean
- * canvas with a soft violet glow. No dark gradient walls, no centered
- * grid-backdrop — light, friendly, premium.
+ * Keka-inspired hero — clean white canvas, heavy black headline, friendly
+ * illustration cards on the right depicting Stackivo's real features:
+ * invoices, contracts with e-signature, time tracking, and due reminders.
  */
 export function HeroSection({ authState }: { authState: MarketingAuthState }) {
   const authed = authState.isAuthenticated;
 
   return (
     <section className="relative isolate overflow-hidden bg-background">
-      {/* Soft ambient glow */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute -top-40 left-1/2 -z-10 h-[640px] w-[1100px] -translate-x-1/2 rounded-full bg-[radial-gradient(ellipse_at_center,hsl(var(--primary)/0.16),transparent_65%)] blur-2xl"
-      />
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 bottom-0 -z-10 h-px bg-gradient-to-r from-transparent via-border to-transparent"
-      />
-
-      <div className="mx-auto w-full max-w-7xl px-5 pb-20 pt-14 sm:px-8 sm:pb-24 sm:pt-20 lg:pb-28 lg:pt-24">
-        <div className="grid grid-cols-1 items-center gap-14 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:gap-12">
-          {/* ── Left column ───────────────────────────────────── */}
+      <div className="mx-auto w-full max-w-7xl px-5 pb-20 pt-12 sm:px-8 sm:pb-24 sm:pt-16 lg:pb-28 lg:pt-20">
+        <div className="grid grid-cols-1 items-center gap-12 lg:grid-cols-2 lg:gap-10">
+          {/* ── Left ─────────────────────────────────────────── */}
           <motion.div
-            initial={{ opacity: 0, y: 16 }}
+            initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, ease: [0.2, 0.8, 0.2, 1] }}
+            transition={{ duration: 0.5, ease: [0.2, 0.8, 0.2, 1] }}
             className="max-w-xl"
           >
-            <Link
-              href="/changelog"
-              className="group inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1 text-xs font-medium text-muted-foreground shadow-sm transition hover:border-primary/30 hover:text-foreground"
-            >
-              <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-primary">
-                New
-              </span>
-              AI workflows are live in beta
-              <ArrowRight className="h-3 w-3 transition-transform group-hover:translate-x-0.5" />
-            </Link>
-
-            <h1 className="mt-6 text-balance text-[40px] font-semibold leading-[1.05] tracking-[-0.035em] text-foreground sm:text-[54px] lg:text-[64px]">
-              Everything you need to{" "}
-              <span className="text-primary">run your business</span>
+            <h1 className="text-balance text-[40px] font-extrabold leading-[1.08] tracking-[-0.02em] text-foreground sm:text-[52px] lg:text-[60px]">
+              Everything you need to run your business
             </h1>
 
-            <p className="mt-6 max-w-lg text-pretty text-[16px] leading-[1.65] text-muted-foreground sm:text-[18px]">
-              Stackivo brings your clients, projects, invoices, contracts,
-              time tracking and AI workflows into one connected workspace —
-              so you stop juggling tools and start shipping work.
+            <p className="mt-6 max-w-lg text-[16.5px] leading-[1.65] text-muted-foreground sm:text-[17.5px]">
+              Stackivo is the all-in-one workspace for invoicing, contracts
+              with e-signature, time tracking, and automatic payment
+              reminders — so you spend less time chasing and more time doing
+              the work.
             </p>
 
-            <div className="mt-9 flex flex-col items-start gap-3 sm:flex-row sm:items-center">
+            <div className="mt-8 flex flex-col items-start gap-3 sm:flex-row sm:items-center">
               {authed ? (
-                <Button asChild size="lg" className="h-12 rounded-full px-6 text-[14.5px] font-semibold">
+                <Button asChild size="lg" className="h-12 rounded-full px-6 text-[14.5px] font-bold">
                   <Link href="/dashboard" data-cta="hero_dashboard">
-                    Open workspace <ArrowRight className="ml-1.5 h-4 w-4" />
+                    Open workspace
                   </Link>
                 </Button>
               ) : (
                 <>
-                  <Button asChild size="lg" className="h-12 rounded-full px-6 text-[14.5px] font-semibold shadow-lg shadow-primary/25">
-                    <Link href="/signup" data-cta="hero_primary">
-                      Get free trial <ArrowRight className="ml-1.5 h-4 w-4" />
-                    </Link>
+                  <Button asChild size="lg" className="h-12 rounded-full bg-primary px-6 text-[14.5px] font-bold text-primary-foreground hover:bg-primary/90">
+                    <Link href="/signup" data-cta="hero_primary">Get free trial</Link>
                   </Button>
-                  <Button asChild variant="outline" size="lg" className="h-12 rounded-full border-border bg-background px-6 text-[14.5px] font-medium">
-                    <Link href="/demo" data-cta="hero_demo">
-                      <Play className="mr-1.5 h-3.5 w-3.5 fill-current" />
-                      Take a tour
-                    </Link>
+                  <Button asChild variant="outline" size="lg" className="h-12 rounded-full border-foreground/15 bg-background px-6 text-[14.5px] font-semibold text-foreground hover:bg-secondary">
+                    <Link href="/demo" data-cta="hero_demo">Take a tour</Link>
                   </Button>
                 </>
               )}
             </div>
 
-            <ul className="mt-7 flex flex-wrap items-center gap-x-5 gap-y-2 text-[13px] text-muted-foreground">
-              {["Free up to 5 clients", "No credit card", "Set up in 2 minutes"].map((t) => (
+            <ul className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-2 text-[13px] text-muted-foreground">
+              {["14-day free trial", "No credit card needed", "Setup in minutes"].map((t) => (
                 <li key={t} className="inline-flex items-center gap-1.5">
-                  <CheckCircle2 className="h-3.5 w-3.5 text-primary" />
-                  {t}
+                  <CheckCircle2 className="h-3.5 w-3.5 text-primary" /> {t}
                 </li>
               ))}
             </ul>
           </motion.div>
 
-          {/* ── Right column: floating product cards ──────────── */}
+          {/* ── Right: feature cards collage ─────────────────── */}
           <HeroVisual />
-        </div>
-
-        {/* Trust strip — light pill band, Keka style */}
-        <div className="mt-20 sm:mt-24">
-          <div className="flex flex-col items-center gap-6 rounded-2xl border border-border bg-secondary/60 px-6 py-7 sm:flex-row sm:gap-10 sm:px-10">
-            <p className="text-[12px] font-semibold uppercase tracking-[0.18em] text-muted-foreground sm:max-w-[160px] sm:border-r sm:border-border sm:pr-10">
-              Trusted by modern teams
-            </p>
-            <div className="flex flex-1 flex-wrap items-center justify-center gap-x-10 gap-y-3 text-[15px] font-semibold tracking-tight text-muted-foreground/80 sm:justify-between">
-              {LOGOS.map((name) => (
-                <span key={name} className="opacity-80 transition hover:opacity-100">
-                  {name}
-                </span>
-              ))}
-            </div>
-          </div>
         </div>
       </div>
     </section>
   );
 }
 
-const LOGOS = [
-  "Northwind",
-  "Atlas Collective",
-  "Mercer & Bell",
-  "Praxis Labs",
-  "Holloway",
-  "Sundial",
-];
-
-/* ───────────────── Floating product visual ───────────────── */
+/* ───────────────── Floating feature cards ───────────────── */
 
 function HeroVisual() {
   return (
     <motion.div
-      initial={{ opacity: 0, y: 24 }}
+      initial={{ opacity: 0, y: 18 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.7, ease: [0.2, 0.8, 0.2, 1], delay: 0.05 }}
-      className="relative mx-auto h-[480px] w-full max-w-[620px] sm:h-[540px] lg:h-[560px]"
+      transition={{ duration: 0.6, ease: [0.2, 0.8, 0.2, 1], delay: 0.05 }}
+      className="relative mx-auto h-[460px] w-full max-w-[560px] sm:h-[520px]"
     >
-      {/* Soft halo behind the cluster */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-8 -z-10 rounded-[40px] bg-[radial-gradient(ellipse_at_center,hsl(var(--primary)/0.18),transparent_70%)] blur-2xl"
-      />
-
-      {/* Card 1 — Clients */}
-      <FloatCard
-        className="left-0 top-4 w-[270px] sm:w-[300px]"
-        delay={0.15}
-        rotate={-2}
-      >
-        <CardHeader icon={<Users className="h-3.5 w-3.5" />} title="Clients" trailing="12 active" tone="violet" />
-        <div className="mt-3 space-y-2">
-          {[
-            { n: "Atlas Collective", t: "Retainer", c: "bg-emerald-500" },
-            { n: "Northwind Studio", t: "Active", c: "bg-primary" },
-            { n: "Mercer & Bell", t: "Proposal", c: "bg-amber-500" },
-          ].map((r) => (
-            <div key={r.n} className="flex items-center justify-between rounded-lg bg-secondary/60 px-2.5 py-2">
-              <div className="flex items-center gap-2">
-                <span className="grid h-6 w-6 place-items-center rounded-md bg-primary/15 text-[9px] font-bold text-primary">
-                  {r.n.split(" ").map((w) => w[0]).slice(0, 2).join("")}
-                </span>
-                <span className="text-[12px] font-medium">{r.n}</span>
-              </div>
-              <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
-                <span className={`h-1.5 w-1.5 rounded-full ${r.c}`} /> {r.t}
-              </span>
-            </div>
-          ))}
-        </div>
-      </FloatCard>
-
-      {/* Card 2 — Project / kanban */}
-      <FloatCard
-        className="right-0 top-0 w-[260px] sm:w-[290px]"
-        delay={0.25}
-        rotate={2.5}
-      >
-        <CardHeader icon={<FolderKanban className="h-3.5 w-3.5" />} title="Brand Refresh · Q3" trailing="On track" tone="emerald" />
-        <div className="mt-3 grid grid-cols-3 gap-1.5">
-          {[
-            { label: "Todo", n: 5, tone: "bg-muted-foreground/40" },
-            { label: "Doing", n: 3, tone: "bg-primary" },
-            { label: "Done", n: 8, tone: "bg-emerald-500" },
-          ].map((c) => (
-            <div key={c.label} className="rounded-lg bg-secondary/60 p-2">
-              <div className="mb-1 flex items-center justify-between text-[9px] font-semibold uppercase tracking-wider text-muted-foreground">
-                <span>{c.label}</span><span>{c.n}</span>
-              </div>
-              <div className="space-y-1">
-                <div className={`h-1 w-full rounded ${c.tone}/60`} />
-                <div className={`h-1 w-3/4 rounded ${c.tone}/40`} />
-                <div className={`h-1 w-1/2 rounded ${c.tone}/30`} />
-              </div>
-            </div>
-          ))}
-        </div>
-        <div className="mt-3 flex items-center justify-between text-[10.5px] text-muted-foreground">
-          <span className="inline-flex items-center gap-1"><Clock className="h-3 w-3" /> Due Thu</span>
-          <div className="flex -space-x-1.5">
-            {["RK", "JM", "AS"].map((i) => (
-              <span key={i} className="grid h-5 w-5 place-items-center rounded-full bg-primary/15 text-[8px] font-bold text-primary ring-2 ring-card">{i}</span>
-            ))}
-          </div>
-        </div>
-      </FloatCard>
-
-      {/* Card 3 — Invoice */}
-      <FloatCard
-        className="left-6 bottom-12 w-[240px] sm:w-[260px]"
-        delay={0.35}
-        rotate={1.5}
-      >
-        <CardHeader icon={<CircleDollarSign className="h-3.5 w-3.5" />} title="Invoice · INV-0142" trailing="Paid" tone="emerald" />
+      {/* Invoice card — top left */}
+      <FloatCard className="left-0 top-2 w-[230px] sm:w-[250px]" delay={0.1}>
+        <CardHeader icon={<CircleDollarSign className="h-3.5 w-3.5" />} title="Invoice · INV-0142" trailing="PAID" tone="emerald" />
         <div className="mt-3 flex items-baseline justify-between">
           <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Total · GST 18%</span>
-          <span className="text-lg font-semibold tracking-tight">₹86,400</span>
+          <span className="text-[17px] font-bold tracking-tight">₹86,400</span>
         </div>
         <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-secondary">
-          <div className="h-full w-full rounded-full bg-gradient-to-r from-emerald-400 to-emerald-500" />
+          <div className="h-full w-full rounded-full bg-emerald-500" />
         </div>
-        <p className="mt-2 text-[10.5px] text-muted-foreground">Settled via Razorpay · 2 days ago</p>
+        <p className="mt-2 text-[10.5px] text-muted-foreground">Settled · 2 days ago</p>
       </FloatCard>
 
-      {/* Card 4 — AI prompt */}
-      <FloatCard
-        className="right-2 bottom-6 w-[270px] sm:w-[300px]"
-        delay={0.45}
-        rotate={-2}
-        glow
-      >
-        <CardHeader icon={<Sparkles className="h-3.5 w-3.5" />} title="Ask Stackivo" trailing="grounded" tone="violet" />
-        <p className="mt-3 text-[12.5px] leading-snug text-foreground">
-          &ldquo;Draft a status note for{" "}
-          <span className="font-mono text-primary">Atlas Collective</span>{" "}
-          based on this week&apos;s shipped tasks.&rdquo;
-        </p>
-        <div className="mt-3 space-y-1">
-          <div className="h-1.5 w-11/12 rounded bg-foreground/12" />
-          <div className="h-1.5 w-3/4 rounded bg-foreground/10" />
-          <div className="h-1.5 w-5/6 rounded bg-foreground/8" />
+      {/* Contract / e-sign card — top right */}
+      <FloatCard className="right-0 top-0 w-[240px] sm:w-[260px]" delay={0.2}>
+        <CardHeader icon={<FileSignature className="h-3.5 w-3.5" />} title="Service Agreement" trailing="SIGNED" tone="violet" />
+        <div className="mt-3 rounded-lg bg-secondary/70 p-3">
+          <p className="text-[10.5px] uppercase tracking-wider text-muted-foreground">E-signature</p>
+          <p className="mt-1 font-serif text-[20px] italic leading-none text-foreground">Riya Kapoor</p>
+          <p className="mt-1.5 text-[10px] text-muted-foreground">Signed · 14 Jun 2026</p>
         </div>
-        <div className="mt-3 inline-flex items-center gap-1.5 text-[10px] text-muted-foreground">
-          <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-primary">
-            <span className="absolute inset-0 animate-ping rounded-full bg-primary/60" />
+      </FloatCard>
+
+      {/* Time tracking — middle */}
+      <FloatCard className="left-4 top-[42%] w-[260px] sm:w-[280px]" delay={0.3}>
+        <CardHeader icon={<Clock className="h-3.5 w-3.5" />} title="Time tracker" trailing="LIVE" tone="violet" />
+        <div className="mt-3 flex items-center justify-between">
+          <div>
+            <p className="text-[10.5px] text-muted-foreground">Atlas Collective · Design</p>
+            <p className="mt-0.5 font-mono text-[22px] font-bold tabular-nums tracking-tight text-foreground">
+              01:24:36
+            </p>
+          </div>
+          <span className="grid h-9 w-9 place-items-center rounded-full bg-primary text-primary-foreground">
+            <span className="h-2.5 w-2.5 rounded-sm bg-current" />
           </span>
-          Reading workspace context · 9 sources
+        </div>
+        <div className="mt-3 flex items-center gap-1">
+          {[60, 80, 45, 90, 70, 55, 85].map((h, i) => (
+            <div key={i} className="flex-1 rounded-sm bg-primary/20" style={{ height: `${h / 4}px` }} />
+          ))}
         </div>
       </FloatCard>
 
-      {/* Card 5 — small doc badge */}
-      <FloatCard
-        className="left-1/2 top-1/2 hidden w-[180px] -translate-x-1/2 -translate-y-1/2 sm:block"
-        delay={0.55}
-        rotate={-1}
-        compact
-      >
+      {/* Reminder card — bottom right */}
+      <FloatCard className="right-2 bottom-2 w-[240px] sm:w-[260px]" delay={0.4}>
+        <CardHeader icon={<BellRing className="h-3.5 w-3.5" />} title="Payment reminder" trailing="SENT" tone="amber" />
+        <p className="mt-3 text-[12px] leading-snug text-foreground">
+          Friendly nudge sent to{" "}
+          <span className="font-semibold">Northwind Studio</span> · invoice
+          due in 3 days.
+        </p>
+        <div className="mt-3 flex items-center gap-1.5 text-[10px] text-muted-foreground">
+          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+          Auto-follow-up every 7 days
+        </div>
+      </FloatCard>
+
+      {/* Tiny doc badge bottom left */}
+      <FloatCard className="left-2 bottom-6 hidden w-[180px] sm:block" delay={0.5} compact>
         <div className="flex items-center gap-2">
-          <span className="grid h-8 w-8 place-items-center rounded-lg bg-primary/12 text-primary">
+          <span className="grid h-8 w-8 place-items-center rounded-lg bg-primary/10 text-primary">
             <FileText className="h-4 w-4" />
           </span>
           <div className="min-w-0">
-            <p className="truncate text-[12px] font-semibold">SOW · v3 signed</p>
-            <p className="text-[10px] text-muted-foreground">Riya K · 2m ago</p>
+            <p className="truncate text-[12px] font-bold">SOW · v3</p>
+            <p className="text-[10px] text-muted-foreground">Awaiting sign</p>
           </div>
+          <ArrowRight className="ml-auto h-3.5 w-3.5 text-muted-foreground" />
         </div>
       </FloatCard>
     </motion.div>
@@ -283,24 +169,20 @@ function FloatCard({
   children,
   className,
   delay = 0,
-  rotate = 0,
-  glow,
   compact,
 }: {
   children: React.ReactNode;
   className?: string;
   delay?: number;
-  rotate?: number;
-  glow?: boolean;
   compact?: boolean;
 }) {
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20, rotate: 0 }}
-      animate={{ opacity: 1, y: 0, rotate }}
-      transition={{ duration: 0.7, ease: [0.2, 0.8, 0.2, 1], delay }}
-      whileHover={{ y: -4, rotate: 0, transition: { duration: 0.3 } }}
-      className={`absolute rounded-2xl border border-border/80 bg-card ${compact ? "p-3" : "p-4"} shadow-[0_18px_40px_-12px_hsl(var(--foreground)/0.18)] backdrop-blur ${glow ? "ring-1 ring-primary/20" : ""} ${className ?? ""}`}
+      initial={{ opacity: 0, y: 14 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.55, ease: [0.2, 0.8, 0.2, 1], delay }}
+      whileHover={{ y: -3, transition: { duration: 0.2 } }}
+      className={`absolute rounded-2xl border border-border bg-card ${compact ? "p-3" : "p-4"} shadow-[0_10px_30px_-12px_rgba(15,23,42,0.18)] ${className ?? ""}`}
     >
       {children}
     </motion.div>
@@ -316,20 +198,26 @@ function CardHeader({
   icon: React.ReactNode;
   title: string;
   trailing?: string;
-  tone?: "violet" | "emerald";
+  tone?: "violet" | "emerald" | "amber";
 }) {
-  const toneClasses =
-    tone === "emerald"
-      ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-      : "bg-primary/10 text-primary";
+  const tones = {
+    violet: "bg-primary/10 text-primary",
+    emerald: "bg-emerald-500/10 text-emerald-600",
+    amber: "bg-amber-500/10 text-amber-600",
+  } as const;
+  const pillTones = {
+    violet: "bg-primary/10 text-primary",
+    emerald: "bg-emerald-500/10 text-emerald-700",
+    amber: "bg-amber-500/15 text-amber-700",
+  } as const;
   return (
     <div className="flex items-center justify-between">
       <div className="flex items-center gap-2">
-        <span className={`grid h-6 w-6 place-items-center rounded-md ${toneClasses}`}>{icon}</span>
-        <span className="text-[12px] font-semibold tracking-tight">{title}</span>
+        <span className={`grid h-6 w-6 place-items-center rounded-md ${tones[tone ?? "violet"]}`}>{icon}</span>
+        <span className="text-[12px] font-bold tracking-tight">{title}</span>
       </div>
       {trailing ? (
-        <span className="rounded-full bg-secondary px-2 py-0.5 text-[9.5px] font-semibold uppercase tracking-wider text-muted-foreground">
+        <span className={`rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider ${pillTones[tone ?? "violet"]}`}>
           {trailing}
         </span>
       ) : null}
